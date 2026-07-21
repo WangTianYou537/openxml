@@ -1,0 +1,56 @@
+[package]
+name = "openxml"
+version = "0.1.0"
+edition = "2021"
+description = "Rust port of the Open XML SDK — work with Word, Excel, and PowerPoint documents"
+license = "MIT"
+readme = "README.md"
+keywords = ["openxml", "docx", "xlsx", "pptx", "office"]
+categories = ["encoding", "parser-implementations"]
+
+[dependencies]
+zip = { version = "2", default-features = false, features = ["deflate"] }
+quick-xml = { version = "0.37", features = ["serialize"] }
+thiserror = "2"
+indexmap = "2"
+serde_json = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+base64 = "0.22"
+rsa = { version = "0.9", default-features = false, features = ["std", "sha2"] }
+rand = "0.8"
+pkcs8 = { version = "0.10", features = ["pem"] }
+spki = { version = "0.7", features = ["pem"] }
+ttf-parser = "0.25"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "openxml-codegen"
+path = "src/bin/openxml-codegen.rs"
+
+[[example]]
+name = "create_word"
+path = "examples/create_word.rs"
+
+[[example]]
+name = "read_word"
+path = "examples/read_word.rs"
+
+[[example]]
+name = "create_report"
+path = "examples/create_report.rs"
+
+[[example]]
+name = "create_spreadsheet"
+path = "examples/create_spreadsheet.rs"
+
+[[example]]
+name = "create_ppt_with_svg"
+path = "examples/create_ppt_with_svg.rs"
+
+[[example]]
+name = "create_ppt_from_svg_shapes"
+path = "examples/create_ppt_from_svg_shapes.rs"
+

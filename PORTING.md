@@ -1,0 +1,760 @@
+# Porting plan: Open-XML-SDK → Rust (`/opt/wp/openxml`)
+
+This document tracks how the C# Open XML SDK maps onto the Rust crate and what remains.
+
+## Source layout (C#)
+
+| C# path | Role |
+|---------|------|
+| `src/DocumentFormat.OpenXml.Framework/` | OPC, DOM, simple types, validation |
+| `src/DocumentFormat.OpenXml/Packaging/` | Word / Excel / PPT package APIs |
+| `data/schemas/*.json` | Schema types for codegen (~157 files) |
+| `data/parts/*.json` | Part graph + content/relationship types |
+| `data/namespaces.json` | Prefix ↔ URI table |
+| `generated/` | Pre-generated typed C# (reference output) |
+| `gen/` | Roslyn source generator |
+
+## Rust layout
+
+```text
+src/
+  opc/            ZIP + [Content_Types].xml + .rels + core props   ✅
+  element/        OpenXmlElement DOM + XML R/W                     ✅
+  simple_types/   StringValue, OnOffValue, Int32Value, …           ✅
+  packaging/      Document packages + parts                        ✅ (core)
+  wordprocessing/ Hand-written Word helpers                        ✅ (minimal)
+  spreadsheet/    Hand-written Excel helpers                       ✅ (minimal)
+  presentation/   Hand-written PPT helpers                         ✅ (minimal)
+  generated/      Codegen output from C# data/*.json               ✅
+  namespace.rs    Constants                                         ✅
+  error.rs        Error type                                        ✅
+  bin/openxml-codegen.rs  Schema/part/namespace generator          ✅
+```
+
+## Completed (MVP + codegen + parts + Flat OPC)
+
+- [x] OPC package open/create/save
+- [x] Content types + relationships round-trip
+- [x] Untyped DOM with parse/serialize
+- [x] `WordprocessingDocument` create/open/save + paragraph text
+- [x] `SpreadsheetDocument` create/open + string grid I/O
+- [x] `PresentationDocument` create/open + empty slide
+- [x] Integration tests + examples
+- [x] `openxml-codegen` binary reading C# `data/schemas`, `data/parts`, `data/namespaces.json`
+- [x] Generated WordprocessingML / SpreadsheetML / PresentationML / DrawingML 2D main
+- [x] Generated part metadata for all 100+ parts
+- [x] Generated namespace prefix table
+- [x] Simple types (`StringValue`, `OnOffValue`, integers, `HexBinaryValue`, …)
+- [x] Package core properties (`docProps/core.xml`)
+- [x] Typed attribute get/set helpers on `OpenXmlElement`
+- [x] Word styles, settings, image parts
+- [x] Word headers / footers / hyperlinks
+- [x] Word comments + find/replace
+- [x] Word numbering + theme + document clone
+- [x] Word tables (`table_from_strings` / `table_to_strings`)
+- [x] Word altChunk (HTML/text/RTF import)
+- [x] Excel shared strings + multiple worksheets + column widths
+- [x] Excel merge cells + minimal stylesheet + formula cells
+- [x] PowerPoint multi-slide + text box helpers + slide size
+- [x] Flat OPC (`to_flat_opc` / `from_flat_opc`)
+- [x] Schema enum codegen (`HighlightColorValues`, …) implementing `OpenXmlSimpleType`
+- [x] Markup Compatibility helpers (`AlternateContent` / Choice / Fallback)
+- [x] Strict → Transitional namespace & relationship rewrite
+
+## Next milestones
+
+### M1 — Codegen depth
+- [x] Schema/part/namespace JSON readers
+- [x] Element factories + `ElementInfo` / `PartInfo` tables
+- [x] Attribute + child metadata (with base-type inheritance)
+- [x] Generate **all** 155 schema modules (`--schema all`)
+- [x] Schema enum types with `as_str` / `from_str` / `OpenXmlSimpleType`
+- [x] Typed attribute setter helpers (`bold_val`, `paragraph_with_rsid_*`, …)
+- [x] Part child constraints (`is_allowed_child`, `allows_multiple`, `PartChildConstraint`)
+
+### M2 — Simple types + attributes
+- [x] `StringValue`, `OnOffValue`, `Int32Value`, `HexBinaryValue`, …
+- [x] Attribute get/set by qname + simple-type helpers
+- [x] Full `EnumValue`-style enums from schema (as native Rust enums)
+
+### M3 — Full Word part graph
+- [x] Styles, settings, headers/footers, images
+- [x] Comments, numbering, theme
+- [x] Find/replace text across runs
+- [x] Tables
+- [x] Embedded objects / altChunk
+
+### M4 — Excel & PowerPoint depth
+- [x] Shared strings, multiple worksheets
+- [x] Multi-slide + text bodies
+- [x] Excel column widths
+- [x] Excel styles / merged cells / formulas
+- [x] Presentation slide size
+- [x] Slide masters/layouts (blank master + layout + slide link)
+
+### M5 — Parity features
+- [x] Flat OPC
+- [x] Markup compatibility helpers (build + resolve AlternateContent)
+- [x] Strict ↔ Transitional namespace rewrite
+- [x] MC Ignorable processing (strip unsupported prefixes)
+- [x] MC ProcessContent / PreserveElements / PreserveAttributes
+- [x] Lightweight schema validation (Document/Body/Paragraph/Run rules)
+- [x] Ordered particle matching (sequence/choice/group/all) for core Word types
+- [x] Particle codegen from schema JSON (`particle_for_class`, 165 Word particles, …)
+- [x] Word footnotes / endnotes parts
+- [x] PowerPoint notes slides
+- [x] Excel bar/column chart parts (embedded literals)
+- [x] On-sheet chart anchors / drawings parts (`add_bar_chart_on_sheet`)
+- [x] On-sheet image anchors (`add_image_on_sheet`, oneCell/absolute/twoCell)
+- [x] MC FileFormatVersions matrix + version-targeted processing
+- [x] Complete prefix→version table generated from namespaces.json
+- [x] Worksheet cell comments (`add_sheet_comments` / `sheet_comments`)
+- [x] Conditional formatting (cellIs + colorScale + dxfs)
+- [x] Pivot tables (cache definition/records + pivotTableDefinition)
+
+### M6 — Gap-analysis P0/P1 follow-ups
+- [x] Extended file properties (`docProps/app.xml`) + Custom properties (`docProps/custom.xml`)
+- [x] Word CustomXml parts (`add_custom_xml_part` / `custom_xml_parts`)
+- [x] `CreateFromTemplate` + `ChangeDocumentType` (Word; Excel template clone)
+- [x] Package structure validation (`validate_package` — main part + rel targets)
+- [x] Excel line/pie chart parts + fill/numFmt stylesheet helpers
+- [x] Encrypted Office detection (`IsEncryptedOfficeFile` / `Error::EncryptedPackage`)
+- [x] Full simple-type set (Base64, DateTime, List, TrueFalse*, Int16/Byte/…)
+- [x] Excel defined names (`set_defined_names` / `defined_names`)
+- [x] Word font table + web settings parts
+- [x] Excel table / autoFilter / data validation list
+- [x] PowerPoint image on slide
+- [x] Word SDT content controls (`sdt_block` / `sdt_run` / `collect_sdt_tags`)
+- [x] Excel calculation chain part
+- [x] Element structural equality (`elements_equal`)
+- [x] Thumbnail part + `MaxCharactersInPart` DoS guard
+- [x] Excel comments VML drawing companion
+- [x] Word track changes (`ins`/`del` helpers + accept/reject)
+- [x] PowerPoint table on slide
+- [x] OpenSettings MarkupCompatibility process mode
+- [x] Word document protection + glossary document part
+- [x] PowerPoint notes master
+- [x] Excel sheet/workbook protection
+- [x] Word embedded package part
+- [x] Word bookmarks (`bookmark_start`/`end`, `collect_bookmarks`)
+- [x] Excel freeze panes
+- [x] PowerPoint handout master
+- [x] Word/Excel page setup + Word simple fields
+- [x] Streaming XML reader (`OpenXmlStreamReader`)
+- [x] Linq-style element query helpers (`element::linq`)
+- [x] Lazy ZIP part load (`OpcPackage::open_lazy` / `open_bytes_lazy` / `load_part`)
+- [x] Attribute simple-type validation
+- [x] PPT CreateFromTemplate
+- [x] Digital signature origin/sig part shells (no crypto)
+- [x] Media data parts (audio/video) + PPT attach helpers
+- [x] Excel row heights / hidden rows
+- [x] Word internal (anchor) hyperlinks + mail-merge recipients part
+- [x] Excel scatter chart + tab color + print area
+- [x] Word page-number footer helper
+- [x] Word document variables + TOC field
+- [x] Excel sparklines (`x14`)
+- [x] Semantic relationship-id validation subset
+- [x] Excel area chart
+- [x] Word document background + drop cap
+- [x] Excel sheet dimension + shared formulas
+- [x] PowerPoint sections (`p14:sectionLst`)
+- [x] Word VML text watermark
+- [x] Excel active tab (`bookViews`)
+- [x] Excel sheet state + calcPr + dataBar/iconSet CF
+- [x] PowerPoint hide slide
+- [x] Excel row outline levels
+- [x] Word even/odd headers + caption field + ruby
+- [x] Word OMML math (fraction)
+- [x] Excel sheet zoom
+- [x] Word docDefaults + bibliography customXml
+- [x] Excel external workbook link shell
+- [x] PowerPoint theme part
+- [x] Word page borders
+- [x] Excel rich-text cells + chartsheet
+- [x] Word VBA project shell + commentsExtended
+- [x] Excel slicer shell + workbook theme
+- [x] Word people part + customXml itemProps
+- [x] Excel connections part
+- [x] Word printer settings shell
+- [x] PPT presentation/view properties
+- [x] Excel queryTable + volatileDependencies shells
+- [x] PPT comment authors
+- [x] Word customUI + document tasks shells
+- [x] Excel timeline shell
+- [x] PPT slide comments
+- [x] Excel named Title cell style
+- [x] Excel print titles
+- [x] Word paragraph styles + table style helper + web extension shell
+- [x] Word track revisions + compatibility mode settings
+- [x] Excel sheetFormatPr + doughnut chart
+- [x] Excel pivot cache with real row data
+- [x] Word updateFields on open
+- [x] PPT table styles part
+- [x] Word tabs/symbol/mirror margins
+- [x] Excel show gridlines/headers
+- [x] PPT clone slide + notes size
+- [x] PPT slide transitions (fade/dissolve/custom)
+- [x] Excel cell hyperlinks + sort state + whole-number DV
+- [x] Word paragraph spacing/shading/highlight
+- [x] Word page/column breaks + indent + page number start
+- [x] Excel row/col page breaks
+- [x] PPT simple appear animation
+- [x] Word DATE/TIME/AUTHOR fields + run spacing/lang
+- [x] Excel array formula + local defined names + show formulas
+- [x] PPT slide header/footer flags
+- [x] Word run/paragraph formatting (jc, borders, strike, underline, color, size)
+- [x] Word SmartArt/diagram shell
+- [x] PPT solid slide background
+- [x] Excel XML maps shell
+- [x] Excel chart styles/colors, dialogsheet, named sheet views, custom data
+- [x] Word label info + embedded OLE object
+- [x] PPT modern comments/authors
+- [x] Excel single-cell table, rich values, feature bags, macrosheet, theme override
+- [x] Word stylesWithEffects, vbaData, customization, QAT
+- [x] PPT user tags, 3D model, slide sync
+- [x] Excel threaded comments, persons, revisions, sort map, metadata, rich data extras
+- [x] Word commentsIds, commentsExtensible, attached toolbars
+- [x] Excel chart drawing, extended chart, intl macrosheet, web image, ActiveX control
+- [x] Word legacy diagram text + embedded package part
+- [x] PPT chart drawing shell
+- [x] CustomProperty + Font parts (Word/Excel/PPT)
+- [x] Word/PPT embedded chart parts
+- [x] Diagram persist layout (drawing) part in diagram shell
+- [x] Semantic validation: unique-attribute + expanded rel rules (Word/Excel/PPT)
+- [x] Excel/PPT validate_relationships + delete_part APIs
+- [x] Radar/bubble charts + ExtendedPart + PPT clone_document
+- [x] Spreadsheet attribute range validation subset
+- [x] Excel border stylesheet + set_cell_style
+- [x] PPT auto-shape / text-box on slide + remove_slide
+- [x] Excel rename_sheet / remove_sheet
+- [x] Excel set_cell_value/number/styled + Word paragraph styles
+- [x] Excel get_cell_value + Word append/remove paragraphs + PPT move_slide
+- [x] Word append_table / body_tables_as_strings
+- [x] Excel insert_rows / delete_row
+- [x] Excel copy_sheet / clear_cell + PPT add_blank_slide
+- [x] Excel clear_range + Word run/paragraph formatting helpers
+- [x] Excel read_range/write_range + PPT replace_slide_text
+- [x] Excel set_column_hidden + Word append_bullet_list
+- [x] Excel find_cells / replace_in_sheet + PPT set_slide_text
+- [x] Excel used_range + Word paragraph_count/word_count/insert_paragraph_at + PPT notes_text
+- [x] Excel move_sheet / sheet_names + Word bookmarks()
+- [x] Excel merge_range/unmerge/clear_sheet/cell_count + Word heading/hyperlink/clear_body
+- [x] Excel insert/delete column + Word append_table_row + PPT all_slide_texts
+- [x] Excel auto_filter get/clear + set_row_hidden + Word remove_table + PPT shape_count
+- [x] Excel list_cell_hyperlinks + is_macro_enabled/part_count (all docs)
+- [x] Excel remove_cell_hyperlink/shared_string_count + Word/PPT contains_text
+- [x] Excel add/remove defined name + sheet_index + Word char count + PPT has_notes
+- [x] ensure/has styles & theme helpers (Word/Excel/PPT)
+- [x] list_headers/footers + media/chart counts
+- [x] remove header/footer + list drawings + master/layout counts
+- [x] has_charts/comments/footnotes/numbering/media flags
+- [x] list_part_uris + relationship counts + has_shared_strings/calc_chain
+- [x] Excel tables/protection flags + PPT hidden slides + Word SDT tags
+- [x] clear sheet/workbook/document protection + external link list/count
+- [x] track revisions / watermark / freeze panes / sections / transition flags
+- [x] zoom/tab color/print area/sheet state getters + updateFields/compat mode
+- [x] slide/notes size + background getters + sheet_dimension
+- [x] doc vars/customXml/glossary flags + DV/calc chain + animation/hf flags
+- [x] CF/sparkline/sort/DV clear flags + footnote/endnote/comment counts
+- [x] Excel slicer/timeline/connections/queryTable/pivot counts + presence flags
+- [x] Word people/mail-merge/web settings/printer settings presence flags
+- [x] PPT handout master / user tags / slide sync presence flags
+- [x] Excel clear_sparklines / clear_print_area/titles / clear_sheet_tab_color
+- [x] Excel show_formulas / show_row_col_headers getters
+- [x] Word list_comments / clear_comments / list_styles
+- [x] PPT list_sections / clear_sections / clear_slide_background
+- [x] Excel column_widths / row_heights / freeze_panes getters
+- [x] Excel get_page_margins / get_page_setup / clear_sheet_comments
+- [x] Word list_footnotes/endnotes / page_size / page_margins / count_text
+- [x] PPT get_slide_transition
+- [x] Excel table_infos / shared_strings_list / is_row_hidden / is_column_hidden
+- [x] Excel row_outline_levels getter
+- [x] Word header_texts / footer_texts / list_external_hyperlinks / document_protection_edit
+- [x] PPT clear_notes
+- [x] Excel remove_table / list_data_validations / clear_calc_chain / get_cell_style_index
+- [x] Word clear_headers/footers / remove_external_hyperlink
+- [x] PPT slide_title / slide_titles
+- [x] Excel list_formulas / row_breaks / col_breaks getters
+- [x] Word paragraph_style_ids / clear_numbering
+- [x] PPT slides_with_transition
+- [x] Excel list_conditional_formatting / clear_shared_strings
+- [x] Word remove/clear custom_xml parts
+- [x] PPT list_media / clear_notes_master / clear_handout_master
+- [x] Excel clear_external_links / list_pivot_tables / pivot_table_infos
+- [x] Word clear_glossary / list_alt_chunks
+- [x] PPT list_charts
+- [x] Excel sheet_format getter
+- [x] Word remove_bookmark
+- [x] PPT clear_user_defined_tags / clear_slide_sync_data
+- [x] Excel get_calc_properties / clear_drawings
+- [x] Word has/clear_thumbnail
+- [x] PPT list_masters / list_layouts
+- [x] Excel clear_slicers/timelines/connections/query_tables/volatile_deps/theme
+- [x] Word clear_theme / clear_vba_project / clear_font_table
+- [x] PPT clear_theme
+- [x] Excel clear_styles / list_media
+- [x] Word clear_styles / clear_settings / digital signature inventory+clear
+- [x] PPT clear_media
+- [x] Word clear_people / mail_merge / web_settings / printer_settings
+- [x] Excel clear_charts / clear_pivot_tables
+- [x] PPT has/clear presentation + view properties
+- [x] Word clear_images / clear_footnotes / clear_endnotes
+- [x] Excel clear_media
+- [x] PPT clear_charts
+- [x] Excel list_named_styles
+- [x] Word clear_alt_chunks
+- [x] PPT has/clear_table_styles
+- [x] Word remove/clear document variables + content_control_count
+- [x] Excel clear_cell_hyperlinks
+- [x] Excel list_hidden_sheets / clear_merge_cells / list_array_formulas
+- [x] Excel list_number_formats / list_shared_formulas
+- [x] PPT slides_with_animation
+- [x] Excel list_style_fonts
+- [x] Word list_font_names
+- [x] PPT notes_master_count / handout_master_count
+- [x] Excel get_defined_name / list_sheet_states
+- [x] PPT section_count
+- [x] Excel sheet_count / table_columns
+- [x] Word list_anchor_hyperlinks
+- [x] PPT list_hidden_slides
+- [x] Excel column_count / clear_row_breaks / clear_col_breaks
+- [x] Word list_style_ids
+- [x] PPT clear_slide_comments
+- [x] Excel list_fills / sheet_protection_flags / workbook_protection_flags
+- [x] Word clear_watermark
+- [x] Excel has_auto_filter / border_count
+- [x] Word has/clear_page_borders / page_border_color
+- [x] PPT clear_slide_header_footer
+- [x] Word clear_document_background
+- [x] Excel dxf_count
+- [x] PPT slides_with_notes
+- [x] Word mirror_margins_enabled
+- [x] Excel list_calc_chain
+- [x] PPT slides_with_background
+- [x] Word even_odd_headers_enabled
+- [x] Excel table_names
+- [x] PPT slides_with_comments (per-slide rel only)
+- [x] Excel is_sheet_hidden
+- [x] Word clear_even_odd_headers
+- [x] PPT slides_with_header_footer
+- [x] Excel list_hidden_rows / list_hidden_columns
+- [x] Excel has_print_area / has_print_titles
+- [x] Excel merge_cell_count / has_merge_cells
+- [x] Word get_document_variable / has_bookmarks / list_bookmark_names / image_count
+- [x] PPT transition_count / animation_count
+- [x] Excel defined_name_count / has_defined_names / drawing_count / has_tables
+- [x] Excel row/col break counts + has_* flags
+- [x] Word header_count / footer_count / external_hyperlink_count / has_external_hyperlinks
+- [x] PPT notes_count / total_shape_count
+- [x] Excel formula_count / has_formulas / cell_hyperlink_count / has_cell_hyperlinks
+- [x] Excel named_style/number_format/style_font/fill counts
+- [x] Excel array_formula_count / shared_formula_count
+- [x] Word style_count / font_count
+- [x] PPT has_charts / slide_comments_count / background_count / header_footer_count
+- [x] Excel slicer_count / timeline_count / connection_count
+- [x] Excel has_page_margins / has_page_setup
+- [x] Word people_count / mail_merge_recipient_count / printer_settings_count
+- [x] PPT has_any_properties / has_any_master_extras / extra_master_count
+- [x] Excel has/clear_active_tab / has/clear_zoom
+- [x] Excel has/clear_sheet_dimension / has_sheet_format
+- [x] Word clear_mirror_margins / has_page_size / has_page_margins
+- [x] PPT has_slide_size / has_notes_size
+- [x] Word/Excel/PPT has_package/extended/custom properties + custom_property_count
+- [x] Word/Excel/PPT set_title/title / set_creator/creator convenience
+- [x] CustomProperties len/is_empty/names/remove/clear
+- [x] Word/Excel/PPT subject/keywords/description/category convenience
+- [x] Word/Excel/PPT application/company convenience
+- [x] Word/Excel/PPT custom property string get/set/remove/clear
+- [x] Word/Excel/PPT last_modified_by / revision / language / version / content_status
+- [x] Word/Excel/PPT manager / template / hyperlink_base convenience
+- [x] Excel threaded comments / persons / chart styles / rich data / feature bag flags
+- [x] Word custom UI / vbaData / stylesWithEffects / commentsIds/Ex/Extensible flags
+- [x] PPT tag/sync counts / comment authors / model3d flags
+- [x] Excel clear_threaded_comments / clear_persons / clear_chart_styles / clear_named_sheet_views / clear_rich_data / clear_feature_property_bag
+- [x] Word clear_custom_ui / clear_vba_data / clear_styles_with_effects / clear_comments_ids/extensible/extended
+- [x] PPT clear_comment_authors / clear_model_3d
+- [x] Excel list_query_tables / query_table_infos / list_persons / list_threaded_comment_entries / list_chart_styles
+- [x] PPT list_comment_authors / list_user_defined_tag_entries / list_slide_sync_parts
+- [x] Word document_tasks / web_extensions / customization / QAT / label_info / attached_toolbars / diagrams / embeddings inventory+clear
+- [x] Excel chartsheet/dialogsheet/macrosheet/xmlMaps/sortMap/revision/single-cell/ActiveX/toolbars inventory+clear
+- [x] Excel cell metadata / chart drawings / theme override / custom data / supporting property bags inventory+clear
+- [x] PPT modern comments/authors + chart drawings inventory+clear
+- [x] Schematron extractable subset: 63 rel + 115 unique-attr + 236 numeric range + 184 string-length + 15 pattern + 37 enum + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count + 17 fixed-val + 7 fixed-ne + 12 multi-ne + 9 both-present + 7 finite + 5 required-attr (948 of 948 source rules)
+- [x] `validate_schematron` / `validate_schematron_subset` / `validate_schematron_constraints` + merged rule tables for Word/Excel/PPT
+- [x] `scripts/generate_schematron_rules.py` regenerator (rules + constraints)
+- [x] Excel/PPT thumbnail / digital-signature shell / customXml inventory APIs (parity with Word)
+- [x] Excel/PPT embeddings + VBA project shell inventory APIs (parity with Word)
+- [x] Excel/PPT customUI add/has/clear (parity with Word)
+- [x] Excel/PPT printer settings + QAT; PPT attached toolbars (parity with Word)
+- [x] Excel/PPT MIP label info add/has/clear (parity with Word)
+- [x] Excel/PPT web extension shell add/has/clear (parity with Word)
+- [x] Word/Excel/PPT font parts has/list/count/clear inventory
+- [x] Word chart inventory (has/list/count/clear); Excel/PPT diagram inventory
+- [x] Excel/PPT `open_with_settings` / `create_with_settings` (parity with Word)
+- [x] Excel/PPT `create_simple` shortcuts (parity with Word)
+- [x] Excel/PPT `validate`/`validate_full` convenience + `add_custom_xml_properties`
+- [x] Word/Excel/PPT `from_bytes` + `remove_part` aliases
+- [x] Excel/PPT images has/list/count/clear; Word `has_images`
+- [x] Word/Excel/PPT theme_count / list_themes
+- [x] styles_count (Word/Excel) + PPT has_styles/clear_styles aliases
+- [x] Excel/PPT comments has/list/clear inventory (parity with Word)
+- [x] Excel/PPT `add_embedded_object` OLE shell (parity with Word)
+- [x] Excel/PPT `add_diagram_shell` SmartArt parts (parity with Word)
+- [x] Excel/PPT `list_main_relationships` / `main_relationship_count` aliases
+- [x] Excel `list_comments` / `comment_count` over classic comments parts
+- [x] Excel/PPT `add_embedded_package_part` alias
+- [x] Excel/PPT `add_legacy_diagram_text` shell
+- [x] Excel/PPT `add_chart` convenience (bar chart / slide 0)
+- [x] Excel/PPT `add_image` media-part helper (unanchored)
+- [x] Excel `add_default_styles` / `list_style_ids` / `style_count`
+- [x] Word media aliases; Excel has_media + hyperlink inventory (has/list/count/clear)
+- [x] Word/PPT drawings has/list/count/clear inventory
+- [x] PPT slide hyperlink list/count/clear inventory
+- [x] Excel `clear_tables` / `list_defined_names` / `clear_defined_names`
+- [x] Hyperlink has/list/clear naming parity across Word/Excel/PPT
+- [x] Excel `has_workbook_protection` / `has_sheet_protection` aliases
+- [x] Excel/PPT `create_from_template_as`; Word `has_document_protection`
+- [x] Excel pivot cache has/list/count/clear + sheets_with_sparklines
+- [x] Excel merge/hidden inventory; PPT master/layout aliases; Word list_document_variables
+- [x] Excel page breaks has/list/clear inventory
+- [x] PPT `has_notes_slides` / `clear_all_notes`
+- [x] PPT `has_any_transition` / `clear_all_transitions` / animation bulk clear
+- [x] PPT bulk clear backgrounds + header/footers
+- [x] Word/Excel/PPT `validate_schematron_attributes` convenience
+- [x] Excel `get_zoom` / `has_sheet_view` helpers
+- [x] Excel tab color set/get/clear + dimension/autofilter aliases
+- [x] Word settings zoom set/get/clear; PPT clear_slide_size / clear_notes_size
+- [x] Word settings view / defaultTabStop / docGrid helpers
+- [x] Excel workbook view inventory; Word `has_track_revisions`
+- [x] Word settings autoHyphenation / embedTrueTypeFonts / savePreviewPicture / gutterAtTop
+- [x] Word hideSpelling/GrammaticalErrors / printHiddenText / printFormsData; Excel gridlines_visible
+- [x] Word displayBackgroundShape / pageBoundaries / autoCompress / printTwoOnOne / strictFirstAndLastChars
+- [x] Word formsDesign / removePersonalInfo / shadeFormData / printPostScript / border surround flags
+- [x] Word East-Asian/spacing settings (FE layout, kinsoku, suppress spacing, etc.)
+- [x] Excel sheet view `rightToLeft` set/get helpers
+- [x] Excel `showZeros` helpers; Word `characterSpacingControl`
+- [x] Excel `showOutlineSymbols` + `sheet_view_type`
+- [x] Excel workbookPr `date1904` / `backupFile` / `filterPrivacy`
+- [x] Excel codeName/themeVersion/refreshAllConnections; PPT firstSlideNum/rtl; Word attachedTemplate
+- [x] Excel workbookPr extended: dateCompatibility/showObjects/updateLinks/autoCompressPictures/…
+- [x] PPT presentation attrs: serverZoom/compatMode/embedTrueTypeFonts/conformance/…
+- [x] Word compat inventory: set/has/list compat flags + compatSetting + clear
+- [x] Excel sheetView (tabSelected/showRuler/topLeftCell/zoom scales) + printOptions + pageSetup attrs + sheetPr + calcPr extended
+- [x] PPT viewProps lastView/showComments/gridSpacing
+- [x] Excel workbookView firstSheet/tabRatio/window/scroll/tabs/visibility/autoFilterDateGrouping
+- [x] Word settings decimalSymbol/listSeparator/hyphenation/bookFold/themeFontLang/drawingGrid/…
+- [x] PPT showPr (loop/narration/animation/timings/mode) + prnPr frame/hidden/scale
+- [x] Excel sheetFormatPr baseColWidth/zeroHeight/thickTop/Bottom/outline levels + clear
+- [x] Word proofState spelling/grammar
+- [x] Excel sheet headerFooter odd/even/first + flags
+- [x] PPT custom shows (add/list/remove/clear)
+- [x] Word writeProtection recommended shell
+- [x] Word sectPr orientation/columns/titlePg/vAlign/section type/bidi/header-footer distance
+- [x] Excel activeCell/selection + sortState read/caseSensitive
+- [x] Word line numbering / page number format / textDirection / gutter / paperSrc / rtlGutter
+- [x] Excel protectedRanges / ignoredErrors / scenarios inventory
+- [x] PPT photoAlbum / kinsoku / slide headerFooter getters
+- [x] Word revisionView / documentType / captions / mathPr / clrSchemeMapping
+- [x] Excel customSheetViews inventory
+- [x] Excel oleObjects / controls / webPublishItems shells
+- [x] PPT modifyVerifier shell
+- [x] Word forceUpgrade / XML validation-related settings flags
+- [x] Word rsids / attachedSchema / saveThroughXslt
+- [x] PPT embeddedFontLst inventory
+- [x] Excel sheetPr outlinePr/pageSetUpPr/filterMode/transitionEvaluation/Entry
+- [x] Word doNotIncludeSubdocsInStats
+- [x] Excel phoneticPr / customWorkbookViews / dataConsolidate
+- [x] Word activeWritingStyle
+- [x] PPT customerData list shell
+- [x] Excel autoFilter filterColumn (values/top10) + dataConsolidate dataRefs
+- [x] Word mailMerge settings shell
+- [x] PPT slide cSld/@name
+- [x] Excel autoFilter customFilters/dynamicFilter + column kind
+- [x] Word mailMerge ODSO/activeRecord
+- [x] PPT notes cSld/@name
+- [x] Excel hyperlink tooltip + location hyperlinks
+- [x] Word mailMerge destination/subject/addressFieldName/mailAsAttachment
+- [x] PPT notes header/footer flags
+- [x] Excel dataValidation messages/errorStyle/date/textLength + autoFilter blank
+- [x] Word mailMerge doNotSuppressBlankLines/linkToQuery/checkErrors/connectString
+- [x] Excel col bestFit/style/outlineLevel/collapsed
+- [x] PPT showPr sldRg/sldAll/custShow
+- [x] Excel dataValidation decimal/custom + showDropDown
+- [x] Word stylePaneFormatFilter flags
+- [x] PPT showPr penClr
+- [x] Excel row thickTop/thickBot/collapsed/style
+- [x] Word saveXmlDataOnly/useXSLTWhenSaving/alwaysMergeEmptyNamespace
+- [x] Excel dataValidation time
+- [x] Word themeFontLang eastAsia/bidi + autoCaption
+- [x] PPT notesMaster/handoutMaster header-footer flags
+- [x] Excel fileVersion/fileSharing/oleSize
+- [x] Word webSettings flags/encoding/pixelsPerInch
+- [x] PPT sldSz/@type
+- [x] Excel functionGroups inventory
+- [x] Word footnotePr/endnotePr in settings
+- [x] PPT defaultTextStyle shell
+- [x] Excel sheetProtection extended permission flags
+- [x] Word webSettings doNotOrganize/doNotUseLongFileNames/doNotSaveAsSingleFile/targetScreenSz
+- [x] PPT slide master header/footer flags
+- [x] Word docGrid type/charSpace + page border display/offsetFrom/zOrder
+- [x] PPT slide layout header/footer flags
+- [x] package_part_count alias on Word + Excel/PPT
+- [x] Word/Excel/PPT set_created/created / set_modified/modified
+- [x] Word/Excel/PPT part_content_type / list_package_relationships
+- [x] Excel package_relationship_count / workbook_relationship_count
+- [x] Word/Excel/PPT list_content_type_overrides / main|workbook|presentation rel lists
+- [x] Word/Excel/PPT application_version / doc_security / pages/words/characters / app_slides/notes
+- [x] typed custom props i4/bool + list names
+- [x] SharedDoc/LinksUpToDate/HyperlinksChanged/ScaleCrop/TotalTime + Word lines/paragraphs stats
+- [x] PPT hidden slides/mmClips + list_slide_relationships
+- [x] example create_presentation
+- [x] Excel list_sheet_relationships / sheet_relationship_count
+- [x] Word/Excel/PPT has_part / get_part_bytes / set_part_bytes / part_size / package_relationship_target
+- [x] Excel/PPT Flat OPC to_flat_opc_string / from_flat_opc
+- [x] Word/Excel/PPT settings/auto_save/rewrite_strict/is_encrypted_office_file
+- [x] Excel/PPT change_document_type + close
+- [x] PPT PresentationDocumentType::from_content_type
+- [x] Excel freeze_panes_ex / freeze_pane_details / colorId / zoomScaleNormal / workbookViewId
+- [x] Word doNotUseMarginsForDrawingGridOrigin / showEnvelope / autoFormatOverride / uiCompat97To2003
+- [x] PPT normalViewPr (showOutlineIcons/preferSingleView/snapVertSplitter/bar states/restoredLeft/Top) + clear_last_view
+- [x] Excel pageSetup attrs (paperSize/orientation/DPI/errors/cellComments/usePrinterDefaults) + clear_page_setup
+- [x] Word noLineBreaksAfter/Before (lang/val kinsoku char lists) + readModeInkLockDown
+- [x] PPT slideViewPr snapToGrid/snapToObjects/showGuides + sorter showFormatting
+- [x] Excel customHeight / print gridLinesSet / custom sheet view attr update+remove
+- [x] Excel custom workbook view attr update/remove; Word smartTagType CRUD
+- [x] PPT notesViewPr snapToGrid/snapToObjects/showGuides
+- [x] Excel page margins set/clear/attr + protected range attrs + scenario attrs/inputs + cellWatches
+- [x] Word schemaLibrary CRUD + web encoding/screen/ppi clear helpers
+- [x] PPT slide view guide list add/list/clear
+- [x] Excel remove_ignored_error + dataConsolidate attrs/refs clear
+- [x] Word font table entry add/get/remove/ensure
+- [x] Excel cell hyperlink attrs/details update
+- [x] Word numbering abstractNum/num inventory + level set/get
+- [x] PPT outlineViewPr scale
+- [x] Excel definedName attrs/details + connection list/update/remove
+- [x] Word style basedOn/next/link get/set
+- [x] Excel sparklines list/attrs + CF rule attrs + external link targets
+- [x] Word style flags (qFormat/semiHidden/locked/uiPriority) + formProt
+- [x] PPT notesTextViewPr/sorterViewPr scale
+- [x] Excel pivot rename/attrs/location + chart title list/set
+- [x] Word glossary docPart list/append/remove + comment attrs/remove/by_id
+- [x] PPT transition details + attr update
+- [x] Excel shared formula clear group/all
+- [x] Word content control tag set/remove
+- [x] PPT animation shape id list
+- [x] Excel clear_array_formulas
+- [x] Word rename_bookmark
+- [x] PPT set_notes_text (replace notes)
+- [x] Excel sheet comment text update/remove
+- [x] Word append_simple_field/toc_field + list_simple_fields
+- [x] PPT set_slide_text_at / slide_text_node_count
+- [x] Excel unmerge_range / is_merged_range
+- [x] Word/PPT theme name list/set
+- [x] Word remove_style / has_style
+- [x] PPT list_slide_transitions
+- [x] Excel named style rename/remove
+- [x] Word set_header_text / set_footer_text
+- [x] PPT list_notes_texts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## API mapping cheat sheet
+
+| C# | Rust |
+|----|------|
+| `WordprocessingDocument.Create(path, type)` | `WordprocessingDocument::create(path, type)` |
+| `doc.AddMainDocumentPart()` | `doc.add_main_document_part()` |
+| `main.Document = new Document(...)` | `main.set_document(document(...))` |
+| `doc.MainDocumentPart.Document.Body.Elements<Paragraph>()` | `doc.paragraph_texts()` / DOM walk |
+| `System.IO.Packaging.Package` | `opc::OpcPackage` |
+| `OpenXmlElement` | `element::OpenXmlElement` |
+
+- [x] Word `remove_external_hyperlink` unwraps body `w:hyperlink` elements
+- [x] Excel `clear_shared_strings` rewrites `t="s"` cells to `inlineStr`
+- [x] Excel `materialize_shared_strings` (inline without dropping SST)
+- [x] Excel `remove_chart` strips drawing anchors that reference the chart (relative target resolve)
+- [x] Excel `remove_table_column` shrinks table `ref` when removing last column
+- [x] Word SDT `content_control_infos` / kind detection / `clear_content_controls`
+- [x] Word revision marker inventory (`list`/`has`/`count` + insertion/deletion counts)
+- [x] Inventory `has_*` companions (autoFilter/cellWatch/hidden cols/sort/scenarios/web publish/threaded comments; bibliography/autoCaptions/compat/glossary/anchor HL/fonts/numbering; PPT shapes/transitions/names/tags/sync/comments)
+
+- [x] Word `remove_chart` / `remove_chart_at`
+- [x] Excel `unhide_all_columns` / `unhide_all_rows` + sheets_with_hidden_*
+- [x] PPT `remove_animation_for_shape` / `list_slide_animation_effects`
+- [x] Word `clear_external_hyperlinks` (rel + body unwrap)
+
+- [x] Excel `clear_all_outlines` / `clear_all_row_outlines`
+- [x] Word `remove_drawing` by URI
+
+- [x] Excel `remove_empty_sheets`
+
+- [x] Word/Excel `remove_embedding` by URI
+
+- [x] Word complex fields (`complex_field` / list/append/has/count)
+
+- [x] Word accept/reject revisions in headers/footers (+ everywhere)
+
+- [x] Word `clear_complex_fields` (keep result text)
+
+- [x] PPT `remove_empty_slides`
+
+- [x] Excel `clear_all_conditional_formatting` / `clear_all_data_validations`
+
+- [x] Excel `clear_all_merged_cells` / `clear_all_cell_hyperlinks`
+
+- [x] Word `clear_all_fields` (simple + complex)
+
+- [x] Excel `clear_all_auto_filters` / `clear_all_sparklines` / `clear_all_freeze_panes`
+
+- [x] Excel `rebuild_calc_chain` from formula cells
+
+- [x] Excel `clear_all_sheet_comments`
+
+- [x] Word `list_used_style_ids` / `list_unused_style_ids` / `remove_unused_styles`
+
+- [x] Word `clear_bookmarks`
+
+- [x] Excel `clear_all_tables`
+
+- [x] Word/Excel/PPT `remove_media` by URI
+
+- [x] Excel `clear_formulas` / `clear_all_formulas` (keep cached values)
+
+- [x] PPT `unhide_all_slides` / `hide_slides`
+
+- [x] Word `list_custom_xml_part_uris`
+
+- [x] Excel `clear_column_widths` / `clear_all_column_widths` / `clear_row_heights`
+
+- [x] Word `clear_all_notes` (footnotes + endnotes)
+
+- [x] Excel `clear_all_tab_colors` / `clear_all_sheet_protection` / `clear_all_sheet_code_names`
+
+- [x] PPT `has_rtl`
+
+- [x] PPT `clear_first_slide_num` / `has_first_slide_num`
+
+- [x] Excel `clear_all_page_setup` / `clear_all_print_options`
+
+- [x] Excel `clear_all_zoom` / `clear_all_sort_state` / `sheets_with_sort_state`
+
+- [x] Excel `unhide_all_sheets` / `clear_all_sheet_format` / `sheets_with_zoom`
+
+- [x] Word settings clear companions (track revisions, do_not_*, forms, personal info, …)
+
+- [x] PPT `has_bookmark_id_seed` / `clear_show_special_pls_on_title_sld`
+
+- [x] Word exhaustive `clear_*` companions for bool settings (has_/set_ pairs)
+
+- [x] Excel sheet-view/print/page `clear_*` companions for bool setters
+
+- [x] PPT `clear_rtl`
+
+- [x] PPT exhaustive `clear_*` companions for presentation bool settings
+
+- [x] Word `add_person` / `remove_mail_merge_odso_field_map` / `remove_complex_fields_matching`
+
+- [x] Excel `clear_all_shared_formulas`
+
+- [x] PPT push/wipe/split/cover/wheel/random transition helpers
+
+- [x] Excel `clear_all_array_formulas` / `sheets_with_array_formulas`
+
+- [x] PPT blinds/checker/circle/diamond/plus/newsflash/strips/wedge/zoom transitions
+
+- [x] Excel `has_data_validation(sqref)`
+
+- [x] Core props has/clear (title/creator/subject/description/keywords/category/…)
+
+- [x] Hyperlink base / language / calc mode has-clear companions
+
+- [x] Extended props has/clear (application/company/manager/template/…)
+
+- [x] Core revision/content_status/created/modified has-clear
+
+- [x] Excel `clear_date1904` / `clear_code_name` / `clear_filter_privacy`
+
+- [x] Word `clear_compat_flag` / `clear_web_settings_flag`
+
+- [x] Word auto-captions remove/clear; page size/margins set/clear; content-control alias set/clear
+- [x] Excel sort-condition clear (sheet + all); slicer-cache remove/clear; CF rule remove; style-font remove
+- [x] Excel scenario input CRUD; cell-watch remove/all; OLE/control remove by shapeId
+- [x] PPT notes/handout master header-footer clear; outlineViewPr clear
+- [x] PPT animation duration get/set/clear; animation filter update; shape solid-fill/line get/set/clear
+- [x] Word footnote/endnote text getters + has_footnote/has_endnote
+- [x] PPT shape transform get/set; Excel sparkline append + remove_sparkline
+- [x] PPT shape rotation + preset geom; Excel chart title has/clear
+- [x] Excel local defined name clear/all; external link target clear; PPT clear_shape_preset_geom
+- [x] Word caption definition remove/has; Excel clear_workbook_views
+- [x] Word math_font clear; Excel named style clear/all; PPT shape flipH/flipV
+- [x] PPT clear_all_notes_text; Excel list_borders inventory
+- [x] Excel list_dxfs/has_dxfs; Word clear_paragraph_styles; PPT has/clear_use_timings (attr remove)
+- [x] Excel clear_table_totals_row/comment; PPT hide_slide/unhide_slide
+- [x] PPT list/clear_all shape text; Excel chart legend has/set/clear
+- [x] Excel chart axis title list/set/clear; PPT shape font size get/set/clear
+- [x] Word extended stats has/clear (pages/words/characters/lines/paragraphs); Excel clear_print_area_for_sheet; PPT shape bold
+- [x] Excel unhide_very_hidden_sheets; PPT shape italic; Word set/clear_all_runs_bold
+- [x] Word set/clear_all_runs_italic/underline; PPT shape font color; Excel has_data_bars/icon_sets/color_scales
+- [x] Word set/clear_all_runs_color; Excel remove_cf_rules_by_type; PPT shape underline
+- [x] Word run highlight/strike/caps/vanish/size/font batch; Excel zoom_scale has/clear + workbookViewId clear; PPT font name/strike + clear_all_shape_fill
+
+## Completion status (practical port)
+
+The MVP + depth milestones above are **complete**. The packaging surface is large and tested:
+
+| Surface | Approx. `pub fn` | Integration tests |
+|---------|------------------|-------------------|
+| SpreadsheetDocument | ~1581 | shared suite |
+| WordprocessingDocument | ~1419 | shared suite |
+| PresentationDocument | ~960 | shared suite |
+
+**Long-term progress (this pass):**
+
+- [x] Schematron extractable subset expanded to ****948/948**** (added ancestor-unique, conditional attrs, non-zero GUID, attr-compare, fixed-bool, cross-part Index-of / count)
+- [x] `validate_schematron_cross_part` for package-aware Index-of / count bounds
+- [x] Digital signature structure + **Reference digest verify** (`validate_digital_signatures` + `validate_signature_digests` / `build_signature_xml`; RSA SignatureValue still empty shell)
+- [x] Lazy ZIP open (`open_lazy` / `open_bytes_lazy` / `load_part` / `materialize_all`)
+- [x] Linq-style DOM queries (`ElementQuery` / `descendants_of` / …)
+- [x] Typed element views (hand) + **generated** `generated::typed_elements` (**1378** wrappers from Word/Excel/PPT schema JSON)
+- [x] Typed element views: Document/Body/Paragraph/Run/Text/Table/Cell/Worksheet/Slide/Style/Hyperlink/Comment/Header/Footer/Notes
+- [x] Lightweight Features bag (`FeatureCollection` + `ParagraphIdGenerator` on `OpenXmlPackage`)
+- [x] VBA project inventory + CFB parse (`vba_project_bytes` / `list_vba_parts` / `inspect_vba_project` / `opc::CfbFile`; no macro execution)
+
+**Still intentionally deferred / partial:**
+
+1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
+2. VBA **bytecode execution** (CFB inventory only; intentional non-goal)  
+3. 1:1 API parity with every C# strongly-typed Part class method surface  
+
+Regenerate Schematron tables / typed wrappers:
+
+```bash
+python3 scripts/generate_schematron_rules.py
+python3 scripts/generate_typed_elements.py
+```
+
+Regenerate Schematron tables:
+
+```bash
+python3 scripts/generate_schematron_rules.py
+```
+
+## Design choices (Rust-idiomatic)
+
+1. **Lightweight Features bag** — `FeatureCollection` type-keyed services; not a full C# DI/event graph.
+2. **Owned DOM** — `OpenXmlElement` is an owned tree (Vec children), not a linked list.
+3. **In-memory package + optional lazy ZIP** — default loads parts; `open_lazy` defers decompress.
+4. **Hand-written core first** — codegen lands once the runtime model is stable.
+5. **Same JSON data** — generator reads `Open-XML-SDK/data` so schemas stay in sync.
