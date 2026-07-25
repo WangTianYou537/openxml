@@ -60,6 +60,60 @@ impl OpenXmlAttribute {
         self.local_name == local_name
             && self.namespace_uri.as_deref().unwrap_or("") == namespace_uri
     }
+
+    /// C# `OpenXmlAttribute(string qualifiedName, string namespaceUri, string? value)`.
+    ///
+    /// `qualifiedName` may be `prefix:local` or bare `local`.
+    pub fn from_qualified_name(
+        qualified_name: &str,
+        namespace_uri: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        let (prefix, local) = match qualified_name.split_once(':') {
+            Some((p, l)) if !p.is_empty() && !l.is_empty() => (Some(p.to_string()), l.to_string()),
+            _ => (None, qualified_name.to_string()),
+        };
+        Self {
+            prefix,
+            namespace_uri: {
+                let ns = namespace_uri.into();
+                if ns.is_empty() {
+                    None
+                } else {
+                    Some(ns)
+                }
+            },
+            local_name: local,
+            value: value.into(),
+        }
+    }
+
+    /// C# `OpenXmlAttribute(prefix, localName, namespaceUri, value)`.
+    pub fn from_parts(
+        prefix: impl Into<String>,
+        local_name: impl Into<String>,
+        namespace_uri: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        let p = prefix.into();
+        let ns = namespace_uri.into();
+        Self {
+            prefix: if p.is_empty() { None } else { Some(p) },
+            namespace_uri: if ns.is_empty() { None } else { Some(ns) },
+            local_name: local_name.into(),
+            value: value.into(),
+        }
+    }
+
+    /// Namespace URI string (empty when unset) — C# `NamespaceUri`.
+    pub fn namespace_uri_str(&self) -> &str {
+        self.namespace_uri.as_deref().unwrap_or("")
+    }
+
+    /// Prefix string (empty when unset) — C# `Prefix`.
+    pub fn prefix_str(&self) -> &str {
+        self.prefix.as_deref().unwrap_or("")
+    }
 }
 
 impl std::fmt::Display for OpenXmlAttribute {
@@ -1624,5 +1678,23 @@ mod element_api_parity_tests {
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("hi"));
         assert!(s.contains("t"));
+    }
+
+    #[test]
+    fn open_xml_attribute_constructors() {
+        let a = OpenXmlAttribute::from_qualified_name(
+            "w:val",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "1",
+        );
+        assert_eq!(a.prefix_str(), "w");
+        assert_eq!(a.local_name, "val");
+        assert_eq!(
+            a.namespace_uri_str(),
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        );
+        let b = OpenXmlAttribute::from_parts("r", "id", "http://ns", "rId1");
+        assert_eq!(b.qualified_name(), "r:id");
+        assert_eq!(b.value, "rId1");
     }
 }

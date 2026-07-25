@@ -84,6 +84,11 @@ impl<'a> OpenXmlDomReader<'a> {
         self.current.map(|e| e.local_name.as_str())
     }
 
+    /// Strongly-typed element type name shell (C# `ElementType`; returns local name).
+    pub fn element_type_name(&self) -> Option<&str> {
+        self.local_name()
+    }
+
     pub fn prefix(&self) -> Option<&str> {
         self.current
             .map(|e| e.prefix.as_str())
@@ -352,6 +357,23 @@ impl<'a> OpenXmlDomReader<'a> {
     /// Attribute value by local name on the current element.
     pub fn get_attribute(&self, local_name: &str) -> Option<&str> {
         self.current.and_then(|e| e.get_attribute(local_name))
+    }
+
+    /// Attribute value by 0-based index (C# `GetAttribute(int)`).
+    pub fn get_attribute_at(&self, index: usize) -> Option<&str> {
+        self.current
+            .and_then(|e| e.get_attributes().get(index))
+            .map(|a| a.value.as_str())
+    }
+
+    /// Attribute value by local name + namespace URI.
+    pub fn get_attribute_ns(&self, local_name: &str, namespace_uri: &str) -> Option<&str> {
+        self.current.and_then(|e| {
+            e.get_attributes()
+                .iter()
+                .find(|a| a.matches(local_name, namespace_uri))
+                .map(|a| a.value.as_str())
+        })
     }
 
     /// Close the reader (C# `Close` shell).

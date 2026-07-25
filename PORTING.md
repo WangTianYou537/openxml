@@ -799,6 +799,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPartReaderOptions` (IgnoreWhitespace / MaxCharactersInPart / ReadMiscellaneousNodes)
 - [x] `CompatibilityLevel` on OpenSettings
 - [x] `ValidationError` Node/RelatedNode/RelatedPart path shells
+- [x] `OpenXmlAttribute::{from_qualified_name,from_parts,namespace_uri_str,prefix_str}`
+- [x] Reader `get_attribute_at` / `get_attribute_ns` + `element_type_name` shell
 
 **Still intentionally deferred / partial:**
 

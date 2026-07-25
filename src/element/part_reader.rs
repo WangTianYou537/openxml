@@ -223,6 +223,11 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         &self.local_name
     }
 
+    /// Strongly-typed element type name shell (C# `ElementType`; returns local name).
+    pub fn element_type_name(&self) -> &str {
+        self.local_name.as_str()
+    }
+
     pub fn prefix(&self) -> Option<&str> {
         self.prefix.as_deref()
     }
@@ -587,6 +592,47 @@ impl<R: BufRead> OpenXmlPartReader<R> {
             .map(|(_, v)| v.as_str())
     }
 
+    /// Attribute value by 0-based index among non-xmlns attributes (C# `GetAttribute(int)`).
+    pub fn get_attribute_at(&self, index: usize) -> Option<&str> {
+        self.attributes
+            .iter()
+            .filter(|(k, _)| !k.starts_with("xmlns"))
+            .nth(index)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Attribute value by local name + namespace URI when the xmlns for the prefix is on this element.
+    pub fn get_attribute_ns(&self, local_name: &str, namespace_uri: &str) -> Option<&str> {
+        // Resolve which prefixes map to namespace_uri on this start tag.
+        let mut prefixes: Vec<&str> = Vec::new();
+        for (k, v) in &self.attributes {
+            if v != namespace_uri {
+                continue;
+            }
+            if k == "xmlns" {
+                prefixes.push("");
+            } else if let Some(p) = k.strip_prefix("xmlns:") {
+                prefixes.push(p);
+            }
+        }
+        self.attributes.iter().find_map(|(k, v)| {
+            if k.starts_with("xmlns") {
+                return None;
+            }
+            let (pfx, local) = match k.split_once(':') {
+                Some((p, l)) => (p, l),
+                None => ("", k.as_str()),
+            };
+            if local == local_name && prefixes.iter().any(|p| *p == pfx) {
+                Some(v.as_str())
+            } else if local == local_name && namespace_uri.is_empty() && pfx.is_empty() {
+                Some(v.as_str())
+            } else {
+                None
+            }
+        })
+    }
+
     /// Close the reader (C# `Close` shell — marks EOF).
     pub fn close(&mut self) {
         self.eof = true;
@@ -663,6 +709,14 @@ mod tests {
         assert_eq!(r.get_attribute("rsidR"), Some("1"));
         assert!(r.has_attributes());
         assert_eq!(r.attribute_count(), 1);
+        assert_eq!(r.get_attribute_at(0), Some("1"));
+        assert_eq!(
+            r.get_attribute_ns(
+                "rsidR",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            ),
+            Some("1")
+        );
         r.close();
         assert!(r.is_eof());
     }
