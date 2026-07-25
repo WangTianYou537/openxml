@@ -950,6 +950,41 @@ impl OpenXmlPackage {
         self.opc().data_parts()
     }
 
+    /// Look up a registered data part by URI.
+    pub fn get_data_part(&self, uri: &crate::opc::PackUri) -> Option<&crate::opc::DataPart> {
+        self.opc.get_data_part(uri)
+    }
+
+    /// Read data-part bytes (C# `DataPart.GetStream`).
+    pub fn get_data_part_stream(
+        &self,
+        uri: &crate::opc::PackUri,
+    ) -> crate::error::Result<Vec<u8>> {
+        self.opc.get_data_part_stream(uri)
+    }
+
+    /// Replace data-part content (C# `DataPart.FeedData`).
+    pub fn feed_data_part(
+        &mut self,
+        uri: &crate::opc::PackUri,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::error::Result<()> {
+        self.opc.feed_data_part(uri, data)
+    }
+
+    /// All data-part reference relationships that target `data_part_uri`
+    /// (C# `DataPart.GetDataPartReferenceRelationships`).
+    pub fn get_data_part_reference_relationships(
+        &self,
+        data_part_uri: &crate::opc::PackUri,
+    ) -> Vec<crate::opc::DataPartReferenceRelationship> {
+        self.opc
+            .find_data_part_references(data_part_uri)
+            .into_iter()
+            .map(|(_source, rel)| rel)
+            .collect()
+    }
+
     /// Delete unused (unreferenced) data parts.
     pub fn delete_unused_data_parts(&mut self) -> usize {
         let before: Vec<String> = self
@@ -3645,5 +3680,37 @@ mod part_events_tests {
         assert!(OpenXmlPackage::is_encrypted_office_stream(&mut hdr).unwrap());
         let related = pkg.get_parts_of_relationship_type(Some(&doc), "http://example");
         assert!(related.is_empty());
+    }
+
+    #[test]
+    fn data_part_stream_and_reference_query() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let slide = crate::opc::PackUri::new("/ppt/slides/slide1.xml");
+        pkg.set_part(slide.clone(), "application/vnd.openxmlformats-officedocument.presentationml.slide+xml", b"<p:sld/>");
+        let media = pkg
+            .create_media_data_part_typed_with_data(crate::opc::MediaDataPartType::Mp3, b"ID3xx")
+            .expect("media");
+        assert!(pkg.get_data_part(&media.uri).is_some());
+        assert_eq!(
+            pkg.get_data_part_stream(&media.uri).unwrap(),
+            b"ID3xx"
+        );
+        pkg.feed_data_part(&media.uri, b"ID3yy").unwrap();
+        assert_eq!(pkg.get_data_part_stream(&media.uri).unwrap(), b"ID3yy");
+        let data = pkg.get_data_part(&media.uri).unwrap().clone();
+        let dpr = pkg
+            .add_data_part_reference_relationship(
+                &slide,
+                &data,
+                crate::opc::media_rel::AUDIO,
+                None,
+            )
+            .expect("ref");
+        let refs = pkg.get_data_part_reference_relationships(&media.uri);
+        assert!(refs.iter().any(|r| r.id() == dpr.id()));
+        assert!(!pkg.data_parts().is_empty());
+        let as_media: crate::opc::MediaDataPart = pkg.get_data_part(&media.uri).unwrap().clone();
+        assert!(as_media.is_media_data_part() || as_media.kind().is_some());
     }
 }

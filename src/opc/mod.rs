@@ -24,7 +24,7 @@ mod uri;
 
 pub use cfb::{inspect_vba_project, CfbEntry, CfbFile, CfbObjectType};
 pub use content_types::{ContentTypeOverride, ContentTypes};
-pub use data_part::{DataPart, DataPartReferenceRelationship, IdPartPair};
+pub use data_part::{DataPart, DataPartReferenceRelationship, IdPartPair, MediaDataPart};
 pub use custom_properties::{
     CustomProperties, CustomProperty, CustomPropertyValue, CUSTOM_PROP_FMTID,
 };

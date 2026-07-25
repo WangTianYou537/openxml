@@ -41,7 +41,33 @@ impl DataPart {
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
+
+    pub fn kind(&self) -> Option<MediaKind> {
+        self.kind
+    }
+
+    /// Whether this is a media (audio/video/media) data part (C# `MediaDataPart` role).
+    pub fn is_media_data_part(&self) -> bool {
+        matches!(
+            self.kind,
+            Some(MediaKind::Audio | MediaKind::Video | MediaKind::Media)
+        )
+    }
+
+    /// Default target path segment for media data parts (C# `MediaDataPart.TargetPath`).
+    pub const DEFAULT_MEDIA_TARGET_PATH: &'static str = "media";
+    /// Default target name (C# `MediaDataPart.TargetName`).
+    pub const DEFAULT_MEDIA_TARGET_NAME: &'static str = "mediadata";
+    /// Default target extension (C# `MediaDataPart.TargetFileExtension`).
+    pub const DEFAULT_MEDIA_TARGET_EXT: &'static str = ".bin";
+    /// Default target path for generic data parts (C# `DataPart.TargetPath`).
+    pub const DEFAULT_DATA_TARGET_PATH: &'static str = "data";
+    pub const DEFAULT_DATA_TARGET_NAME: &'static str = "data";
+    pub const DEFAULT_DATA_TARGET_EXT: &'static str = ".bin";
 }
+
+/// Type alias for media-focused data parts (C# `MediaDataPart`).
+pub type MediaDataPart = DataPart;
 
 /// Internal reference to a [`DataPart`] (C# `DataPartReferenceRelationship`).
 ///
@@ -226,6 +252,22 @@ impl OpcPackage {
     /// Read data-part bytes (C# `DataPart.GetStream` read).
     pub fn data_part_bytes(&self, uri: &PackUri) -> Option<&[u8]> {
         self.get_part(uri)
+    }
+
+    /// Owned copy of data-part bytes (C# `DataPart.GetStream` read shell).
+    pub fn get_data_part_stream(&self, uri: &PackUri) -> Result<Vec<u8>> {
+        self.data_part_bytes(uri)
+            .map(|b| b.to_vec())
+            .ok_or_else(|| Error::PartNotFound(uri.to_string()))
+    }
+
+    /// Replace data-part content (C# `DataPart.FeedData` shell).
+    pub fn feed_data_part_stream(
+        &mut self,
+        uri: &PackUri,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<()> {
+        self.feed_data_part(uri, data)
     }
 
     /// Add a data-part reference relationship from `source` to an existing data part

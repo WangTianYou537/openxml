@@ -89,7 +89,7 @@ pub use namespace::{Namespace, OpenXmlNamespace};
 pub use opc::{
     add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, FileOpenAccess,
     PackageDiff, PackageEqualityOptions, PackageMode, compare_packages, packages_equal,
-    CustomProperties, DataPart, DataPartReferenceRelationship, IdPartPair, CustomProperty,
+    CustomProperties, DataPart, DataPartReferenceRelationship, IdPartPair, MediaDataPart, CustomProperty,
     CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaDataPartType, MediaKind, media_rel,
     MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartExtensionProvider,
     PartUriHelper, ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
