@@ -261,3 +261,42 @@ mod tests {
         assert_eq!(p.part_uri.as_deref(), Some("/word/document.xml"));
     }
 }
+
+/// Optional source line/position for a reader cursor (C# `IXmlLineInfo` / `XmlLineInfo`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct XmlLineInfo {
+    pub line_number: u64,
+    pub line_position: u64,
+}
+
+impl XmlLineInfo {
+    /// No line information (C# `XmlLineInfo.Empty`).
+    pub const EMPTY: Self = Self {
+        line_number: 0,
+        line_position: 0,
+    };
+
+    pub fn new(line_number: u64, line_position: u64) -> Self {
+        Self {
+            line_number,
+            line_position,
+        }
+    }
+
+    pub fn has_line_info(self) -> bool {
+        self.line_number > 0
+    }
+}
+
+#[cfg(test)]
+mod line_info_tests {
+    use super::*;
+
+    #[test]
+    fn xml_line_info_empty() {
+        assert!(!XmlLineInfo::EMPTY.has_line_info());
+        assert_eq!(XmlLineInfo::new(3, 10).line_number, 3);
+        assert!(XmlLineInfo::new(1, 1).has_line_info());
+    }
+}
+

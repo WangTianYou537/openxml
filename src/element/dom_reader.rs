@@ -56,6 +56,12 @@ impl<'a> OpenXmlDomReader<'a> {
         self.eof || self.state == ElementState::EOF
     }
 
+    /// Line info is unavailable for pure DOM walks (C# DomReader → Empty).
+    pub fn get_line_info(&self) -> super::xml_path::XmlLineInfo {
+        let _ = self;
+        super::xml_path::XmlLineInfo::EMPTY
+    }
+
     pub fn depth(&self) -> usize {
         self.stack.len()
     }

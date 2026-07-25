@@ -92,6 +92,12 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         self.eof || self.state == ElementState::EOF
     }
 
+    /// Line/position info when tracked; currently empty shell (C# `GetLineInfo`).
+    pub fn get_line_info(&self) -> super::xml_path::XmlLineInfo {
+        let _ = self;
+        super::xml_path::XmlLineInfo::EMPTY
+    }
+
     pub fn depth(&self) -> usize {
         self.depth
     }

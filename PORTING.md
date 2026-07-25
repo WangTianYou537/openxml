@@ -772,6 +772,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationError::id` / `error_type` (C# ValidationErrorInfo.Id / ErrorType subset)
 - [x] `OpenXmlValidator::on_validation_error` (ValidationErrorEventArgs shell) + `OpenXmlElement::has_attributes`
 - [x] `OpenXmlElement::write_to` (C# `WriteTo`)
+- [x] `XmlLineInfo` + reader `get_line_info` (Empty shell)
 - [x] `OpenXmlDomReader::{read_first_child,read_next_sibling,load_current_element}`
 - [x] `OpenXmlPartReader::{read_first_child,read_next_sibling,has_attributes}`
 - [x] `OpenXmlPartWriter` WriteStartElement overloads + WriteStartDocument(standalone) + from Part/Dom reader
