@@ -918,6 +918,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationContext::{create_error,mc_context,current_path,max_number_of_errors}` shells
 - [x] `PackagePartFeature::{uri,is_bound}`; `RootElementFeature::{contains,clear,registered_type_names}`
 
+- [x] `ValidationStack` / `ValidationElement` / `StateManager` / `ValidationErrorEventArgs`
+- [x] `ValidationContext` embeds stack + state manager
+- [x] `OpenSettings` fluent builders + `from_other` copy ctor
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

@@ -16,6 +16,10 @@ pub struct ValidationContext {
     pub mc_context: Option<crate::markup_compatibility::McContext>,
     /// Current element XPath / path for [`create_error`](Self::create_error).
     pub current_path: String,
+    /// Validation element stack (C# `ValidationStack`).
+    pub stack: super::ValidationStack,
+    /// Per-pass typed state cache (C# `StateManager`).
+    pub state: super::StateManager,
 }
 
 impl ValidationContext {
@@ -29,6 +33,8 @@ impl ValidationContext {
             expected_children: Vec::new(),
             mc_context: None,
             current_path: String::new(),
+            stack: super::ValidationStack::new(),
+            state: super::StateManager::new(),
         }
     }
 
@@ -48,6 +54,24 @@ impl ValidationContext {
         self.errors.clear();
         self.expected_children.clear();
         self.current_path.clear();
+        self.stack.clear();
+        self.state.clear();
+    }
+
+    pub fn stack(&self) -> &super::ValidationStack {
+        &self.stack
+    }
+
+    pub fn stack_mut(&mut self) -> &mut super::ValidationStack {
+        &mut self.stack
+    }
+
+    pub fn state(&self) -> &super::StateManager {
+        &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut super::StateManager {
+        &mut self.state
     }
 
     pub fn set_current_path(&mut self, path: impl Into<String>) {
@@ -195,5 +219,14 @@ mod tests {
 
         assert!(ctx.add_error_with_id("/x", "Sem_UniqueAttributeValue", "dup"));
         assert_eq!(ctx.errors().len(), 2);
+
+        ctx.stack_mut().push_part("/word/document.xml");
+        ctx.stack_mut().push_element_path("/w:document[1]");
+        assert_eq!(ctx.stack().depth(), 2);
+        let n = ctx.state_mut().get_or_create("count", || 1u32).clone();
+        assert_eq!(n, 1);
+        ctx.clear();
+        assert!(ctx.stack().is_empty());
+        assert!(ctx.state().is_empty());
     }
 }

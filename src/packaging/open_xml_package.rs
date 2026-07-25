@@ -96,6 +96,45 @@ impl Default for OpenSettings {
     }
 }
 
+impl OpenSettings {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Copy constructor shell (C# `OpenSettings(OpenSettings)`).
+    pub fn from_other(other: &OpenSettings) -> Self {
+        other.clone()
+    }
+
+    pub fn with_auto_save(mut self, auto_save: bool) -> Self {
+        self.auto_save = auto_save;
+        self
+    }
+
+    pub fn with_max_characters_in_part(mut self, max: u64) -> Self {
+        self.max_characters_in_part = max;
+        self
+    }
+
+    pub fn with_compression(mut self, compression: crate::opc::CompressionOption) -> Self {
+        self.compression = compression;
+        self
+    }
+
+    pub fn with_compatibility_level(mut self, level: CompatibilityLevel) -> Self {
+        self.compatibility_level = level;
+        self
+    }
+
+    pub fn with_markup_compatibility(
+        mut self,
+        settings: MarkupCompatibilityProcessSettings,
+    ) -> Self {
+        self.markup_compatibility = settings;
+        self
+    }
+}
+
 /// Base Open XML package.
 ///
 /// Holds the underlying OPC package and open settings. Typed documents
@@ -3951,5 +3990,20 @@ mod part_events_tests {
         assert!(pkg.is_known_data_part_relationship(
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
         ));
+    }
+
+    #[test]
+    fn open_settings_builders() {
+        let s = OpenSettings::new()
+            .with_auto_save(false)
+            .with_max_characters_in_part(1000)
+            .with_compression(crate::opc::CompressionOption::Maximum)
+            .with_compatibility_level(CompatibilityLevel::Version3_0);
+        assert!(!s.auto_save);
+        assert_eq!(s.max_characters_in_part, 1000);
+        assert_eq!(s.compression, crate::opc::CompressionOption::Maximum);
+        let s2 = OpenSettings::from_other(&s);
+        assert_eq!(s2.max_characters_in_part, 1000);
+        assert!(!s2.auto_save);
     }
 }
