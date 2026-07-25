@@ -140,6 +140,62 @@ impl OpenXmlPackage {
                 dp.add(u);
             }
         }
+        // Seed part/reference relationship feature shells from existing .rels.
+        {
+            let mut part_entries: Vec<(String, String)> = Vec::new();
+            let mut ref_entries: Vec<(String, String, String, bool)> = Vec::new();
+            for r in pkg.opc.package_relationships().iter() {
+                let external =
+                    r.target_mode == crate::opc::RelationshipTargetMode::External;
+                if external {
+                    ref_entries.push((
+                        r.id.clone(),
+                        r.relationship_type.clone(),
+                        r.target.clone(),
+                        true,
+                    ));
+                } else {
+                    part_entries.push((r.id.clone(), r.target.clone()));
+                }
+            }
+            let sources = pkg.opc.part_relationship_sources();
+            for src in sources {
+                if let Some(rels) = pkg.opc.part_relationships(&src) {
+                    for r in rels.iter() {
+                        let external =
+                            r.target_mode == crate::opc::RelationshipTargetMode::External;
+                        if external {
+                            ref_entries.push((
+                                r.id.clone(),
+                                r.relationship_type.clone(),
+                                r.target.clone(),
+                                true,
+                            ));
+                        } else {
+                            part_entries.push((r.id.clone(), r.target.clone()));
+                            ref_entries.push((
+                                r.id.clone(),
+                                r.relationship_type.clone(),
+                                r.target.clone(),
+                                false,
+                            ));
+                        }
+                    }
+                }
+            }
+            {
+                let pr = pkg.part_relationships_feature();
+                for (id, target) in part_entries {
+                    pr.add(id, target);
+                }
+            }
+            {
+                let rr = pkg.reference_relationships_feature();
+                for (id, ty, target, ext) in ref_entries {
+                    rr.add(id, ty, target, ext);
+                }
+            }
+        }
         pkg
     }
 
@@ -1629,6 +1685,8 @@ mod part_events_tests {
 
     #[test]
     fn from_opc_seeds_parts_and_part_uri_features() {
+        use crate::namespace::rel;
+        use crate::opc::RelationshipTargetMode;
         let mut opc = crate::opc::OpcPackage::create();
         let uri = PackUri::new("/word/document.xml");
         opc.set_part(
@@ -1636,9 +1694,15 @@ mod part_events_tests {
             content_type::WORD_DOCUMENT,
             b"<w:document/>".to_vec(),
         );
+        opc.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &uri,
+            RelationshipTargetMode::Internal,
+        );
         let mut pkg = OpenXmlPackage::from_opc(opc, OpenSettings::default());
         assert!(pkg.parts_feature().contains(uri.as_str()));
         assert!(pkg.part_uri_feature().is_reserved(&uri));
+        assert!(!pkg.part_relationships_feature().is_empty());
     }
 
     #[test]

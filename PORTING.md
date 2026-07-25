@@ -838,6 +838,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackage::delete_reference_relationship` updates part/ref feature bags; documents route through it
 - [x] Word/Excel/PPT document builders run `PackageInitializerFeature` after middleware
 - [x] Transitional → Strict package/element rewrite (`rewrite_package_to_strict` / `rewrite_transitional_to_strict`)
+- [x] `from_opc` seeds `PartRelationshipsFeature` / `ReferenceRelationshipsFeature` from existing package + part relationships
 
 **Still intentionally deferred / partial:**
 
