@@ -33,7 +33,7 @@ mod ttc;
 
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
-use crate::presentation::{group_shape_pr, group_shape_properties, shape_tree};
+use crate::presentation::{group_shape_pr_sized, group_shape_properties, shape_tree};
 use dml::{freeform_shape, preset_shape, text_shape, ShapeBuild, ShapeEffect, TextShapeOpts};
 use font::FontDb;
 use matrix::Matrix;
@@ -251,7 +251,10 @@ pub fn shape_tree_from_svg(
     target_cy: i64,
 ) -> Result<(OpenXmlElement, SvgShapeConversion)> {
     let conv = svg_to_shapes(svg_bytes, target_cx, target_cy, 2)?;
-    let mut kids = vec![group_shape_properties(), group_shape_pr()];
+    let mut kids = vec![
+        group_shape_properties(),
+        group_shape_pr_sized(target_cx, target_cy),
+    ];
     kids.extend(conv.shapes.clone());
     Ok((shape_tree(kids), conv))
 }

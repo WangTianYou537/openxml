@@ -10346,11 +10346,26 @@ impl PresentationDocument {
     }
 
     /// Add an embedded font part related from the presentation.
+    ///
+    /// When `preferred_stem` is `Some`, the part is stored as
+    /// `/ppt/fonts/{stem}.{ext}` (Office ODTTF parts use a braced GUID stem that
+    /// matches the XOR key). Otherwise `font{N}.{ext}` is used.
     pub fn add_font_part(
         &mut self,
         data: impl Into<Vec<u8>>,
         content_type_str: &str,
         extension: &str,
+    ) -> Result<(PackUri, String)> {
+        self.add_font_part_named(data, content_type_str, extension, None)
+    }
+
+    /// Like [`add_font_part`], but allow a preferred part stem (no extension).
+    pub fn add_font_part_named(
+        &mut self,
+        data: impl Into<Vec<u8>>,
+        content_type_str: &str,
+        extension: &str,
+        preferred_stem: Option<&str>,
     ) -> Result<(PackUri, String)> {
         let pres_uri = self
             .package
@@ -10366,13 +10381,30 @@ impl PresentationDocument {
             })
             .unwrap_or_else(|| PackUri::new("/ppt/presentation.xml"));
         let ext = extension.trim_start_matches('.');
-        let mut index = 1u32;
-        let uri = loop {
-            let c = PackUri::new(format!("/ppt/fonts/font{index}.{ext}"));
-            if !self.package.opc().has_part(&c) {
-                break c;
+        let uri = if let Some(stem) = preferred_stem {
+            let stem = stem.trim();
+            let candidate = PackUri::new(format!("/ppt/fonts/{stem}.{ext}"));
+            if self.package.opc().has_part(&candidate) {
+                let mut index = 1u32;
+                loop {
+                    let c = PackUri::new(format!("/ppt/fonts/{stem}_{index}.{ext}"));
+                    if !self.package.opc().has_part(&c) {
+                        break c;
+                    }
+                    index += 1;
+                }
+            } else {
+                candidate
             }
-            index += 1;
+        } else {
+            let mut index = 1u32;
+            loop {
+                let c = PackUri::new(format!("/ppt/fonts/font{index}.{ext}"));
+                if !self.package.opc().has_part(&c) {
+                    break c;
+                }
+                index += 1;
+            }
         };
         self.package
             .opc_mut()
@@ -15689,7 +15721,11 @@ impl PresentationDocument {
                 );
             }
             let lst = OpenXmlElement::new("p", p, "embeddedFontLst").with_child(entry);
-            root.children.push(lst);
+            // ECMA-376 CT_Presentation order: ... notesSz, embeddedFontLst, ...
+            // defaultTextStyle. Appending after defaultTextStyle makes MS PowerPoint
+            // refuse to open the package ("cannot read").
+            let insert_at = presentation_embedded_font_lst_insert_at(&root);
+            root.children.insert(insert_at, lst);
         }
         let xml = write_element(&root)?;
         self.package
@@ -16769,8 +16805,10 @@ impl PresentationDocument {
             }
             let guid = crate::presentation::svg_to_shapes::odttf::new_font_guid();
             let odttf = crate::presentation::svg_to_shapes::odttf::to_odttf(&uf.data, &guid);
+            // MS-OFFCRYPTO: part stem is the braced GUID used as the XOR key.
+            let stem = crate::presentation::svg_to_shapes::odttf::guid_string(&guid);
             let ct = content_type::FONT_ODTTF;
-            if let Ok((_uri, rid)) = self.add_font_part(odttf, ct, "odttf") {
+            if let Ok((_uri, rid)) = self.add_font_part_named(odttf, ct, "odttf", Some(&stem)) {
                 // panose/charset: set common defaults so Office accepts the face
                 let _ = self.add_embedded_font_faces_ex(
                     &uf.typeface,
@@ -16779,7 +16817,6 @@ impl PresentationDocument {
                     /* charset */ Some(0), // ANSI default; EA faces still work
                     /* pitchFamily */ Some(34), // Swiss variable (2<<4 | 2)
                 );
-                let _ = guid;
             }
         }
         // Offset all shapes by (x, y) if non-zero
@@ -16792,13 +16829,14 @@ impl PresentationDocument {
         let count = shapes.len();
         if let Some(csld) = root.child_mut("cSld") {
             if let Some(tree) = csld.child_mut("spTree") {
+                ensure_sp_tree_group_extents(tree, cx, cy);
                 for sp in shapes {
                     tree.append_child(sp);
                 }
             } else {
                 let mut kids = vec![
                     crate::presentation::group_shape_properties(),
-                    crate::presentation::group_shape_pr(),
+                    crate::presentation::group_shape_pr_sized(cx, cy),
                 ];
                 kids.extend(shapes);
                 csld.append_child(shape_tree(kids));
@@ -16806,7 +16844,7 @@ impl PresentationDocument {
         } else {
             let mut kids = vec![
                 crate::presentation::group_shape_properties(),
-                crate::presentation::group_shape_pr(),
+                crate::presentation::group_shape_pr_sized(cx, cy),
             ];
             kids.extend(shapes);
             root.append_child(common_slide_data(vec![shape_tree(kids)]));
@@ -17531,5 +17569,76 @@ fn offset_shape(elem: &mut OpenXmlElement, dx: i64, dy: i64) {
     }
     for child in &mut elem.children {
         offset_shape(child, dx, dy);
+    }
+}
+
+/// Insert index for `p:embeddedFontLst` under `p:presentation` per ECMA-376 CT_Presentation:
+/// after `notesSz` (or `sldSz`), before `custShowLst` / `defaultTextStyle` / later siblings.
+fn presentation_embedded_font_lst_insert_at(root: &OpenXmlElement) -> usize {
+    const AFTER: &[&str] = &[
+        "sldMasterIdLst",
+        "notesMasterIdLst",
+        "handoutMasterIdLst",
+        "sldIdLst",
+        "sldSz",
+        "notesSz",
+    ];
+    const BEFORE: &[&str] = &[
+        "custShowLst",
+        "photoAlbum",
+        "custDataLst",
+        "kinsoku",
+        "defaultTextStyle",
+        "modifyVerifier",
+        "extLst",
+    ];
+    if let Some(i) = root
+        .children
+        .iter()
+        .position(|c| BEFORE.contains(&c.local_name.as_str()))
+    {
+        return i;
+    }
+    if let Some(i) = root
+        .children
+        .iter()
+        .rposition(|c| AFTER.contains(&c.local_name.as_str()))
+    {
+        return i + 1;
+    }
+    root.children.len()
+}
+
+/// Ensure root `p:spTree/p:grpSpPr` extents match the slide target (non-zero).
+fn ensure_sp_tree_group_extents(tree: &mut OpenXmlElement, cx: i64, cy: i64) {
+    let cx = cx.max(0);
+    let cy = cy.max(0);
+    let Some(grp) = tree.child_mut("grpSpPr") else {
+        tree.children.insert(
+            if tree.child("nvGrpSpPr").is_some() { 1 } else { 0 },
+            crate::presentation::group_shape_pr_sized(cx, cy),
+        );
+        return;
+    };
+    let Some(xfrm) = grp.child_mut("xfrm") else {
+        *grp = crate::presentation::group_shape_pr_sized(cx, cy);
+        return;
+    };
+    for (tag, xk, yk, xv, yv) in [
+        ("ext", "cx", "cy", cx, cy),
+        ("chExt", "cx", "cy", cx, cy),
+        ("off", "x", "y", 0i64, 0i64),
+        ("chOff", "x", "y", 0i64, 0i64),
+    ] {
+        if let Some(el) = xfrm.child_mut(tag) {
+            el.set_attribute(xk, xv.to_string());
+            el.set_attribute(yk, yv.to_string());
+        } else {
+            xfrm.append_child(
+                OpenXmlElement::new("a", crate::namespace::ns::DRAWINGML.uri, tag)
+                    .with_attribute(xk, xv.to_string())
+                    .with_attribute(yk, yv.to_string()),
+            );
+        }
     }
 }

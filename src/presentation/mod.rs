@@ -84,7 +84,17 @@ pub fn group_shape_properties() -> OpenXmlElement {
 }
 
 /// Group shape properties (`p:grpSpPr`) with identity transform (required by PowerPoint).
+///
+/// Root `p:spTree` extents must match the slide size. Zero `cx`/`cy` is tolerated by
+/// LibreOffice but Microsoft PowerPoint rejects the package as unreadable.
 pub fn group_shape_pr() -> OpenXmlElement {
+    group_shape_pr_sized(SLIDE_SIZE_16_9.0, SLIDE_SIZE_16_9.1)
+}
+
+/// `p:grpSpPr` with explicit child/parent extents (EMUs).
+pub fn group_shape_pr_sized(cx: i64, cy: i64) -> OpenXmlElement {
+    let cx_s = cx.max(0).to_string();
+    let cy_s = cy.max(0).to_string();
     OpenXmlElement::new("p", P, "grpSpPr").with_child(
         OpenXmlElement::new("a", A, "xfrm")
             .with_child(
@@ -94,8 +104,8 @@ pub fn group_shape_pr() -> OpenXmlElement {
             )
             .with_child(
                 OpenXmlElement::new("a", A, "ext")
-                    .with_attribute("cx", "0")
-                    .with_attribute("cy", "0"),
+                    .with_attribute("cx", &cx_s)
+                    .with_attribute("cy", &cy_s),
             )
             .with_child(
                 OpenXmlElement::new("a", A, "chOff")
@@ -104,8 +114,8 @@ pub fn group_shape_pr() -> OpenXmlElement {
             )
             .with_child(
                 OpenXmlElement::new("a", A, "chExt")
-                    .with_attribute("cx", "0")
-                    .with_attribute("cy", "0"),
+                    .with_attribute("cx", &cx_s)
+                    .with_attribute("cy", &cy_s),
             ),
     )
 }
