@@ -895,6 +895,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPart::{change_id_of_part,delete_part_by_id,delete_*_relationship}`
 - [x] `ProgrammaticIdentifierFeature` program_id/set/reset + package wrappers
 
+- [x] `OpenXmlPart` add external/hyperlink/data-part-ref relationships
+- [x] `OpenXmlPackage::dispose` / `open_settings` accessors
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

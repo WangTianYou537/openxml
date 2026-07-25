@@ -2458,6 +2458,26 @@ impl OpenXmlPackage {
         Ok(())
     }
 
+    /// Dispose the package (C# `IDisposable.Dispose`), saving when `auto_save` is set
+    /// and the package has an associated path.
+    pub fn dispose(&mut self) -> Result<()> {
+        if self.closed {
+            return Ok(());
+        }
+        let save = self.settings.auto_save && self.can_save() && self.opc.path().is_some();
+        self.close(save)
+    }
+
+    /// Open settings (C# `OpenSettings` property).
+    pub fn open_settings(&self) -> &OpenSettings {
+        &self.settings
+    }
+
+    /// Mutable open settings.
+    pub fn open_settings_mut(&mut self) -> &mut OpenSettings {
+        &mut self.settings
+    }
+
     /// Import a part (optionally recursive) from another package (C# `AddPart` cross-package).
     pub fn copy_part_from(
         &mut self,

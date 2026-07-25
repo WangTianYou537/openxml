@@ -431,6 +431,51 @@ impl OpenXmlPart {
         package.delete_external_relationship(Some(&self.uri), id)
     }
 
+    /// Add an external relationship from this part (C# `AddExternalRelationship`).
+    pub fn add_external_relationship(
+        &self,
+        package: &mut OpenXmlPackage,
+        relationship_type: &str,
+        target: &str,
+    ) -> String {
+        package.add_external_relationship(Some(&self.uri), relationship_type, target)
+    }
+
+    /// Add a hyperlink relationship from this part (C# `AddHyperlinkRelationship`).
+    pub fn add_hyperlink_relationship(
+        &self,
+        package: &mut OpenXmlPackage,
+        target: &str,
+        is_external: bool,
+    ) -> String {
+        package.add_hyperlink_relationship(&self.uri, target, is_external)
+    }
+
+    /// Add a data-part reference relationship from this part.
+    pub fn add_data_part_reference_relationship(
+        &self,
+        package: &mut OpenXmlPackage,
+        data_part: &crate::opc::DataPart,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> crate::error::Result<crate::opc::DataPartReferenceRelationship> {
+        package.add_data_part_reference_relationship(
+            &self.uri,
+            data_part,
+            relationship_type,
+            id,
+        )
+    }
+
+    /// Get a reference relationship by id from this part.
+    pub fn get_reference_relationship(
+        &self,
+        package: &OpenXmlPackage,
+        id: &str,
+    ) -> Option<crate::opc::ReferenceRelationship> {
+        package.get_reference_relationship(Some(&self.uri), id)
+    }
+
     /// Add an extended part under this part (C# `AddExtendedPart`).
     pub fn add_extended_part(
         &self,
@@ -886,5 +931,17 @@ mod open_xml_part_container_tests {
         assert_eq!(part.get_part_by_id(&pkg, "rIdChild"), Some(child.clone()));
         assert!(part.delete_part_by_id(&mut pkg, "rIdChild"));
         assert!(!part.is_child_part(&pkg, &child));
+        let eid = part.add_external_relationship(
+            &mut pkg,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://example.com",
+        );
+        assert!(part.get_reference_relationship(&pkg, &eid).is_some());
+        assert!(part.delete_external_relationship(&mut pkg, &eid).is_some());
+        pkg.set_program_id("Word.Document");
+        assert_eq!(pkg.program_id(), Some("Word.Document"));
+        assert!(!pkg.is_closed());
+        pkg.dispose().expect("dispose");
+        assert!(pkg.is_closed());
     }
 }
