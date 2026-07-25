@@ -387,6 +387,20 @@ impl OpenXmlPackage {
             .copy_part_from(source.opc(), source_uri, dest_uri, opts)
     }
 
+    /// Structural package comparison (part set, relationships, XML DOM).
+    pub fn compare_to(
+        &self,
+        other: &OpenXmlPackage,
+        opts: crate::opc::PackageEqualityOptions,
+    ) -> crate::opc::PackageDiff {
+        crate::opc::compare_packages(self.opc(), other.opc(), &opts)
+    }
+
+    /// Whether packages are structurally equal under default options.
+    pub fn packages_equal(&self, other: &OpenXmlPackage) -> bool {
+        crate::opc::packages_equal(self.opc(), other.opc())
+    }
+
 
 
     pub(crate) fn ensure_open(&self) -> Result<()> {

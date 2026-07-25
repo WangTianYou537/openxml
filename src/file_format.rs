@@ -128,6 +128,59 @@ impl FileFormatVersions {
         }
     }
 
+    /// C# `FileFormatVersionsExtensions.AtLeast` — whether `self` is at least `minimum`.
+    pub fn at_least(self, minimum: Self) -> bool {
+        if minimum == Self::NONE {
+            return true;
+        }
+        if self == Self::NONE {
+            return false;
+        }
+        // Multi-bit: treat as set membership / order of lowest
+        self.order() > 0 && minimum.order() > 0 && self.order() >= minimum.order()
+            || self.contains(minimum)
+            || self.intersects(minimum)
+    }
+
+    /// C# `FileFormatVersionsExtensions.AndEarlier` shell.
+    pub const fn and_earlier(self) -> Self {
+        match self {
+            Self::MICROSOFT365 => Self::ALL,
+            Self::OFFICE2021 => Self(
+                Self::OFFICE2007.0
+                    | Self::OFFICE2010.0
+                    | Self::OFFICE2013.0
+                    | Self::OFFICE2016.0
+                    | Self::OFFICE2019.0
+                    | Self::OFFICE2021.0,
+            ),
+            Self::OFFICE2019 => Self(
+                Self::OFFICE2007.0
+                    | Self::OFFICE2010.0
+                    | Self::OFFICE2013.0
+                    | Self::OFFICE2016.0
+                    | Self::OFFICE2019.0,
+            ),
+            Self::OFFICE2016 => Self(
+                Self::OFFICE2007.0
+                    | Self::OFFICE2010.0
+                    | Self::OFFICE2013.0
+                    | Self::OFFICE2016.0,
+            ),
+            Self::OFFICE2013 => {
+                Self(Self::OFFICE2007.0 | Self::OFFICE2010.0 | Self::OFFICE2013.0)
+            }
+            Self::OFFICE2010 => Self(Self::OFFICE2007.0 | Self::OFFICE2010.0),
+            Self::OFFICE2007 => Self::OFFICE2007,
+            _ => self,
+        }
+    }
+
+    /// True when any Office version bit is set.
+    pub fn is_office_version(self) -> bool {
+        self != Self::NONE && self.intersects(Self::ALL)
+    }
+
     /// Whether content introduced in `intro` is available when targeting `self`.
     pub fn includes_introduction(self, intro: Self) -> bool {
         // Target is a single version or a set; content is available if target
@@ -272,5 +325,21 @@ mod tests {
         assert!(p.contains(&"w"));
         assert!(p.contains(&"w14"));
         assert!(!p.contains(&"w15"));
+    }
+}
+
+#[cfg(test)]
+mod version_ext_tests {
+    use super::*;
+
+    #[test]
+    fn at_least_and_earlier() {
+        assert!(FileFormatVersions::OFFICE2016.at_least(FileFormatVersions::OFFICE2010));
+        assert!(!FileFormatVersions::OFFICE2010.at_least(FileFormatVersions::OFFICE2016));
+        let early = FileFormatVersions::OFFICE2013.and_earlier();
+        assert!(early.contains(FileFormatVersions::OFFICE2007));
+        assert!(early.contains(FileFormatVersions::OFFICE2013));
+        assert!(!early.contains(FileFormatVersions::OFFICE2016));
+        assert!(FileFormatVersions::OFFICE2010.and_later().contains(FileFormatVersions::OFFICE2021));
     }
 }

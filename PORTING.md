@@ -756,6 +756,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] EqualityOptions/hash/ElementComparer expanded; OpenXmlPartWriter SAX writer shell
 - [x] OpenXmlPartReader cursor (Read/GetText/LoadCurrentElement/ElementState)
 - [x] OpenXmlElementContext / LoadMode / element mutation events feature
+- [x] FileFormatVersions::at_least / and_earlier; package compare_packages / PackageDiff
 
 **Still intentionally deferred / partial:**
 
