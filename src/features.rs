@@ -125,8 +125,9 @@ pub struct PackageEvent {
 
 type Listener = Arc<dyn Fn(&PackageEvent) + Send + Sync>;
 
-/// Observable package event hub (C# `IPackageEventsFeature` / `IPartEventsFeature` shell).
+/// Observable package event hub (C# `IPackageEventsFeature` shell).
 ///
+/// Part container events live on [`PartEvents`]; part-root DOM events on [`PartRootEvents`].
 /// Store in [`FeatureCollection`] via `features.set(PackageEvents::new())`.
 #[derive(Clone, Default)]
 pub struct PackageEvents {
@@ -189,6 +190,48 @@ impl PackageEvents {
 
     pub fn listener_count(&self) -> usize {
         self.listeners.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
+/// Part container lifecycle events (C# `IPartEventsFeature` shell).
+///
+/// Fired when parts are added or removed from the package graph (not DOM root load/save —
+/// that is [`PartRootEvents`]).
+#[derive(Clone, Default)]
+pub struct PartEvents {
+    inner: PackageEvents,
+}
+
+impl std::fmt::Debug for PartEvents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PartEvents")
+            .field("listeners", &self.inner.listener_count())
+            .finish()
+    }
+}
+
+impl PartEvents {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn subscribe<F>(&self, f: F) -> usize
+    where
+        F: Fn(&PackageEvent) + Send + Sync + 'static,
+    {
+        self.inner.subscribe(f)
+    }
+
+    pub fn unsubscribe(&self, id: usize) {
+        self.inner.unsubscribe(id);
+    }
+
+    pub fn raise(&self, event_type: PackageEventType, part_uri: impl Into<String>) {
+        self.inner.raise_part(event_type, part_uri);
+    }
+
+    pub fn listener_count(&self) -> usize {
+        self.inner.listener_count()
     }
 }
 
@@ -346,6 +389,21 @@ mod tests {
         });
         events.raise(PackageEventType::Reloading, "/word/document.xml");
         events.raise(PackageEventType::Reloaded, "/word/document.xml");
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn part_events_fire() {
+        let events = PartEvents::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c2 = count.clone();
+        events.subscribe(move |e| {
+            if e.event_type == PackageEventType::Added {
+                c2.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        events.raise(PackageEventType::Adding, "/word/styles.xml");
+        events.raise(PackageEventType::Added, "/word/styles.xml");
         assert_eq!(count.load(Ordering::SeqCst), 1);
     }
 }

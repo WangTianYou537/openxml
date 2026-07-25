@@ -764,6 +764,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `XmlPath` + path-from-indices (owned-DOM); `OpenXmlUnknownElement` marker; `OpenXmlValidator` facade (max errors / file format / package+element)
 - [x] `PartRootEvents` (IPartRootEventsFeature) + raise on load/reload/save/unload
 - [x] Fluent package builders (`WordprocessingDocumentBuilder` / spreadsheet / presentation + middleware/properties shell; C# experimental `IPackageBuilder` subset)
+- [x] `PartEvents` (IPartEventsFeature) distinct from PackageEvents/PartRootEvents; raise on OpenXmlPackage set_part/delete_part
 
 **Still intentionally deferred / partial:**
 

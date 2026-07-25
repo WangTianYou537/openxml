@@ -164,9 +164,53 @@ impl OpenXmlPackage {
         crate::namespace_rewrite::rewrite_package_to_transitional(&mut self.opc)
     }
 
-    /// Delete multiple parts by URI (C# `DeleteParts`).
+    /// Delete multiple parts by URI (C# `DeleteParts`), raising part Removing/Removed events.
     pub fn delete_parts(&mut self, uris: &[crate::opc::PackUri]) -> usize {
-        self.opc.delete_parts(uris)
+        let mut n = 0;
+        for uri in uris {
+            if self.delete_part(uri).is_some() {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Remove a part and raise part Removing/Removed events (C# `DeletePart` + `IPartEventsFeature`).
+    pub fn delete_part(&mut self, uri: &crate::opc::PackUri) -> Option<Vec<u8>> {
+        let uri_str = uri.to_string();
+        self.raise_part_event(crate::features::PackageEventType::Removing, &uri_str);
+        self.raise_part_event(crate::features::PackageEventType::Deleting, &uri_str);
+        let data = self.opc.remove_part(uri);
+        if data.is_some() {
+            self.raise_part_event(crate::features::PackageEventType::Removed, &uri_str);
+            self.raise_part_event(crate::features::PackageEventType::Deleted, &uri_str);
+        }
+        data
+    }
+
+    /// Insert or replace part bytes and raise Adding/Added (or Creating/Created) part events.
+    pub fn set_part(
+        &mut self,
+        uri: impl Into<crate::opc::PackUri>,
+        content_type: impl Into<String>,
+        data: impl Into<Vec<u8>>,
+    ) {
+        let uri = uri.into();
+        let uri_str = uri.to_string();
+        let existed = self.opc.has_part(&uri);
+        if existed {
+            self.raise_part_event(crate::features::PackageEventType::Adding, &uri_str);
+        } else {
+            self.raise_part_event(crate::features::PackageEventType::Creating, &uri_str);
+            self.raise_part_event(crate::features::PackageEventType::Adding, &uri_str);
+        }
+        self.opc.set_part(uri, content_type, data);
+        if existed {
+            self.raise_part_event(crate::features::PackageEventType::Added, &uri_str);
+        } else {
+            self.raise_part_event(crate::features::PackageEventType::Created, &uri_str);
+            self.raise_part_event(crate::features::PackageEventType::Added, &uri_str);
+        }
     }
 
     /// Apply Markup Compatibility processing to all XML parts when mode is
@@ -252,6 +296,17 @@ impl OpenXmlPackage {
             .expect("PackageEvents just set")
     }
 
+    /// Ensure a [`PartEvents`](crate::features::PartEvents) feature exists
+    /// (C# `AddPartEventsFeature` / `IPartEventsFeature`).
+    pub fn part_events(&mut self) -> &crate::features::PartEvents {
+        if !self.features.contains::<crate::features::PartEvents>() {
+            self.features.set(crate::features::PartEvents::new());
+        }
+        self.features
+            .get::<crate::features::PartEvents>()
+            .expect("PartEvents just set")
+    }
+
     /// Raise a package lifecycle event if a listener hub is registered (no-op otherwise).
     pub fn raise_package_event(&self, event_type: crate::features::PackageEventType) {
         if let Some(ev) = self.features.get::<crate::features::PackageEvents>() {
@@ -259,13 +314,18 @@ impl OpenXmlPackage {
         }
     }
 
+    /// Raise a part-container event on [`PartEvents`] (and mirror on [`PackageEvents`] if present).
     pub fn raise_part_event(
         &self,
         event_type: crate::features::PackageEventType,
         part_uri: impl Into<String>,
     ) {
+        let uri = part_uri.into();
+        if let Some(ev) = self.features.get::<crate::features::PartEvents>() {
+            ev.raise(event_type, uri.clone());
+        }
         if let Some(ev) = self.features.get::<crate::features::PackageEvents>() {
-            ev.raise_part(event_type, part_uri);
+            ev.raise_part(event_type, uri);
         }
     }
 
@@ -475,5 +535,41 @@ impl OpenXmlPackage {
         self.raise_package_event(crate::features::PackageEventType::Closing);
         self.closed = true;
         self.raise_package_event(crate::features::PackageEventType::Closed);
+    }
+}
+
+
+#[cfg(test)]
+mod part_events_tests {
+    use super::*;
+    use crate::features::PackageEventType;
+    use crate::opc::PackUri;
+    use crate::namespace::content_type;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn part_events_on_set_and_delete() {
+        let mut pkg = OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let added = Arc::new(AtomicUsize::new(0));
+        let removed = Arc::new(AtomicUsize::new(0));
+        let a = added.clone();
+        let r = removed.clone();
+        pkg.part_events().subscribe(move |e| {
+            match e.event_type {
+                PackageEventType::Added => {
+                    a.fetch_add(1, Ordering::SeqCst);
+                }
+                PackageEventType::Removed => {
+                    r.fetch_add(1, Ordering::SeqCst);
+                }
+                _ => {}
+            }
+        });
+        let uri = PackUri::new("/word/styles.xml");
+        pkg.set_part(uri.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        assert_eq!(added.load(Ordering::SeqCst), 1);
+        assert!(pkg.delete_part(&uri).is_some());
+        assert_eq!(removed.load(Ordering::SeqCst), 1);
     }
 }

@@ -12996,7 +12996,7 @@ impl WordprocessingDocument {
 
     /// Remove a part from the package (content-type override, child rels, inbound rels).
     pub fn delete_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
-        self.package.opc_mut().remove_part(uri)
+        self.package.delete_part(uri)
     }
 
     /// Alias for [`delete_part`](Self::delete_part).
@@ -13024,7 +13024,7 @@ impl WordprocessingDocument {
     /// (approximate C# `DeletePartsRecursivelyOfType<T>`).
     /// Delete multiple parts by URI (C# `DeleteParts`).
     pub fn delete_parts(&mut self, uris: &[PackUri]) -> usize {
-        self.package.opc_mut().delete_parts(uris)
+        self.package.delete_parts(uris)
     }
 
     /// C# `StrictRelationshipFound`.
@@ -13067,15 +13067,12 @@ impl WordprocessingDocument {
 
     /// Ensure a [`PackageEvents`](crate::features::PackageEvents) feature exists and return it.
     pub fn package_events(&mut self) -> &crate::features::PackageEvents {
-        if !self.package.features().contains::<crate::features::PackageEvents>() {
-            self.package
-                .features_mut()
-                .set(crate::features::PackageEvents::new());
-        }
-        self.package
-            .features()
-            .get::<crate::features::PackageEvents>()
-            .expect("PackageEvents just set")
+        self.package.package_events()
+    }
+
+    /// Part-container events (C# `IPartEventsFeature`).
+    pub fn part_events(&mut self) -> &crate::features::PartEvents {
+        self.package.part_events()
     }
 
     /// Child parts related from the main document (C# `MainDocumentPart` children / `GetPartsOfType`).

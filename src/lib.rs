@@ -67,7 +67,7 @@ pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlDomReader, OpenXmlEle
 pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, FeatureCollection, PackageEvent, PackageEventType, PackageEvents,
-    ParagraphIdGenerator, PartRootEvents,
+    ParagraphIdGenerator, PartEvents, PartRootEvents,
 };
 pub use file_format::FileFormatVersions;
 pub use opc::{

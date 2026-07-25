@@ -2928,7 +2928,7 @@ impl PresentationDocument {
 
     /// Remove a part from the package (content-type, child rels, inbound rels).
     pub fn delete_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
-        self.package.opc_mut().remove_part(uri)
+        self.package.delete_part(uri)
     }
 
     /// Alias for [`delete_part`](Self::delete_part).
@@ -2992,19 +2992,12 @@ impl PresentationDocument {
 
     /// Ensure [`PackageEvents`](crate::features::PackageEvents) is registered.
     pub fn package_events(&mut self) -> &crate::features::PackageEvents {
-        if !self
-            .package
-            .features()
-            .contains::<crate::features::PackageEvents>()
-        {
-            self.package
-                .features_mut()
-                .set(crate::features::PackageEvents::new());
-        }
-        self.package
-            .features()
-            .get::<crate::features::PackageEvents>()
-            .expect("PackageEvents just set")
+        self.package.package_events()
+    }
+
+    /// Part-container events (C# `IPartEventsFeature`).
+    pub fn part_events(&mut self) -> &crate::features::PartEvents {
+        self.package.part_events()
     }
 
     /// Child parts related from the main part (C# GetPartsOfType / Parts).
@@ -3050,7 +3043,7 @@ impl PresentationDocument {
 
     /// Delete multiple parts by URI (C# `DeleteParts`).
     pub fn delete_parts(&mut self, uris: &[PackUri]) -> usize {
-        self.package.opc_mut().delete_parts(uris)
+        self.package.delete_parts(uris)
     }
 
     /// C# `StrictRelationshipFound`.
