@@ -80,6 +80,14 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         self.state
     }
 
+    pub fn is_start_element(&self) -> bool {
+        self.state == ElementState::Start
+    }
+
+    pub fn is_end_element(&self) -> bool {
+        self.state == ElementState::End
+    }
+
     pub fn is_eof(&self) -> bool {
         self.eof || self.state == ElementState::EOF
     }

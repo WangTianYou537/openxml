@@ -112,6 +112,35 @@ impl<W: Write> OpenXmlPartWriter<W> {
         self.write_start_element_with(element, attributes, &[])
     }
 
+    /// Write a start element mirroring the current cursor of a part reader
+    /// (C# `WriteStartElement(OpenXmlReader)`).
+    pub fn write_start_from_part_reader<R: std::io::BufRead>(
+        &mut self,
+        reader: &super::part_reader::OpenXmlPartReader<R>,
+    ) -> Result<()> {
+        if !reader.is_start_element() {
+            return Err(Error::Xml(
+                "WriteStartElement(OpenXmlReader) requires a start element".into(),
+            ));
+        }
+        let attrs = reader.open_xml_attributes();
+        self.write_start(reader.prefix(), reader.local_name(), &attrs)
+    }
+
+    /// Write a start element from a DOM reader cursor (C# `WriteStartElement(OpenXmlReader)` subset).
+    pub fn write_start_from_dom_reader(
+        &mut self,
+        reader: &super::dom_reader::OpenXmlDomReader<'_>,
+    ) -> Result<()> {
+        let Some(el) = reader.current() else {
+            return Err(Error::Xml("DOM reader has no current element".into()));
+        };
+        if !reader.is_start_element() && !reader.is_misc_node() {
+            return Err(Error::Xml("DOM reader is not on a start element".into()));
+        }
+        self.write_start_element(el)
+    }
+
     /// Write start document declaration explicitly (C# `WriteStartDocument`).
     pub fn write_start_document(&mut self) -> Result<()> {
         self.write_declaration = true;
@@ -371,5 +400,21 @@ mod tests {
         }
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("standalone=\"no\""), "{s}");
+    }
+
+    #[test]
+    fn write_start_from_part_reader_roundtrip() {
+        use super::super::part_reader::OpenXmlPartReader;
+        let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:rsidR="1"><w:r/></w:p>"#;
+        let mut r = OpenXmlPartReader::from_bytes(xml);
+        assert!(r.read().unwrap());
+        let mut buf = Vec::new();
+        let mut w = OpenXmlPartWriter::new(&mut buf).without_declaration();
+        w.write_start_from_part_reader(&r).unwrap();
+        w.write_end_element().unwrap();
+        w.finish().unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("p"), "{s}");
+        assert!(s.contains("rsidR") || s.contains("w:p"), "{s}");
     }
 }
