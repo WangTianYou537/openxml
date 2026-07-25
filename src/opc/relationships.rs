@@ -136,6 +136,42 @@ impl Relationships {
         self.items.shift_remove(id)
     }
 
+    /// Remove every relationship matching `pred`; returns the removed entries.
+    pub fn remove_where<F>(&mut self, mut pred: F) -> Vec<Relationship>
+    where
+        F: FnMut(&Relationship) -> bool,
+    {
+        let ids: Vec<String> = self
+            .items
+            .values()
+            .filter(|r| pred(r))
+            .map(|r| r.id.clone())
+            .collect();
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(r) = self.items.shift_remove(&id) {
+                out.push(r);
+            }
+        }
+        out
+    }
+
+    /// Relationships with `TargetMode=External`.
+    pub fn external(&self) -> Vec<&Relationship> {
+        self.items
+            .values()
+            .filter(|r| r.target_mode == RelationshipTargetMode::External)
+            .collect()
+    }
+
+    /// Relationships with `TargetMode=Internal`.
+    pub fn internal(&self) -> Vec<&Relationship> {
+        self.items
+            .values()
+            .filter(|r| r.target_mode == RelationshipTargetMode::Internal)
+            .collect()
+    }
+
     fn allocate_id(&mut self) -> String {
         loop {
             let id = format!("rId{}", self.next_id);

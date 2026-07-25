@@ -25389,19 +25389,90 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         Ok(crate::validation::validate_schematron_attributes(&root))
     }
 
-    /// Remove a part from the package (and its content-type override + child rels).
+    /// Remove a part from the package (content-type, child rels, inbound rels).
     ///
     /// Does not rewrite workbook sheet lists; callers that remove a worksheet
     /// should update the workbook separately.
     pub fn delete_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
-        self.package.opc_mut().remove_part(&uri)
+        self.package.opc_mut().remove_part(uri)
     }
-
 
     /// Alias for [`delete_part`](Self::delete_part).
     pub fn remove_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
         self.delete_part(uri)
     }
+
+    /// Delete a part and cascade to parts that become unreachable.
+    pub fn delete_part_and_orphans(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
+        self.package.opc_mut().delete_part_and_orphans(uri)
+    }
+
+    /// Delete the part identified by relationship id on the workbook part.
+    pub fn delete_part_by_id(&mut self, id: &str) -> bool {
+        let source = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .ok();
+        self.package
+            .opc_mut()
+            .delete_part_by_id(source.as_ref(), id)
+    }
+
+    /// Delete every part with the given content type, cascading orphans.
+    pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
+        self.package
+            .opc_mut()
+            .delete_parts_of_content_type(content_type)
+    }
+
+    /// Add an external relationship from the workbook part.
+    pub fn add_external_relationship(
+        &mut self,
+        relationship_type: &str,
+        external_uri: &str,
+    ) -> Result<String> {
+        let wb = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no workbook part".into()))?;
+        Ok(self.package.opc_mut().add_external_relationship(
+            Some(&wb),
+            relationship_type,
+            external_uri,
+        ))
+    }
+
+    /// External relationships on the workbook part.
+    pub fn external_relationships(&self) -> Vec<&crate::opc::Relationship> {
+        let Ok(wb) = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+        else {
+            return Vec::new();
+        };
+        self.package.opc().external_relationships(Some(&wb))
+    }
+
+    /// Ensure [`PackageEvents`](crate::features::PackageEvents) is registered.
+    pub fn package_events(&mut self) -> &crate::features::PackageEvents {
+        if !self
+            .package
+            .features()
+            .contains::<crate::features::PackageEvents>()
+        {
+            self.package
+                .features_mut()
+                .set(crate::features::PackageEvents::new());
+        }
+        self.package
+            .features()
+            .get::<crate::features::PackageEvents>()
+            .expect("PackageEvents just set")
+    }
+
 
     /// Create a workbook by cloning an existing package (template).
     pub fn create_from_template(template_path: impl AsRef<Path>) -> Result<Self> {

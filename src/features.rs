@@ -2,10 +2,12 @@
 //!
 //! The C# SDK uses a full Features DI container with events and ParagraphId
 //! generation. This module provides a typed-key bag for attaching optional
-//! services to a package without a full DI graph.
+//! services to a package without a full DI graph, plus a small package-event
+//! hub mirroring `IPackageEventsFeature` / `EventType`.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// Type-keyed bag of optional services.
 #[derive(Default)]
@@ -94,9 +96,106 @@ impl ParagraphIdGenerator {
     }
 }
 
+/// Package / part lifecycle events (subset of C# `DocumentFormat.OpenXml.Features.EventType`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PackageEventType {
+    Creating,
+    Created,
+    Deleting,
+    Deleted,
+    Adding,
+    Added,
+    Removing,
+    Removed,
+    Closing,
+    Closed,
+    Saving,
+    Saved,
+    Reloading,
+    Reloaded,
+}
+
+/// Event payload for package-level notifications.
+#[derive(Debug, Clone)]
+pub struct PackageEvent {
+    pub event_type: PackageEventType,
+    /// Optional part URI related to the event (empty for package-wide events).
+    pub part_uri: Option<String>,
+}
+
+type Listener = Arc<dyn Fn(&PackageEvent) + Send + Sync>;
+
+/// Observable package event hub (C# `IPackageEventsFeature` / `IPartEventsFeature` shell).
+///
+/// Store in [`FeatureCollection`] via `features.set(PackageEvents::new())`.
+#[derive(Clone, Default)]
+pub struct PackageEvents {
+    listeners: Arc<Mutex<Vec<Listener>>>,
+}
+
+impl std::fmt::Debug for PackageEvents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.listeners.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("PackageEvents")
+            .field("listeners", &n)
+            .finish()
+    }
+}
+
+impl PackageEvents {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a listener. Returns an id that can be passed to [`unsubscribe`](Self::unsubscribe).
+    pub fn subscribe<F>(&self, f: F) -> usize
+    where
+        F: Fn(&PackageEvent) + Send + Sync + 'static,
+    {
+        let mut guard = self.listeners.lock().expect("package events lock");
+        guard.push(Arc::new(f));
+        guard.len() - 1
+    }
+
+    /// Remove listener by index from [`subscribe`](Self::subscribe). No-op if out of range.
+    pub fn unsubscribe(&self, id: usize) {
+        let mut guard = self.listeners.lock().expect("package events lock");
+        if id < guard.len() {
+            guard[id] = Arc::new(|_: &PackageEvent| {});
+        }
+    }
+
+    /// Raise an event to all listeners.
+    pub fn raise(&self, event: PackageEvent) {
+        let guard = self.listeners.lock().expect("package events lock");
+        for listener in guard.iter() {
+            listener(&event);
+        }
+    }
+
+    pub fn raise_type(&self, event_type: PackageEventType) {
+        self.raise(PackageEvent {
+            event_type,
+            part_uri: None,
+        });
+    }
+
+    pub fn raise_part(&self, event_type: PackageEventType, part_uri: impl Into<String>) {
+        self.raise(PackageEvent {
+            event_type,
+            part_uri: Some(part_uri.into()),
+        });
+    }
+
+    pub fn listener_count(&self) -> usize {
+        self.listeners.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
     fn feature_bag_roundtrip() {
@@ -115,5 +214,21 @@ mod tests {
         let mut g = f.remove::<ParagraphIdGenerator>().unwrap();
         assert!(!f.contains::<ParagraphIdGenerator>());
         assert_eq!(g.next_id(), "0000000C");
+    }
+
+    #[test]
+    fn package_events_fire() {
+        let events = PackageEvents::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c2 = count.clone();
+        events.subscribe(move |e| {
+            if e.event_type == PackageEventType::Closing {
+                c2.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        events.raise_type(PackageEventType::Saving);
+        events.raise_type(PackageEventType::Closing);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        events.raise_part(PackageEventType::Deleted, "/word/styles.xml");
     }
 }

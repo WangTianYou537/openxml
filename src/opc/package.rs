@@ -470,15 +470,369 @@ impl OpcPackage {
         self.dirty = true;
     }
 
+    /// Remove a part's bytes, content-type override, and its own `.rels`.
+    ///
+    /// Also strips **inbound** relationships (package-level and other parts) that
+    /// target this URI — closer to C# `OpenXmlPartContainer.DeletePart` than a bare
+    /// map remove. Does **not** cascade into children of the deleted part; use
+    /// [`delete_part_and_orphans`](Self::delete_part_and_orphans) for that.
     pub fn remove_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
+        self.remove_inbound_relationships(uri);
         self.content_types.overrides.shift_remove(uri.as_str());
         self.part_rels.shift_remove(uri);
         self.dirty = true;
         match self.parts.borrow_mut().shift_remove(uri) {
             Some(PartData::Loaded(d)) => Some(d),
-            Some(PartData::Lazy { .. }) => None,
+            Some(PartData::Lazy { .. }) => {
+                // Part existed (lazy) but bytes were never materialised.
+                Some(Vec::new())
+            }
             None => None,
         }
+    }
+
+    /// Remove every relationship (package or part) whose resolved internal target is `uri`.
+    pub fn remove_inbound_relationships(&mut self, uri: &PackUri) {
+        let target = uri.as_str();
+        self.package_rels.remove_where(|r| {
+            r.target_mode == RelationshipTargetMode::Internal
+                && relationship_targets_uri(None, r, target)
+        });
+        // Collect source URIs first to avoid borrow issues while mutating.
+        let sources: Vec<PackUri> = self.part_rels.keys().cloned().collect();
+        for source in sources {
+            if let Some(rels) = self.part_rels.get_mut(&source) {
+                rels.remove_where(|r| {
+                    r.target_mode == RelationshipTargetMode::Internal
+                        && relationship_targets_uri(Some(&source), r, target)
+                });
+            }
+        }
+        self.dirty = true;
+    }
+
+    /// Collect absolute URIs of all parts reachable from package relationships
+    /// (and optionally only from `roots` if provided).
+    pub fn reachable_parts(&self, roots: Option<&[PackUri]>) -> indexmap::IndexSet<PackUri> {
+        use indexmap::IndexSet;
+        let mut seen: IndexSet<PackUri> = IndexSet::new();
+        let mut stack: Vec<PackUri> = Vec::new();
+        if let Some(roots) = roots {
+            for r in roots {
+                if self.has_part(r) {
+                    stack.push(r.clone());
+                }
+            }
+        } else {
+            for rel in self.package_rels.iter() {
+                if rel.target_mode != RelationshipTargetMode::Internal {
+                    continue;
+                }
+                if let Ok(u) = self.resolve_relationship(None, rel) {
+                    if self.has_part(&u) {
+                        stack.push(u);
+                    }
+                }
+            }
+        }
+        while let Some(uri) = stack.pop() {
+            if !seen.insert(uri.clone()) {
+                continue;
+            }
+            if let Some(rels) = self.part_relationships(&uri) {
+                for rel in rels.iter() {
+                    if rel.target_mode != RelationshipTargetMode::Internal {
+                        continue;
+                    }
+                    if let Ok(child) = self.resolve_relationship(Some(&uri), rel) {
+                        if self.has_part(&child) && !seen.contains(&child) {
+                            stack.push(child);
+                        }
+                    }
+                }
+            }
+        }
+        seen
+    }
+
+    /// Delete `uri` and any parts that become unreachable from the package root
+    /// (C# `DeletePartCore` orphan cascade, simplified).
+    ///
+    /// Returns the removed bytes of `uri` if it existed.
+    pub fn delete_part_and_orphans(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
+        if !self.has_part(uri) {
+            return None;
+        }
+        // Parts reachable *only* via the subtree starting at `uri`.
+        let from_target = self.reachable_parts(Some(std::slice::from_ref(uri)));
+        // Live parts if we pretend `uri` is already gone: walk from package root but
+        // skip entering `uri`.
+        let live = self.reachable_parts_excluding(uri);
+        let mut to_delete: Vec<PackUri> = from_target
+            .into_iter()
+            .filter(|p| !live.contains(p))
+            .collect();
+        // Ensure the primary target is deleted even if still referenced (caller asked).
+        if !to_delete.iter().any(|p| p == uri) {
+            to_delete.push(uri.clone());
+        }
+        // Delete deepest paths first so inbound cleanup is predictable.
+        to_delete.sort_by(|a, b| b.as_str().len().cmp(&a.as_str().len()));
+        let mut primary = None;
+        for p in &to_delete {
+            let data = self.remove_part(p);
+            if p == uri {
+                primary = data;
+            }
+        }
+        primary
+    }
+
+    /// Like [`reachable_parts`](Self::reachable_parts) from package root, but never
+    /// descends into `exclude` (treats it as already deleted).
+    pub fn reachable_parts_excluding(&self, exclude: &PackUri) -> indexmap::IndexSet<PackUri> {
+        use indexmap::IndexSet;
+        let mut seen: IndexSet<PackUri> = IndexSet::new();
+        let mut stack: Vec<PackUri> = Vec::new();
+        for rel in self.package_rels.iter() {
+            if rel.target_mode != RelationshipTargetMode::Internal {
+                continue;
+            }
+            if let Ok(u) = self.resolve_relationship(None, rel) {
+                if &u != exclude && self.has_part(&u) {
+                    stack.push(u);
+                }
+            }
+        }
+        while let Some(uri) = stack.pop() {
+            if &uri == exclude || !seen.insert(uri.clone()) {
+                continue;
+            }
+            if let Some(rels) = self.part_relationships(&uri) {
+                for rel in rels.iter() {
+                    if rel.target_mode != RelationshipTargetMode::Internal {
+                        continue;
+                    }
+                    if let Ok(child) = self.resolve_relationship(Some(&uri), rel) {
+                        if &child != exclude && self.has_part(&child) && !seen.contains(&child) {
+                            stack.push(child);
+                        }
+                    }
+                }
+            }
+        }
+        seen
+    }
+
+    /// Delete the part identified by relationship `id` on `source` (or package-level
+    /// when `source` is `None`), cascading orphans. Mirrors C# `DeletePart(string id)`.
+    pub fn delete_part_by_id(&mut self, source: Option<&PackUri>, id: &str) -> bool {
+        let rel = match source {
+            Some(s) => self.part_relationships(s).and_then(|r| r.get(id)).cloned(),
+            None => self.package_rels.get(id).cloned(),
+        };
+        let Some(rel) = rel else {
+            return false;
+        };
+        if rel.target_mode == RelationshipTargetMode::External {
+            match source {
+                Some(s) => {
+                    self.part_relationships_mut(s).remove(id);
+                }
+                None => {
+                    self.package_rels.remove(id);
+                }
+            }
+            self.dirty = true;
+            return true;
+        }
+        let Ok(target) = self.resolve_relationship(source, &rel) else {
+            return false;
+        };
+        // Drop the relationship first so orphan detection sees it gone.
+        match source {
+            Some(s) => {
+                self.part_relationships_mut(s).remove(id);
+            }
+            None => {
+                self.package_rels.remove(id);
+            }
+        }
+        self.dirty = true;
+        if self.has_part(&target) {
+            // Orphans relative to remaining graph (relationship already removed).
+            let live = self.reachable_parts(None);
+            let from_target = self.reachable_parts(Some(std::slice::from_ref(&target)));
+            let mut to_delete: Vec<PackUri> = from_target
+                .into_iter()
+                .filter(|p| !live.contains(p))
+                .collect();
+            if to_delete.is_empty() && !live.contains(&target) {
+                to_delete.push(target);
+            } else if !to_delete.iter().any(|p| p == &target) && !live.contains(&target) {
+                to_delete.push(target);
+            }
+            to_delete.sort_by(|a, b| b.as_str().len().cmp(&a.as_str().len()));
+            for p in to_delete {
+                // remove_part also strips any remaining inbound refs
+                let _ = self.remove_part(&p);
+            }
+        }
+        true
+    }
+
+    /// Delete every part whose content type equals `content_type`, cascading orphans.
+    ///
+    /// Approximate stand-in for C# `DeletePartsRecursivelyOfType<T>` when T is known
+    /// only by content type (Rust has no generic OpenXmlPart hierarchy).
+    pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
+        let mut uris: Vec<PackUri> = self
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
+                self.content_types
+                    .content_type_for(u.as_str())
+                    .map(|ct| ct == content_type)
+                    .unwrap_or(false)
+            })
+            .collect();
+        uris.sort_by(|a, b| b.as_str().len().cmp(&a.as_str().len()));
+        let mut n = 0;
+        for u in uris {
+            if self.has_part(&u) {
+                let _ = self.delete_part_and_orphans(&u);
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Delete every internal relationship of `relationship_type` under `source`
+    /// (package-level if `source` is `None`), cascading part deletion.
+    pub fn delete_parts_of_relationship_type(
+        &mut self,
+        source: Option<&PackUri>,
+        relationship_type: &str,
+    ) -> usize {
+        let ids: Vec<String> = match source {
+            Some(s) => self
+                .part_relationships(s)
+                .map(|rels| {
+                    rels.find_all_by_type(relationship_type)
+                        .into_iter()
+                        .map(|r| r.id.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            None => self
+                .package_rels
+                .find_all_by_type(relationship_type)
+                .into_iter()
+                .map(|r| r.id.clone())
+                .collect(),
+        };
+        let mut n = 0;
+        for id in ids {
+            if self.delete_part_by_id(source, &id) {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Add an external relationship from `source` (or package-level if `None`).
+    ///
+    /// Mirrors C# `OpenXmlPartContainer.AddExternalRelationship`.
+    pub fn add_external_relationship(
+        &mut self,
+        source: Option<&PackUri>,
+        relationship_type: &str,
+        external_uri: &str,
+    ) -> String {
+        let id = match source {
+            Some(s) => self
+                .part_relationships_mut(s)
+                .add(
+                    relationship_type,
+                    external_uri,
+                    RelationshipTargetMode::External,
+                )
+                .id
+                .clone(),
+            None => self
+                .package_rels
+                .add(
+                    relationship_type,
+                    external_uri,
+                    RelationshipTargetMode::External,
+                )
+                .id
+                .clone(),
+        };
+        self.dirty = true;
+        id
+    }
+
+    /// Add an external relationship with an explicit id.
+    pub fn add_external_relationship_with_id(
+        &mut self,
+        source: Option<&PackUri>,
+        id: &str,
+        relationship_type: &str,
+        external_uri: &str,
+    ) -> String {
+        let id = match source {
+            Some(s) => self
+                .part_relationships_mut(s)
+                .add_with_id(
+                    id,
+                    relationship_type,
+                    external_uri,
+                    RelationshipTargetMode::External,
+                )
+                .id
+                .clone(),
+            None => self
+                .package_rels
+                .add_with_id(
+                    id,
+                    relationship_type,
+                    external_uri,
+                    RelationshipTargetMode::External,
+                )
+                .id
+                .clone(),
+        };
+        self.dirty = true;
+        id
+    }
+
+    /// List external relationships on `source` (package-level if `None`).
+    pub fn external_relationships(&self, source: Option<&PackUri>) -> Vec<&Relationship> {
+        match source {
+            Some(s) => self
+                .part_relationships(s)
+                .map(|r| r.external())
+                .unwrap_or_default(),
+            None => self.package_rels.external(),
+        }
+    }
+
+    /// Delete a relationship by id from `source` (or package-level). Does not delete
+    /// the target part — use [`delete_part_by_id`](Self::delete_part_by_id) for that.
+    pub fn delete_relationship(
+        &mut self,
+        source: Option<&PackUri>,
+        id: &str,
+    ) -> Option<Relationship> {
+        let removed = match source {
+            Some(s) => self.part_relationships_mut(s).remove(id),
+            None => self.package_rels.remove(id),
+        };
+        if removed.is_some() {
+            self.dirty = true;
+        }
+        removed
     }
 
     pub fn part_relationships(&self, part: &PackUri) -> Option<&Relationships> {
@@ -675,6 +1029,32 @@ impl OpcPackage {
     }
 }
 
+/// Whether an internal relationship resolves to absolute pack URI `target`.
+fn relationship_targets_uri(
+    source: Option<&PackUri>,
+    rel: &Relationship,
+    target: &str,
+) -> bool {
+    if rel.target_mode != RelationshipTargetMode::Internal {
+        return false;
+    }
+    // Fast path: absolute or same string forms.
+    let t = rel.target.trim_start_matches('/');
+    let want = target.trim_start_matches('/');
+    if t == want || rel.target == target {
+        return true;
+    }
+    match source {
+        None => {
+            // Package-level targets are relative to package root.
+            format!("/{t}") == target || rel.target == target
+        }
+        Some(src) => resolve_uri(src, &rel.target)
+            .map(|u| u.as_str() == target)
+            .unwrap_or(false),
+    }
+}
+
 /// Convert `/word/_rels/document.xml.rels` → `/word/document.xml`.
 fn part_uri_from_rels_uri(rels_uri: &PackUri) -> PackUri {
     let s = rels_uri.as_str();
@@ -717,6 +1097,117 @@ mod tests {
         assert!(opened.has_part(&PackUri::new("/word/document.xml")));
         let main = opened.main_part_uri(rel::OFFICE_DOCUMENT).unwrap();
         assert_eq!(main.as_str(), "/word/document.xml");
+    }
+
+    #[test]
+    fn remove_part_strips_inbound_rels() {
+        let mut pkg = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        pkg.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        pkg.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &doc,
+            RelationshipTargetMode::Internal,
+        );
+        pkg.add_part_relationship(
+            &doc,
+            rel::STYLES,
+            &styles,
+            RelationshipTargetMode::Internal,
+        );
+        assert!(pkg
+            .part_relationships(&doc)
+            .unwrap()
+            .get_by_type(rel::STYLES)
+            .is_some());
+        let _ = pkg.remove_part(&styles);
+        assert!(!pkg.has_part(&styles));
+        assert!(pkg
+            .part_relationships(&doc)
+            .unwrap()
+            .get_by_type(rel::STYLES)
+            .is_none());
+    }
+
+    #[test]
+    fn delete_part_and_orphans_cascades() {
+        let mut pkg = OpcPackage::create();
+        let slide = PackUri::new("/ppt/slides/slide1.xml");
+        let chart = PackUri::new("/ppt/charts/chart1.xml");
+        let drawing = PackUri::new("/ppt/charts/_rels/unused-child.xml");
+        // Use a real child under chart
+        let colors = PackUri::new("/ppt/charts/colors1.xml");
+        pkg.set_part(
+            PackUri::new("/ppt/presentation.xml"),
+            content_type::PRESENTATION,
+            b"<p:presentation/>".to_vec(),
+        );
+        pkg.set_part(slide.clone(), content_type::PRESENTATION_SLIDE, b"<p:sld/>".to_vec());
+        pkg.set_part(
+            chart.clone(),
+            content_type::DRAWINGML_CHART,
+            b"<c:chartSpace/>".to_vec(),
+        );
+        pkg.set_part(
+            colors.clone(),
+            content_type::CHART_COLOR_STYLE,
+            b"<c:colorStyle/>".to_vec(),
+        );
+        let _ = drawing;
+        pkg.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &PackUri::new("/ppt/presentation.xml"),
+            RelationshipTargetMode::Internal,
+        );
+        pkg.add_part_relationship(
+            &PackUri::new("/ppt/presentation.xml"),
+            rel::SLIDE,
+            &slide,
+            RelationshipTargetMode::Internal,
+        );
+        pkg.add_part_relationship(
+            &slide,
+            rel::CHART,
+            &chart,
+            RelationshipTargetMode::Internal,
+        );
+        // Private child only reachable from chart
+        pkg.add_part_relationship(
+            &chart,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartColorStyle",
+            &colors,
+            RelationshipTargetMode::Internal,
+        );
+        let _ = pkg.delete_part_and_orphans(&chart);
+        assert!(!pkg.has_part(&chart));
+        assert!(!pkg.has_part(&colors));
+        assert!(pkg.has_part(&slide));
+        assert!(pkg
+            .part_relationships(&slide)
+            .unwrap()
+            .get_by_type(rel::CHART)
+            .is_none());
+    }
+
+    #[test]
+    fn external_relationship_roundtrip() {
+        let mut pkg = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        let id = pkg.add_external_relationship(
+            Some(&doc),
+            rel::HYPERLINK,
+            "https://example.com/a",
+        );
+        let ext = pkg.external_relationships(Some(&doc));
+        assert_eq!(ext.len(), 1);
+        assert_eq!(ext[0].id, id);
+        assert_eq!(ext[0].target, "https://example.com/a");
+        assert_eq!(ext[0].target_mode, RelationshipTargetMode::External);
+        assert!(pkg.delete_relationship(Some(&doc), &id).is_some());
+        assert!(pkg.external_relationships(Some(&doc)).is_empty());
     }
 
     #[test]

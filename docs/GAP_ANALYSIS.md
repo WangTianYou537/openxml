@@ -210,7 +210,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | 元素类 | 强类型 class + 属性属性 + 子元素属性 | `fn element(...)` + `ElementInfo` |
 | 枚举 | `EnumValue` 包装 | Rust `enum` + `OpenXmlSimpleType` |
 | Particles | 嵌入类型校验 | `particle_for_class` 可选表 |
-| Parts | 完整 `*Part` partial class | `PartInfo` + constraints 表 |
+| Parts | 完整 `*Part` partial class | `PartInfo` + constraints；`delete_part_and_orphans` / external rels / PackageEvents |
 | Namespaces | resolver + versions | `namespaces.rs` + `PREFIX_INTRODUCED_IN` |
 | Linq 命名 | 单独 Linq 包生成 | 无 |
 

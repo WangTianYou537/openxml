@@ -3274,6 +3274,68 @@ fn semantic_unique_and_delete_part() {
     let _ = slide_uri;
 }
 
+
+
+#[test]
+fn delete_part_strips_inbound_and_cascades() {
+    use officexml::namespace::{content_type, rel};
+    use officexml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
+
+    let mut pkg = OpcPackage::create();
+    let doc = PackUri::new("/word/document.xml");
+    let styles = PackUri::new("/word/styles.xml");
+    pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+    pkg.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+    pkg.add_package_relationship(rel::OFFICE_DOCUMENT, &doc, RelationshipTargetMode::Internal);
+    pkg.add_part_relationship(&doc, rel::STYLES, &styles, RelationshipTargetMode::Internal);
+    assert!(pkg.remove_part(&styles).is_some());
+    assert!(pkg
+        .part_relationships(&doc)
+        .unwrap()
+        .get_by_type(rel::STYLES)
+        .is_none());
+
+    // Cascade: chart + private child
+    let mut ppt =
+        PresentationDocument::create_in_memory(PresentationDocumentType::Presentation).unwrap();
+    ppt.add_slide_with_text("S").unwrap();
+    let (chart_uri, _) = ppt.add_chart_on_slide(0, "T", &["a"], &[1.0]).unwrap();
+    // chart may have children; cascade delete
+    assert!(ppt.delete_part_and_orphans(&chart_uri).is_some());
+    assert!(!ppt.package().opc().has_part(&chart_uri));
+}
+
+#[test]
+fn external_relationship_and_package_events() {
+    use officexml::features::PackageEventType;
+    use officexml::namespace::rel;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    let rid = doc
+        .add_external_relationship(rel::HYPERLINK, "https://example.com/x")
+        .unwrap();
+    assert!(doc.external_relationships().iter().any(|r| r.id == rid));
+
+    let n = Arc::new(AtomicUsize::new(0));
+    let n2 = n.clone();
+    doc.package_events().subscribe(move |e| {
+        if e.event_type == PackageEventType::Saving || e.event_type == PackageEventType::Saved {
+            n2.fetch_add(1, Ordering::SeqCst);
+        }
+    });
+    // to_bytes goes through opc directly on Word — raise via package save path:
+    doc.package_mut()
+        .raise_package_event(PackageEventType::Saving);
+    doc.package_mut()
+        .raise_package_event(PackageEventType::Saved);
+    assert!(n.load(Ordering::SeqCst) >= 2);
+}
+
 #[test]
 fn unique_attribute_validation_unit() {
     use officexml::validation::{

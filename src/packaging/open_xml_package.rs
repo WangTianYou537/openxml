@@ -115,6 +115,33 @@ impl OpenXmlPackage {
         &mut self.features
     }
 
+    /// Ensure a [`crate::features::PackageEvents`] feature exists.
+    pub fn package_events(&mut self) -> &crate::features::PackageEvents {
+        if !self.features.contains::<crate::features::PackageEvents>() {
+            self.features.set(crate::features::PackageEvents::new());
+        }
+        self.features
+            .get::<crate::features::PackageEvents>()
+            .expect("PackageEvents just set")
+    }
+
+    /// Raise a package lifecycle event if a listener hub is registered (no-op otherwise).
+    pub fn raise_package_event(&self, event_type: crate::features::PackageEventType) {
+        if let Some(ev) = self.features.get::<crate::features::PackageEvents>() {
+            ev.raise_type(event_type);
+        }
+    }
+
+    pub fn raise_part_event(
+        &self,
+        event_type: crate::features::PackageEventType,
+        part_uri: impl Into<String>,
+    ) {
+        if let Some(ev) = self.features.get::<crate::features::PackageEvents>() {
+            ev.raise_part(event_type, part_uri);
+        }
+    }
+
     pub fn path(&self) -> Option<&Path> {
         self.opc.path()
     }
@@ -134,13 +161,19 @@ impl OpenXmlPackage {
     /// Save the package to its associated path.
     pub fn save(&mut self) -> Result<()> {
         self.ensure_open()?;
-        self.opc.save()
+        self.raise_package_event(crate::features::PackageEventType::Saving);
+        self.opc.save()?;
+        self.raise_package_event(crate::features::PackageEventType::Saved);
+        Ok(())
     }
 
     /// Save the package to a new path.
     pub fn save_as(&mut self, path: impl AsRef<Path>) -> Result<()> {
         self.ensure_open()?;
-        self.opc.save_as(path)
+        self.raise_package_event(crate::features::PackageEventType::Saving);
+        self.opc.save_as(path)?;
+        self.raise_package_event(crate::features::PackageEventType::Saved);
+        Ok(())
     }
 
     /// Serialize to bytes without writing to disk.
@@ -155,6 +188,8 @@ impl OpenXmlPackage {
     }
 
     pub(crate) fn mark_closed(&mut self) {
+        self.raise_package_event(crate::features::PackageEventType::Closing);
         self.closed = true;
+        self.raise_package_event(crate::features::PackageEventType::Closed);
     }
 }

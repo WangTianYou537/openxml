@@ -12987,16 +12987,80 @@ impl WordprocessingDocument {
         Ok(crate::validation::validate_schematron_attributes(&root))
     }
 
-    /// Remove a part from the package (and its content-type override + child rels).
+    /// Remove a part from the package (content-type override, child rels, inbound rels).
     pub fn delete_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
-        self.package.opc_mut().remove_part(&uri)
+        self.package.opc_mut().remove_part(uri)
     }
-
 
     /// Alias for [`delete_part`](Self::delete_part).
     pub fn remove_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
         self.delete_part(uri)
     }
+
+    /// Delete a part and cascade to parts that become unreachable (C# DeletePart orphan cascade).
+    pub fn delete_part_and_orphans(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
+        self.package.opc_mut().delete_part_and_orphans(uri)
+    }
+
+    /// Delete the part identified by relationship id on the main document (or package if no main).
+    pub fn delete_part_by_id(&mut self, id: &str) -> bool {
+        let source = self
+            .main_document_part
+            .as_ref()
+            .map(|m| m.uri().clone());
+        self.package
+            .opc_mut()
+            .delete_part_by_id(source.as_ref(), id)
+    }
+
+    /// Delete every part with the given content type, cascading orphans
+    /// (approximate C# `DeletePartsRecursivelyOfType<T>`).
+    pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
+        self.package
+            .opc_mut()
+            .delete_parts_of_content_type(content_type)
+    }
+
+    /// Add an external relationship from the main document part.
+    pub fn add_external_relationship(
+        &mut self,
+        relationship_type: &str,
+        external_uri: &str,
+    ) -> Result<String> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?;
+        let uri = main.uri().clone();
+        Ok(self
+            .package
+            .opc_mut()
+            .add_external_relationship(Some(&uri), relationship_type, external_uri))
+    }
+
+    /// External relationships on the main document part.
+    pub fn external_relationships(&self) -> Vec<&crate::opc::Relationship> {
+        let Some(main) = self.main_document_part.as_ref() else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .external_relationships(Some(main.uri()))
+    }
+
+    /// Ensure a [`PackageEvents`](crate::features::PackageEvents) feature exists and return it.
+    pub fn package_events(&mut self) -> &crate::features::PackageEvents {
+        if !self.package.features().contains::<crate::features::PackageEvents>() {
+            self.package
+                .features_mut()
+                .set(crate::features::PackageEvents::new());
+        }
+        self.package
+            .features()
+            .get::<crate::features::PackageEvents>()
+            .expect("PackageEvents just set")
+    }
+
 
     /// Add an arbitrary extended part related from the main document.
     ///

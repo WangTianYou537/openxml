@@ -735,12 +735,15 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Typed element views: Document/Body/Paragraph/Run/Text/Table/Cell/Worksheet/Slide/Style/Hyperlink/Comment/Header/Footer/Notes
 - [x] Lightweight Features bag (`FeatureCollection` + `ParagraphIdGenerator` on `OpenXmlPackage`)
 - [x] VBA project inventory + CFB parse (`vba_project_bytes` / `list_vba_parts` / `inspect_vba_project` / `opc::CfbFile`; no macro execution)
+- [x] Part delete parity: `remove_part` strips inbound rels; `delete_part_and_orphans` / `delete_part_by_id` / `delete_parts_of_content_type` (C# DeletePart orphan cascade)
+- [x] `AddExternalRelationship` / `ExternalRelationships` on OPC + Word/Excel/PPT documents
+- [x] `PackageEvents` / `PackageEventType` feature hub (C# `IPackageEventsFeature` shell); raised on package save/close
 
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
 2. VBA **bytecode execution** (CFB inventory only; intentional non-goal)  
-3. 1:1 API parity with every C# strongly-typed Part class method surface  
+3. 1:1 API parity with every C# strongly-typed Part class method surface (generated `*Part` wrappers still thin / metadata-driven)  
 
 Regenerate Schematron tables / typed wrappers:
 
