@@ -925,6 +925,184 @@ impl OpenXmlElement {
     pub fn clone_node(&self) -> Self {
         self.clone()
     }
+
+    /// Shallow clone: attributes and ns decls only, no children or text
+    /// (C# `CloneNode(false)` shell — text is treated as content, omitted).
+    pub fn clone_node_shallow(&self) -> Self {
+        Self {
+            prefix: self.prefix.clone(),
+            namespace_uri: self.namespace_uri.clone(),
+            local_name: self.local_name.clone(),
+            attributes: self.attributes.clone(),
+            namespace_declarations: self.namespace_declarations.clone(),
+            children: Vec::new(),
+            text: None,
+            raw_outer_xml: None,
+            misc_kind: self.misc_kind,
+            annotations: Vec::new(),
+        }
+    }
+
+    /// All attributes (C# `GetAttributes`).
+    pub fn get_attributes(&self) -> &[OpenXmlAttribute] {
+        &self.attributes
+    }
+
+    /// Replace the attribute list (C# `SetAttributes`).
+    pub fn set_attributes(&mut self, attrs: impl IntoIterator<Item = OpenXmlAttribute>) {
+        self.attributes = attrs.into_iter().collect();
+    }
+
+    /// Remove every attribute (C# `ClearAllAttributes`).
+    pub fn clear_all_attributes(&mut self) {
+        self.attributes.clear();
+    }
+
+    /// Insert a child at `index` (C# `InsertAt`). Clamps to end if out of range.
+    pub fn insert_at(&mut self, index: usize, child: OpenXmlElement) {
+        let i = index.min(self.children.len());
+        self.children.insert(i, child);
+    }
+
+    /// Remove all children whose local name equals `local_name`
+    /// (C# `RemoveAllChildren<T>` shell by name).
+    pub fn remove_all_children_named(&mut self, local_name: &str) {
+        self.children.retain(|c| c.local_name != local_name);
+    }
+
+    /// Resolve a namespace URI for `prefix` from declarations on this element
+    /// (C# `LookupNamespace` on the element — no parent walk in owned trees).
+    pub fn lookup_namespace(&self, prefix: &str) -> Option<&str> {
+        let key = if prefix == "xmlns" { "" } else { prefix };
+        self.namespace_declarations
+            .iter()
+            .find(|(p, _)| p == key)
+            .map(|(_, u)| u.as_str())
+            .or_else(|| {
+                if !self.prefix.is_empty() && self.prefix == prefix && !self.namespace_uri.is_empty()
+                {
+                    Some(self.namespace_uri.as_str())
+                } else if prefix.is_empty() && !self.namespace_uri.is_empty() {
+                    Some(self.namespace_uri.as_str())
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Resolve prefix for a namespace URI from this element's declarations
+    /// (C# `LookupPrefix` shell).
+    pub fn lookup_prefix(&self, namespace_uri: &str) -> Option<&str> {
+        self.namespace_declarations
+            .iter()
+            .find(|(_, u)| u == namespace_uri)
+            .map(|(p, _)| p.as_str())
+            .or_else(|| {
+                if self.namespace_uri == namespace_uri {
+                    Some(self.prefix.as_str())
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Add or replace a namespace declaration (C# `AddNamespaceDeclaration`).
+    pub fn add_namespace_declaration(&mut self, prefix: impl Into<String>, uri: impl Into<String>) {
+        let prefix = prefix.into();
+        let uri = uri.into();
+        if let Some((_, existing)) = self
+            .namespace_declarations
+            .iter_mut()
+            .find(|(p, _)| *p == prefix)
+        {
+            *existing = uri;
+        } else {
+            self.namespace_declarations.push((prefix, uri));
+        }
+    }
+
+    /// Remove a namespace declaration by prefix (C# `RemoveNamespaceDeclaration`).
+    pub fn remove_namespace_declaration(&mut self, prefix: &str) -> bool {
+        let before = self.namespace_declarations.len();
+        self.namespace_declarations.retain(|(p, _)| p != prefix);
+        before != self.namespace_declarations.len()
+    }
+
+    /// Whether a namespace declaration with `prefix` exists.
+    pub fn has_namespace_declaration(&self, prefix: &str) -> bool {
+        self.namespace_declarations.iter().any(|(p, _)| p == prefix)
+    }
+
+    /// All namespace declarations as `(prefix, uri)` pairs.
+    pub fn namespace_declarations(&self) -> &[(String, String)] {
+        &self.namespace_declarations
+    }
+
+    /// Get attribute by local name + namespace URI (C# `GetAttribute(local, ns)`).
+    pub fn get_attribute_ns(&self, local_name: &str, namespace_uri: &str) -> Option<&str> {
+        self.attributes
+            .iter()
+            .find(|a| {
+                a.local_name == local_name
+                    && a.namespace_uri.as_deref() == Some(namespace_uri)
+            })
+            .map(|a| a.value.as_str())
+            .or_else(|| {
+                // Fallback: match local only when ns empty on attr
+                if namespace_uri.is_empty() {
+                    self.get_attribute(local_name)
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Direct element children only (C# `Elements()` / `ChildElements` shell).
+    pub fn elements(&self) -> impl Iterator<Item = &OpenXmlElement> {
+        self.children.iter().filter(|c| !c.is_misc_node())
+    }
+
+    /// Element children with the given local name (C# `Elements<T>` by name).
+    pub fn elements_named<'a>(
+        &'a self,
+        local_name: &'a str,
+    ) -> impl Iterator<Item = &'a OpenXmlElement> + 'a {
+        self.children
+            .iter()
+            .filter(move |c| !c.is_misc_node() && c.local_name == local_name)
+    }
+
+    /// First element child (skipping misc nodes) — C# `GetFirstChild` shell.
+    pub fn get_first_child_element(&self) -> Option<&OpenXmlElement> {
+        self.elements().next()
+    }
+
+    pub fn get_first_child_named<'a>(&'a self, local_name: &str) -> Option<&'a OpenXmlElement> {
+        self.children
+            .iter()
+            .find(|c| !c.is_misc_node() && c.local_name == local_name)
+    }
+
+    /// Siblings before `index` among the parent's children (caller supplies parent slice).
+    pub fn elements_before_in_parent<'a>(
+        parent_children: &'a [OpenXmlElement],
+        index: usize,
+    ) -> impl Iterator<Item = &'a OpenXmlElement> + 'a {
+        parent_children[..index.min(parent_children.len())]
+            .iter()
+            .filter(|c| !c.is_misc_node())
+    }
+
+    /// Siblings after `index` among the parent's children.
+    pub fn elements_after_in_parent<'a>(
+        parent_children: &'a [OpenXmlElement],
+        index: usize,
+    ) -> impl Iterator<Item = &'a OpenXmlElement> + 'a {
+        let start = (index + 1).min(parent_children.len());
+        parent_children[start..]
+            .iter()
+            .filter(|c| !c.is_misc_node())
+    }
 }
 
 /// Iterator over descendants (children, grandchildren, …).
@@ -1052,5 +1230,55 @@ mod path_nav_tests {
         // second call returns existing
         let _ = body.get_or_add_first_child_with("sectPr", || OpenXmlElement::w("sectPr"));
         assert_eq!(body.child_count(), 4);
+    }
+}
+
+#[cfg(test)]
+mod element_api_parity_tests {
+    use super::*;
+
+    #[test]
+    fn clone_node_shallow_and_attrs() {
+        let mut el = OpenXmlElement::w("p")
+            .with_attribute("rsidR", "00AB")
+            .with_ns_decl("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+            .with_child(OpenXmlElement::w("r").with_text("hi"));
+        el.set_text("ignore-on-shallow");
+        let shallow = el.clone_node_shallow();
+        assert!(shallow.children.is_empty());
+        assert!(shallow.text.is_none());
+        assert_eq!(shallow.get_attribute("rsidR"), Some("00AB"));
+        assert_eq!(
+            shallow.lookup_namespace("w"),
+            Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+        );
+
+        el.clear_all_attributes();
+        assert!(el.get_attributes().is_empty());
+        el.set_attributes(vec![OpenXmlAttribute {
+            prefix: None,
+            namespace_uri: None,
+            local_name: "a".into(),
+            value: "1".into(),
+        }]);
+        assert_eq!(el.get_attribute("a"), Some("1"));
+
+        el.insert_at(0, OpenXmlElement::w("x"));
+        assert_eq!(el.children[0].local_name, "x");
+        el.append_child(OpenXmlElement::w("r"));
+        el.append_child(OpenXmlElement::comment("c"));
+        el.remove_all_children_named("r");
+        assert!(el.children.iter().all(|c| c.local_name != "r" || c.is_misc_node()));
+        assert_eq!(el.elements().count(), 1); // only x
+        assert_eq!(el.get_first_child_named("x").map(|e| e.local_name.as_str()), Some("x"));
+
+        el.add_namespace_declaration("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
+        assert!(el.has_namespace_declaration("r"));
+        assert_eq!(
+            el.lookup_namespace("r"),
+            Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships")
+        );
+        assert!(el.remove_namespace_declaration("r"));
+        assert!(!el.has_namespace_declaration("r"));
     }
 }

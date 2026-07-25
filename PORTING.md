@@ -751,6 +751,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Cross-package `copy_part_from` / `import_part` (C# `AddPart` when part is foreign)
 - [x] Excel/PPT packaging parity: delete_parts, ChangeIdOfPart, IdPartPair, media data parts, CreateRelationshipToPart, ExtendedPart
 - [x] Word `add_typed_child_part` (AddNewPart via PartInfo)
+- [x] DOM: CloneNode(shallow), Get/Set/Clear attributes, InsertAt, RemoveAllChildren by name, LookupNamespace/Prefix, Elements/GetFirstChild, ns decl add/remove
+- [x] Package `delete_data_part` (C# DeletePart(DataPart)) on OpenXmlPackage + Word/Excel/PPT
 
 **Still intentionally deferred / partial:**
 

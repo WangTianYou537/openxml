@@ -297,6 +297,12 @@ impl OpenXmlPackage {
         self.opc_mut().delete_unused_data_parts()
     }
 
+    /// Delete a data part if unreferenced (C# `DeletePart(DataPart)`).
+    pub fn delete_data_part(&mut self, uri: &crate::opc::PackUri) -> Result<bool> {
+        self.ensure_open()?;
+        self.opc.delete_data_part(uri)
+    }
+
     pub fn path(&self) -> Option<&Path> {
         self.opc.path()
     }

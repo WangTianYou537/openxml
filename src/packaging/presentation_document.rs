@@ -3122,6 +3122,12 @@ impl PresentationDocument {
             .create_media_data_part(content_type, extension)
     }
 
+    /// Delete a package data part if unreferenced (C# `DeletePart(DataPart)`).
+    pub fn delete_data_part(&mut self, uri: &PackUri) -> Result<bool> {
+        self.package.delete_data_part(uri)
+    }
+
+
     /// Add a data-part reference from the main part (C# `AddDataPartReferenceRelationship`).
     pub fn add_data_part_reference_relationship(
         &mut self,
