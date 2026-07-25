@@ -11,6 +11,7 @@ mod attributes;
 mod digsig;
 mod digsig_crypto;
 mod package;
+mod package_validator;
 mod particle;
 mod schematron_constraints;
 mod schematron_rules;
@@ -29,6 +30,10 @@ pub use attributes::{
     validate_spreadsheet_attribute_ranges, AttributeRule, AttributeType,
 };
 pub use package::validate_package;
+pub use package_validator::{
+    message_id as package_constraint_message_id, validate_package_constraints,
+    validate_part_constraints,
+};
 pub use particle::{validate_particle, validate_word_particles, Occurs, Particle};
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,

@@ -760,6 +760,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Digsig packaging helpers: ensure origin, add/list/clear signature parts (no full crypto)
 - [x] OpenXmlDomReader DOM cursor (Read/Skip over element trees)
 - [x] PartConstraintFeature / PartConstraintRule (IPartConstraintFeature shell)
+- [x] PackageValidator-style `validate_package_constraints` (PartIsNotAllowed / RequiredPart / OnlyOne / InvalidContentType / DataPartRef) wired into `validate_package` + Word/Excel/PPT
 
 **Still intentionally deferred / partial:**
 

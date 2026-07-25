@@ -109,6 +109,11 @@ impl OpenXmlPackage {
         &mut self.opc
     }
 
+    /// Validate part relationship constraints (C# `PackageValidator`).
+    pub fn validate_package_constraints(&self) -> Vec<crate::validation::ValidationError> {
+        crate::validation::validate_package_constraints(&self.opc)
+    }
+
     /// Feature bag (typed services attached to this package).
     pub fn features(&self) -> &FeatureCollection {
         &self.features

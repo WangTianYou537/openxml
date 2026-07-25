@@ -25324,6 +25324,13 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         ))
     }
 
+    /// Validate part relationship constraints (C# `PackageValidator`).
+    pub fn validate_package_constraints(&self) -> Result<Vec<crate::validation::ValidationError>> {
+        Ok(crate::validation::validate_package_constraints(
+            self.package.opc(),
+        ))
+    }
+
     /// Validate relationship-id attributes and unique-attribute rules in the workbook.
     pub fn validate_relationships(&self) -> Result<Vec<crate::validation::ValidationError>> {
         let wb_uri = PackUri::new("/xl/workbook.xml");

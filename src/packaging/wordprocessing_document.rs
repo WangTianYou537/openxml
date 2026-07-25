@@ -12930,6 +12930,13 @@ impl WordprocessingDocument {
         ))
     }
 
+    /// Validate part relationship constraints (C# `PackageValidator`).
+    pub fn validate_package_constraints(&self) -> Result<Vec<ValidationError>> {
+        Ok(crate::validation::validate_package_constraints(
+            self.package.opc(),
+        ))
+    }
+
     /// Validate relationship-id attributes in the main document against part relationships.
     ///
     /// Uses hand-curated Word rules merged with the extractable Schematron subset.

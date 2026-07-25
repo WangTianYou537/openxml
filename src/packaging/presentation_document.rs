@@ -2851,6 +2851,13 @@ impl PresentationDocument {
         ))
     }
 
+    /// Validate part relationship constraints (C# `PackageValidator`).
+    pub fn validate_package_constraints(&self) -> Result<Vec<crate::validation::ValidationError>> {
+        Ok(crate::validation::validate_package_constraints(
+            self.package.opc(),
+        ))
+    }
+
     /// Validate relationship-id attributes and unique-attribute rules in the presentation.
     pub fn validate_relationships(&self) -> Result<Vec<crate::validation::ValidationError>> {
         let pres_uri = PackUri::new(PRESENTATION_URI);

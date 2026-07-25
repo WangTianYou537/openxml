@@ -128,6 +128,9 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
     errors.extend(super::validate_digital_signatures(package));
     errors.extend(super::validate_signature_digests(package));
 
+    // Part relationship constraints (C# PackageValidator).
+    errors.extend(super::validate_package_constraints(package));
+
     errors
 }
 
