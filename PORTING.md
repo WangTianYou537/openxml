@@ -738,6 +738,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Part delete parity: `remove_part` strips inbound rels; `delete_part_and_orphans` / `delete_part_by_id` / `delete_parts_of_content_type` (C# DeletePart orphan cascade)
 - [x] `AddExternalRelationship` / `ExternalRelationships` on OPC + Word/Excel/PPT documents
 - [x] `PackageEvents` / `PackageEventType` feature hub (C# `IPackageEventsFeature` shell); raised on package save/close
+- [x] `PartUriHelper` + `RelatedPart` / `related_parts` / `parts_of_relationship_type` (C# PartUriHelper + GetPartsOfType shell)
 
 **Still intentionally deferred / partial:**
 

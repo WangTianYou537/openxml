@@ -25473,6 +25473,45 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .expect("PackageEvents just set")
     }
 
+    /// Child parts related from the main part (C# GetPartsOfType / Parts).
+    pub fn related_parts(
+        &self,
+        relationship_type: Option<&str>,
+    ) -> Vec<crate::opc::RelatedPart> {
+        let Ok(main) = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+        else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .related_parts(Some(&main), relationship_type)
+    }
+
+    /// Allocate a unique part URI under the main part.
+    pub fn create_unique_part_uri(
+        &self,
+        content_type: &str,
+        target_path: &str,
+        target_name: &str,
+        target_ext: &str,
+    ) -> Result<PackUri> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        self.package.opc().create_unique_part_uri(
+            content_type,
+            &main,
+            target_path,
+            target_name,
+            target_ext,
+        )
+    }
+
 
     /// Create a workbook by cloning an existing package (template).
     pub fn create_from_template(template_path: impl AsRef<Path>) -> Result<Self> {

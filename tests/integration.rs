@@ -3276,6 +3276,38 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn part_uri_helper_and_related_parts() {
+    use officexml::namespace::{content_type, rel};
+    use officexml::opc::PartUriHelper;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    doc.add_default_styles().unwrap();
+    let kids = doc.related_parts(Some(rel::STYLES));
+    assert_eq!(kids.len(), 1);
+    assert!(kids[0].uri.as_str().contains("styles"));
+
+    let uri = doc
+        .create_unique_part_uri(content_type::WORD_HEADER, ".", "header", ".xml")
+        .unwrap();
+    assert!(uri.as_str().contains("header"));
+    // Reserve by actually adding the part so the next allocation differs.
+    doc.package_mut()
+        .opc_mut()
+        .set_part(uri.clone(), content_type::WORD_HEADER, b"<w:hdr/>".to_vec());
+    let uri2 = doc
+        .create_unique_part_uri(content_type::WORD_HEADER, ".", "header", ".xml")
+        .unwrap();
+    assert_ne!(uri, uri2);
+
+    let mut h = PartUriHelper::from_package(doc.package().opc());
+    assert!(h.is_reserved(&kids[0].uri));
+}
+
 #[test]
 fn delete_part_strips_inbound_and_cascades() {
     use officexml::namespace::{content_type, rel};

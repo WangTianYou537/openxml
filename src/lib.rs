@@ -71,7 +71,7 @@ pub use features::{
 pub use file_format::FileFormatVersions;
 pub use opc::{
     add_media_part, CompressionOption, CustomProperties, CustomProperty, CustomPropertyValue,
-    ExtendedProperties, MediaKind, MediaPartInfo, PackageProperties,
+    ExtendedProperties, MediaKind, MediaPartInfo, PackageProperties, PartUriHelper, RelatedPart,
 };
 pub use packaging::{
     default_settings, default_styles, footer, footer_reference, header, header_reference,

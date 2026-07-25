@@ -13061,6 +13061,40 @@ impl WordprocessingDocument {
             .expect("PackageEvents just set")
     }
 
+    /// Child parts related from the main document (C# `MainDocumentPart` children / `GetPartsOfType`).
+    pub fn related_parts(
+        &self,
+        relationship_type: Option<&str>,
+    ) -> Vec<crate::opc::RelatedPart> {
+        let Some(main) = self.main_document_part.as_ref() else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .related_parts(Some(main.uri()), relationship_type)
+    }
+
+    /// Allocate a unique part URI under the main document using [`PartUriHelper`](crate::opc::PartUriHelper).
+    pub fn create_unique_part_uri(
+        &self,
+        content_type: &str,
+        target_path: &str,
+        target_name: &str,
+        target_ext: &str,
+    ) -> Result<PackUri> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?;
+        self.package.opc().create_unique_part_uri(
+            content_type,
+            main.uri(),
+            target_path,
+            target_name,
+            target_ext,
+        )
+    }
+
 
     /// Add an arbitrary extended part related from the main document.
     ///
