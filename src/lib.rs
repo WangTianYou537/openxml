@@ -68,10 +68,10 @@ pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, ApplicationType, ContentTypeFeature, DisposableFeature, DocumentTypeFeature,
     FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature, PackageCapabilities,
-    PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageRelationshipBuilder,
-    ParagraphIdGenerator, PartEvents, PartFactoryFeature, PartRootEvents, PartsFeature,
-    ProgrammaticIdentifierFeature, RelationshipFilterFeature, SchemaTrackingFeature,
-    StrictNamespaceFeature,
+    PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageInitializerFeature,
+    PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature, ParagraphIdGenerator,
+    PartEvents, PartFactoryFeature, PartRootEvents, PartsFeature, ProgrammaticIdentifierFeature,
+    RelationshipFilterFeature, SchemaTrackingFeature, StrictNamespaceFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

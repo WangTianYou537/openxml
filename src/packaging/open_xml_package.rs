@@ -691,6 +691,58 @@ impl OpenXmlPackage {
         self.known_data_part_feature().is_known(relationship_type)
     }
 
+    /// Package stream bytes when opened from memory (C# `IPackageStreamFeature`).
+    pub fn package_stream_feature(&mut self) -> &mut crate::features::PackageStreamFeature {
+        if !self
+            .features
+            .contains::<crate::features::PackageStreamFeature>()
+        {
+            self.features
+                .set(crate::features::PackageStreamFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::PackageStreamFeature>()
+            .expect("just inserted")
+    }
+
+    /// Current part URI context (C# `IPackagePartFeature`).
+    pub fn package_part_feature(&mut self) -> &mut crate::features::PackagePartFeature {
+        if !self
+            .features
+            .contains::<crate::features::PackagePartFeature>()
+        {
+            self.features
+                .set(crate::features::PackagePartFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::PackagePartFeature>()
+            .expect("just inserted")
+    }
+
+    /// Package initializer hooks (C# `IPackageInitializer`).
+    pub fn package_initializer(&mut self) -> &crate::features::PackageInitializerFeature {
+        if !self
+            .features
+            .contains::<crate::features::PackageInitializerFeature>()
+        {
+            self.features
+                .set(crate::features::PackageInitializerFeature::new());
+        }
+        self.features
+            .get::<crate::features::PackageInitializerFeature>()
+            .expect("just inserted")
+    }
+
+    /// Run all registered package initializers and clear them.
+    pub fn run_package_initializers(&mut self) {
+        if let Some(init) = self
+            .features
+            .get::<crate::features::PackageInitializerFeature>()
+        {
+            init.run_all();
+        }
+    }
+
     /// Add a package-level relationship after running any registered relationship filters
     /// (C# relationship create + `IRelationshipFilterFeature`).
     pub fn add_package_relationship(
@@ -1034,6 +1086,30 @@ mod part_events_tests {
         pkg.lock_feature().with_lock(|| {
             r.fetch_add(1, Ordering::SeqCst);
         });
+        assert_eq!(ran.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn package_stream_part_initializer_accessors() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        pkg.package_stream_feature().set_bytes(b"abc");
+        assert_eq!(
+            pkg.package_stream_feature().bytes.as_deref(),
+            Some(&b"abc"[..])
+        );
+        pkg.package_part_feature()
+            .set_uri("/word/document.xml");
+        assert_eq!(
+            pkg.package_part_feature().part_uri.as_deref(),
+            Some("/word/document.xml")
+        );
+        let ran = Arc::new(AtomicUsize::new(0));
+        let r = ran.clone();
+        pkg.package_initializer().register(move || {
+            r.fetch_add(1, Ordering::SeqCst);
+        });
+        pkg.run_package_initializers();
         assert_eq!(ran.load(Ordering::SeqCst), 1);
     }
 }

@@ -822,6 +822,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartFactoryFeature` / `KnownDataPartFeature` shells + package accessors
 - [x] Route Word/Excel/PPT `add_*_relationship` through filtered `OpenXmlPackage` APIs
 - [x] Stream/Part reader capture XML declaration encoding + standalone; DomReader declaration shells
+- [x] `PackageStreamFeature` / `PackagePartFeature` / `PackageInitializerFeature` shells
 
 **Still intentionally deferred / partial:**
 

@@ -725,6 +725,106 @@ impl KnownDataPartFeature {
     }
 }
 
+/// Holds package source bytes when opened from a stream (C# `IPackageStreamFeature` shell).
+#[derive(Debug, Clone, Default)]
+pub struct PackageStreamFeature {
+    pub bytes: Option<Vec<u8>>,
+}
+
+impl PackageStreamFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from_bytes(bytes: impl Into<Vec<u8>>) -> Self {
+        Self {
+            bytes: Some(bytes.into()),
+        }
+    }
+
+    pub fn set_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
+        self.bytes = Some(bytes.into());
+    }
+
+    pub fn clear(&mut self) {
+        self.bytes = None;
+    }
+}
+
+/// Current package-part URI context (C# `IPackagePartFeature` shell).
+#[derive(Debug, Clone, Default)]
+pub struct PackagePartFeature {
+    pub part_uri: Option<String>,
+}
+
+impl PackagePartFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_uri(uri: impl Into<String>) -> Self {
+        Self {
+            part_uri: Some(uri.into()),
+        }
+    }
+
+    pub fn set_uri(&mut self, uri: impl Into<String>) {
+        self.part_uri = Some(uri.into());
+    }
+
+    pub fn clear(&mut self) {
+        self.part_uri = None;
+    }
+}
+
+/// Package initializer callbacks (C# `IPackageInitializer` shell).
+///
+/// Runs registered hooks after a package is constructed (builder path).
+#[derive(Default)]
+pub struct PackageInitializerFeature {
+    hooks: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+}
+
+impl std::fmt::Debug for PackageInitializerFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.hooks.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("PackageInitializerFeature")
+            .field("hooks", &n)
+            .finish()
+    }
+}
+
+impl PackageInitializerFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register an initializer callback (C# `IPackageInitializer.Initialize` shell).
+    pub fn register<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        if let Ok(mut g) = self.hooks.lock() {
+            g.push(Box::new(f));
+        }
+    }
+
+    pub fn run_all(&self) {
+        let hooks: Vec<_> = self
+            .hooks
+            .lock()
+            .map(|mut g| std::mem::take(&mut *g))
+            .unwrap_or_default();
+        for h in hooks {
+            h();
+        }
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.hooks.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
 /// Application host type flags (C# `ApplicationType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ApplicationType {
@@ -1107,5 +1207,29 @@ mod tests {
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
         ));
         assert!(!known.is_known("http://example/unknown"));
+    }
+
+    #[test]
+    fn package_stream_part_and_initializer() {
+        let mut stream = PackageStreamFeature::from_bytes(b"zip-bytes");
+        assert_eq!(stream.bytes.as_deref(), Some(&b"zip-bytes"[..]));
+        stream.clear();
+        assert!(stream.bytes.is_none());
+
+        let mut part = PackagePartFeature::with_uri("/word/document.xml");
+        assert_eq!(part.part_uri.as_deref(), Some("/word/document.xml"));
+        part.clear();
+        assert!(part.part_uri.is_none());
+
+        let fired = Arc::new(AtomicUsize::new(0));
+        let init = PackageInitializerFeature::new();
+        let f = fired.clone();
+        init.register(move || {
+            f.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(init.pending_count(), 1);
+        init.run_all();
+        assert_eq!(fired.load(Ordering::SeqCst), 1);
+        assert_eq!(init.pending_count(), 0);
     }
 }
