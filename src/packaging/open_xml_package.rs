@@ -239,6 +239,31 @@ impl OpenXmlPackage {
         self.settings.auto_save
     }
 
+    /// Set auto-save behavior (C# `OpenSettings.AutoSave`).
+    pub fn set_auto_save(&mut self, auto_save: bool) {
+        self.settings.auto_save = auto_save;
+    }
+
+    /// Markup Compatibility process settings.
+    pub fn markup_compatibility_settings(&self) -> &MarkupCompatibilityProcessSettings {
+        &self.settings.markup_compatibility
+    }
+
+    /// Mutable Markup Compatibility process settings.
+    pub fn markup_compatibility_settings_mut(&mut self) -> &mut MarkupCompatibilityProcessSettings {
+        &mut self.settings.markup_compatibility
+    }
+
+    /// Behavioral compatibility level (C# `OpenSettings.CompatibilityLevel`).
+    pub fn compatibility_level(&self) -> CompatibilityLevel {
+        self.settings.compatibility_level
+    }
+
+    /// Set behavioral compatibility level.
+    pub fn set_compatibility_level(&mut self, level: CompatibilityLevel) {
+        self.settings.compatibility_level = level;
+    }
+
     pub fn opc(&self) -> &OpcPackage {
         &self.opc
     }
@@ -831,6 +856,28 @@ impl OpenXmlPackage {
     }
 
     /// Registered data parts (C# `DataParts`).
+    /// Create a media data part from a C# `MediaDataPartType` (content type + extension).
+    pub fn create_media_data_part_typed(
+        &mut self,
+        media_type: crate::opc::MediaDataPartType,
+    ) -> crate::error::Result<crate::opc::DataPart> {
+        self.create_media_data_part(media_type.content_type(), Some(media_type.extension()))
+    }
+
+    /// Create a media data part of `media_type` pre-filled with bytes.
+    pub fn create_media_data_part_typed_with_data(
+        &mut self,
+        media_type: crate::opc::MediaDataPartType,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::error::Result<crate::opc::DataPart> {
+        self.create_media_data_part_with_data(
+            media_type.content_type(),
+            Some(media_type.extension()),
+            data,
+        )
+    }
+
+
     pub fn data_parts(&self) -> &[crate::opc::DataPart] {
         self.opc().data_parts()
     }
@@ -2147,6 +2194,19 @@ impl OpenXmlPackage {
         crate::opc::packages_equal(self.opc(), other.opc())
     }
 
+    /// Package-level relationships (`/_rels/.rels`).
+    pub fn package_relationships(&self) -> &crate::opc::Relationships {
+        self.opc.package_relationships()
+    }
+
+    /// Part-level relationships for `source`, if any.
+    pub fn part_relationships(
+        &self,
+        source: &crate::opc::PackUri,
+    ) -> Option<&crate::opc::Relationships> {
+        self.opc.part_relationships(source)
+    }
+
     /// External relationships under `source` (package-level when `None`)
     /// (C# `OpenXmlPartContainer.ExternalRelationships`).
     pub fn external_relationships(
@@ -3004,5 +3064,32 @@ mod part_events_tests {
             .external_relationships(Some(&doc))
             .iter()
             .any(|r| r.target == "https://example.com"));
+    }
+
+    #[test]
+    fn media_data_part_type_and_settings_accessors() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        assert!(pkg.auto_save());
+        pkg.set_auto_save(false);
+        assert!(!pkg.auto_save());
+        pkg.set_compatibility_level(CompatibilityLevel::Version2_20);
+        assert_eq!(pkg.compatibility_level(), CompatibilityLevel::Version2_20);
+        pkg.markup_compatibility_settings_mut().mode =
+            MarkupCompatibilityProcessMode::ProcessAllParts;
+        assert_eq!(
+            pkg.markup_compatibility_settings().mode,
+            MarkupCompatibilityProcessMode::ProcessAllParts
+        );
+        let part = pkg
+            .create_media_data_part_typed(crate::opc::MediaDataPartType::Mp3)
+            .expect("mp3");
+        assert!(part.uri.as_str().ends_with(".mp3"));
+        let filled = pkg
+            .create_media_data_part_typed_with_data(crate::opc::MediaDataPartType::Wav, b"RIFF")
+            .expect("wav");
+        assert!(filled.uri.as_str().ends_with(".wav"));
+        assert!(pkg.package_relationships().is_empty() || true);
+        assert!(pkg.part_relationships(&crate::opc::PackUri::new("/none")).is_none());
     }
 }

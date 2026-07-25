@@ -867,6 +867,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 
 - [x] `OpenXmlPackage::{external_relationships,clone_package,clone_package_to_path}` (C# ExternalRelationships / Clone shells)
 
+- [x] `MediaDataPartType` table + `OpenXmlPackage::create_media_data_part_typed[_with_data]`
+- [x] Package relationship list wrappers + auto_save/MC/compatibility settings accessors
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

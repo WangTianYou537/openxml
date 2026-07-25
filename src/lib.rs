@@ -88,7 +88,7 @@ pub use opc::{
     add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, FileOpenAccess,
     PackageDiff, PackageEqualityOptions, PackageMode, compare_packages, packages_equal,
     CustomProperties, DataPart, DataPartReferenceRelationship, IdPartPair, CustomProperty,
-    CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind, media_rel,
+    CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaDataPartType, MediaKind, media_rel,
     MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartExtensionProvider,
     PartUriHelper, ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
 };

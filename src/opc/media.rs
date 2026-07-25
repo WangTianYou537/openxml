@@ -47,6 +47,105 @@ pub struct MediaPartInfo {
     pub kind: MediaKind,
 }
 
+/// C# `MediaDataPartType` content-type / extension table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MediaDataPartType {
+    Aiff,
+    Midi,
+    Mp3,
+    MpegUrl,
+    Wav,
+    Wma,
+    MpegAudio,
+    OggAudio,
+    Asx,
+    Avi,
+    Mpg,
+    MpegVideo,
+    Wmv,
+    Wmx,
+    Wvx,
+    Quicktime,
+    OggVideo,
+    Vc1,
+    Mp4,
+}
+
+impl MediaDataPartType {
+    /// MIME content type for this media type.
+    pub fn content_type(self) -> &'static str {
+        match self {
+            Self::Aiff => "audio/aiff",
+            Self::Midi => "audio/midi",
+            Self::Mp3 => "audio/mpeg",
+            Self::MpegUrl => "audio/x-mpegurl",
+            Self::Wav => "audio/wav",
+            Self::Wma => "audio/x-ms-wma",
+            Self::MpegAudio => "audio/mpeg",
+            Self::OggAudio => "audio/ogg",
+            Self::Asx => "video/x-ms-asf",
+            Self::Avi => "video/avi",
+            Self::Mpg | Self::MpegVideo => "video/mpeg",
+            Self::Wmv | Self::Vc1 => "video/x-ms-wmv",
+            Self::Wmx => "video/x-ms-wmx",
+            Self::Wvx => "video/x-ms-wvx",
+            Self::Quicktime => "video/quicktime",
+            Self::OggVideo => "video/ogg",
+            Self::Mp4 => "video/mp4",
+        }
+    }
+
+    /// File extension without leading dot.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Aiff => "aiff",
+            Self::Midi => "mid",
+            Self::Mp3 => "mp3",
+            Self::MpegUrl => "m3u",
+            Self::Wav => "wav",
+            Self::Wma => "wma",
+            Self::MpegAudio => "mpeg",
+            Self::OggAudio => "ogg",
+            Self::Asx => "asx",
+            Self::Avi => "avi",
+            Self::Mpg => "mpg",
+            Self::MpegVideo => "mpeg",
+            Self::Wmv => "wmv",
+            Self::Wmx => "wmx",
+            Self::Wvx => "wvx",
+            Self::Quicktime => "mov",
+            Self::OggVideo => "ogg",
+            Self::Vc1 => "wmv",
+            Self::Mp4 => "mp4",
+        }
+    }
+
+    /// Broad media kind for relationship type selection.
+    pub fn kind(self) -> MediaKind {
+        match self {
+            Self::Aiff
+            | Self::Midi
+            | Self::Mp3
+            | Self::MpegUrl
+            | Self::Wav
+            | Self::Wma
+            | Self::MpegAudio
+            | Self::OggAudio => MediaKind::Audio,
+            Self::Asx
+            | Self::Avi
+            | Self::Mpg
+            | Self::MpegVideo
+            | Self::Wmv
+            | Self::Wmx
+            | Self::Wvx
+            | Self::Quicktime
+            | Self::OggVideo
+            | Self::Vc1
+            | Self::Mp4 => MediaKind::Video,
+        }
+    }
+}
+
 /// Add a media/data part related from `source_part`.
 ///
 /// `extension` should not include a leading dot (e.g. `"mp3"`, `"mp4"`).
@@ -114,5 +213,14 @@ mod tests {
         .unwrap();
         assert!(pkg.has_part(&info.uri));
         assert!(info.relationship_id.starts_with('r'));
+    }
+
+    #[test]
+    fn media_data_part_type_table() {
+        assert_eq!(MediaDataPartType::Mp3.content_type(), "audio/mpeg");
+        assert_eq!(MediaDataPartType::Mp3.extension(), "mp3");
+        assert_eq!(MediaDataPartType::Mp3.kind(), MediaKind::Audio);
+        assert_eq!(MediaDataPartType::Mp4.kind(), MediaKind::Video);
+        assert_eq!(MediaDataPartType::Quicktime.extension(), "mov");
     }
 }
