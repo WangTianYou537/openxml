@@ -121,6 +121,10 @@ pub struct OpenXmlStreamReader<R: BufRead> {
     /// Line/column of the most recently *returned* event start.
     event_line: u64,
     event_column: u64,
+    /// Encoding from XML declaration when present.
+    encoding: Option<String>,
+    /// Standalone from XML declaration when present.
+    standalone: Option<bool>,
 }
 
 impl<R: BufRead> OpenXmlStreamReader<R> {
@@ -132,7 +136,19 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
             buf: Vec::new(),
             event_line: 0,
             event_column: 0,
+            encoding: None,
+            standalone: None,
         }
+    }
+
+    /// Encoding from `<?xml ... encoding=...?>` when seen.
+    pub fn encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
+    }
+
+    /// Standalone flag from XML declaration when seen.
+    pub fn standalone(&self) -> Option<bool> {
+        self.standalone
     }
 
     /// Line/position of the last returned event (C# `IXmlLineInfo` subset).
@@ -162,6 +178,17 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
                 .read_event_into(&mut self.buf)
                 .map_err(|e| Error::Xml(e.to_string()))?;
             match event {
+                Event::Decl(d) => {
+                    if let Some(Ok(enc)) = d.encoding() {
+                        self.encoding =
+                            Some(String::from_utf8_lossy(enc.as_ref()).into_owned());
+                    }
+                    if let Some(Ok(st)) = d.standalone() {
+                        let s = String::from_utf8_lossy(st.as_ref());
+                        self.standalone = Some(s.eq_ignore_ascii_case("yes"));
+                    }
+                    continue;
+                }
                 Event::Start(e) => {
                     self.event_line = mark_line;
                     self.event_column = mark_col;
@@ -216,12 +243,7 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
                     self.event_column = mark_col;
                     return Ok(Some(XmlEvent::ProcessingInstruction { target, data }));
                 }
-                Event::Eof => {
-                    self.event_line = 0;
-                    self.event_column = 0;
-                    return Ok(None);
-                }
-                // Skip declarations / doc types (bytes already counted).
+                Event::Eof => return Ok(None),
                 _ => continue,
             }
         }
@@ -419,6 +441,17 @@ mod tests {
         let mut r = OpenXmlStreamReader::from_bytes(xml);
         let texts = r.collect_text_under("t").unwrap();
         assert_eq!(texts, vec!["Hello".to_string(), "World".to_string()]);
+        assert_eq!(r.encoding(), None); // declaration already consumed; encoding captured during scan
+    }
+
+    #[test]
+    fn stream_captures_xml_declaration() {
+        let xml = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><root/>"#;
+        let mut r = OpenXmlStreamReader::from_bytes(xml);
+        let ev = r.read_event().unwrap().unwrap();
+        assert!(matches!(ev, XmlEvent::Empty { local_name: ref n, .. } if n == "root"));
+        assert_eq!(r.encoding().map(|s| s.to_ascii_lowercase()), Some("utf-8".into()));
+        assert_eq!(r.standalone(), Some(true));
     }
 
     #[test]

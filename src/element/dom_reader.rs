@@ -383,6 +383,28 @@ impl<'a> OpenXmlDomReader<'a> {
         self.current = None;
         self.stack.clear();
     }
+
+    /// Whether miscellaneous nodes are read (C# `ReadMiscNodes`).
+    pub fn read_misc_nodes(&self) -> bool {
+        self.read_misc_nodes
+    }
+
+    /// XML declaration encoding — always `None` for pure DOM walks (C# DomReader).
+    pub fn encoding(&self) -> Option<&str> {
+        let _ = self;
+        None
+    }
+
+    /// XML declaration standalone — always `None` for pure DOM walks.
+    pub fn standalone_xml(&self) -> Option<bool> {
+        let _ = self;
+        None
+    }
+
+    /// Whether the current node has a text value (C# `HasValue`).
+    pub fn has_value(&self) -> bool {
+        self.get_text().map(|t| !t.is_empty()).unwrap_or(false)
+    }
 }
 
 #[cfg(test)]
@@ -483,5 +505,16 @@ mod tests {
             .any(|(p, _)| p == "w"));
         r.close();
         assert!(r.is_eof());
+    }
+
+    #[test]
+    fn dom_reader_declaration_shells() {
+        let root = OpenXmlElement::w("p").with_text("hi");
+        let mut r = OpenXmlDomReader::create_with_misc(&root, true);
+        assert!(r.read_misc_nodes());
+        assert!(r.encoding().is_none());
+        assert!(r.standalone_xml().is_none());
+        assert!(r.read());
+        assert!(r.has_value());
     }
 }

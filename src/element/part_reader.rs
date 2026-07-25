@@ -203,16 +203,14 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         self.read_misc_nodes
     }
 
-    /// XML declaration encoding when known (C# `Encoding`; always `None` shell).
+    /// XML declaration encoding when known (C# `Encoding`).
     pub fn encoding(&self) -> Option<&str> {
-        let _ = self;
-        None
+        self.inner.encoding()
     }
 
-    /// XML declaration standalone flag (C# `StandaloneXml`; always `None` shell).
+    /// XML declaration standalone flag (C# `StandaloneXml`).
     pub fn standalone_xml(&self) -> Option<bool> {
-        let _ = self;
-        None
+        self.inner.standalone()
     }
 
     /// Whether the current node carries a text value (C# `HasValue` shell).
@@ -784,6 +782,16 @@ mod tests {
         assert!(!r.read_misc_nodes());
         assert!(r.encoding().is_none());
         assert!(r.standalone_xml().is_none());
+    }
+
+    #[test]
+    fn part_reader_reads_xml_declaration() {
+        let xml = br#"<?xml version="1.0" encoding="UTF-8" standalone="no"?><a/>"#;
+        let mut r = OpenXmlPartReader::from_bytes(xml);
+        assert!(r.read().unwrap());
+        assert_eq!(r.local_name(), "a");
+        assert_eq!(r.encoding().map(|s| s.to_ascii_lowercase()), Some("utf-8".into()));
+        assert_eq!(r.standalone_xml(), Some(false));
     }
 
     #[test]
