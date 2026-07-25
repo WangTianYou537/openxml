@@ -68,6 +68,72 @@ impl<W: Write> OpenXmlPartWriter<W> {
         Ok(())
     }
 
+    /// Write a start tag using `element`'s name with overridden attributes and
+    /// optional extra namespace declarations (C# `WriteStartElement` overloads).
+    pub fn write_start_element_with(
+        &mut self,
+        element: &OpenXmlElement,
+        attributes: &[OpenXmlAttribute],
+        namespace_declarations: &[(String, String)],
+    ) -> Result<()> {
+        self.ensure_decl()?;
+        let qname = element.qualified_name();
+        self.writer.write_all(b"<").map_err(Error::Io)?;
+        self.writer.write_all(qname.as_bytes()).map_err(Error::Io)?;
+        // Element's own ns decls first, then extras (extras win on duplicate prefix when serialized in order).
+        let mut seen = std::collections::HashSet::new();
+        for (prefix, uri) in element.namespace_declarations.iter().chain(namespace_declarations.iter()) {
+            if !seen.insert(prefix.clone()) {
+                continue;
+            }
+            self.writer.write_all(b" xmlns").map_err(Error::Io)?;
+            if !prefix.is_empty() {
+                self.writer.write_all(b":").map_err(Error::Io)?;
+                self.writer.write_all(prefix.as_bytes()).map_err(Error::Io)?;
+            }
+            self.writer.write_all(b"=\"").map_err(Error::Io)?;
+            write_escaped_attr(&mut self.writer, uri)?;
+            self.writer.write_all(b"\"").map_err(Error::Io)?;
+        }
+        for attr in attributes {
+            write_attr(&mut self.writer, attr)?;
+        }
+        self.writer.write_all(b">").map_err(Error::Io)?;
+        self.stack.push(qname);
+        Ok(())
+    }
+
+    /// Convenience: start element with explicit attributes only (keep element ns decls).
+    pub fn write_start_element_attrs(
+        &mut self,
+        element: &OpenXmlElement,
+        attributes: &[OpenXmlAttribute],
+    ) -> Result<()> {
+        self.write_start_element_with(element, attributes, &[])
+    }
+
+    /// Write start document declaration explicitly (C# `WriteStartDocument`).
+    pub fn write_start_document(&mut self) -> Result<()> {
+        self.write_declaration = true;
+        self.ensure_decl()
+    }
+
+    /// Write start document with standalone flag (C# `WriteStartDocument(bool)`).
+    pub fn write_start_document_standalone(&mut self, standalone: bool) -> Result<()> {
+        if self.wrote_decl {
+            return Ok(());
+        }
+        let decl = if standalone {
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.as_slice()
+        } else {
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="no"?>"#.as_slice()
+        };
+        self.writer.write_all(decl).map_err(Error::Io)?;
+        self.wrote_decl = true;
+        self.write_declaration = true;
+        Ok(())
+    }
+
     /// Write a start tag from local name + attributes.
     pub fn write_start(
         &mut self,
@@ -272,5 +338,38 @@ mod tests {
         assert!(s.contains("<w:document"));
         assert!(s.contains("Hi &amp; Bye"));
         assert!(s.ends_with("</w:document>") || s.contains("</w:document>"));
+    }
+
+    #[test]
+    fn write_start_element_with_attrs() {
+        let mut buf = Vec::new();
+        let mut w = OpenXmlPartWriter::new(&mut buf).without_declaration();
+        let el = OpenXmlElement::w("p");
+        let attrs = vec![OpenXmlAttribute {
+            prefix: Some("w".into()),
+            namespace_uri: None,
+            local_name: "rsidR".into(),
+            value: "00AB".into(),
+        }];
+        w.write_start_element_attrs(&el, &attrs).unwrap();
+        w.write_end_element().unwrap();
+        w.finish().unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("rsidR"), "{s}");
+        assert!(s.contains("<w:p") || s.contains(":p"), "{s}");
+    }
+
+    #[test]
+    fn write_start_document_standalone_flag() {
+        let mut buf = Vec::new();
+        {
+            let mut w = OpenXmlPartWriter::new(&mut buf).without_declaration();
+            w.write_start_document_standalone(false).unwrap();
+            w.write_start(None, "root", &[]).unwrap();
+            w.write_end_element().unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("standalone=\"no\""), "{s}");
     }
 }

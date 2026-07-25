@@ -774,6 +774,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlElement::write_to` (C# `WriteTo`)
 - [x] `OpenXmlDomReader::{read_first_child,read_next_sibling,load_current_element}`
 - [x] `OpenXmlPartReader::{read_first_child,read_next_sibling,has_attributes}`
+- [x] `OpenXmlPartWriter` WriteStartElement overloads + WriteStartDocument(standalone)
 
 **Still intentionally deferred / partial:**
 
