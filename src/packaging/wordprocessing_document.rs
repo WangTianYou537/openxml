@@ -13188,7 +13188,6 @@ impl WordprocessingDocument {
             return Vec::new();
         };
         self.package
-            .opc()
             .hyperlink_relationships(Some(main.uri()))
     }
 
@@ -13196,14 +13195,13 @@ impl WordprocessingDocument {
     pub fn get_id_of_part(&self, part_uri: &PackUri) -> Option<String> {
         let main = self.main_document_part.as_ref()?;
         self.package
-            .opc()
             .get_id_of_part(Some(main.uri()), part_uri)
     }
 
     /// Part URI for relationship id on the main document (C# `GetPartById`).
     pub fn get_part_by_id(&self, id: &str) -> Option<PackUri> {
         let main = self.main_document_part.as_ref()?;
-        self.package.opc().get_part_by_id(Some(main.uri()), id)
+        self.package.get_part_by_id(Some(main.uri()), id)
     }
 
     /// Change the relationship id of a child part (C# `ChangeIdOfPart`).
@@ -13215,7 +13213,6 @@ impl WordprocessingDocument {
             .uri()
             .clone();
         self.package
-            .opc_mut()
             .change_id_of_part(Some(&main), part_uri, new_id)
     }
 
@@ -13224,7 +13221,7 @@ impl WordprocessingDocument {
         let Some(main) = self.main_document_part.as_ref() else {
             return Vec::new();
         };
-        self.package.opc().id_part_pairs(Some(main.uri()))
+        self.package.id_part_pairs(Some(main.uri()))
     }
 
     /// Create a media data part in the package (C# `CreateMediaDataPart`).
@@ -13234,7 +13231,6 @@ impl WordprocessingDocument {
         extension: Option<&str>,
     ) -> Result<crate::opc::DataPart> {
         self.package
-            .opc_mut()
             .create_media_data_part(content_type, extension)
     }
 
@@ -13274,7 +13270,6 @@ impl WordprocessingDocument {
             return Vec::new();
         };
         self.package
-            .opc()
             .data_part_reference_relationships(Some(main.uri()))
     }
 
@@ -13290,7 +13285,6 @@ impl WordprocessingDocument {
     pub fn get_reference_relationship(&self, id: &str) -> Option<crate::opc::ReferenceRelationship> {
         let main = self.main_document_part.as_ref()?.uri();
         self.package
-            .opc()
             .get_reference_relationship(Some(main), id)
     }
 
@@ -13359,8 +13353,7 @@ impl WordprocessingDocument {
             .uri()
             .clone();
         self.package
-            .opc_mut()
-            .add_part_relationship_to_existing(&main, target, relationship_type, id)
+            .create_relationship_to_part(&main, target, relationship_type, id)
     }
 
     /// Add a new typed child part under the main document via generated PartInfo

@@ -839,6 +839,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Word/Excel/PPT document builders run `PackageInitializerFeature` after middleware
 - [x] Transitional → Strict package/element rewrite (`rewrite_package_to_strict` / `rewrite_transitional_to_strict`)
 - [x] `from_opc` seeds `PartRelationshipsFeature` / `ReferenceRelationshipsFeature` from existing package + part relationships
+- [x] `OpenXmlPackage::{id_part_pairs,get_reference_relationship,get_part_by_id,get_id_of_part,data_part_reference_relationships,hyperlink_relationships}`
+- [x] `OpenXmlPackage::{create_relationship_to_part,change_id_of_part}` apply filters + keep part/ref feature bags in sync
+- [x] Word/Excel/PPT route IdPartPair / Get* / CreateRelationshipToPart / ChangeIdOfPart / media / data-part-ref / hyperlink queries through package APIs
 
 **Still intentionally deferred / partial:**
 

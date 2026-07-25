@@ -25601,7 +25601,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             return Vec::new();
         };
         self.package
-            .opc()
             .hyperlink_relationships(Some(&main))
     }
 
@@ -25612,9 +25611,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .opc()
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .ok()?;
-        self.package
-            .opc()
-            .get_id_of_part(Some(&main), part_uri)
+        self.package.get_id_of_part(Some(&main), part_uri)
     }
 
     /// Part URI for relationship id on the main part (C# `GetPartById`).
@@ -25624,7 +25621,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .opc()
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .ok()?;
-        self.package.opc().get_part_by_id(Some(&main), id)
+        self.package.get_part_by_id(Some(&main), id)
     }
 
     /// Change the relationship id of a child part (C# `ChangeIdOfPart`).
@@ -25635,7 +25632,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .map_err(|_| Error::Package("no main part".into()))?;
         self.package
-            .opc_mut()
             .change_id_of_part(Some(&main), part_uri, new_id)
     }
 
@@ -25648,7 +25644,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         else {
             return Vec::new();
         };
-        self.package.opc().id_part_pairs(Some(&main))
+        self.package.id_part_pairs(Some(&main))
     }
 
     /// Create a media data part in the package (C# `CreateMediaDataPart`).
@@ -25658,7 +25654,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         extension: Option<&str>,
     ) -> Result<crate::opc::DataPart> {
         self.package
-            .opc_mut()
             .create_media_data_part(content_type, extension)
     }
 
@@ -25700,7 +25695,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             return Vec::new();
         };
         self.package
-            .opc()
             .data_part_reference_relationships(Some(&main))
     }
 
@@ -25724,7 +25718,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .ok()?;
         self.package
-            .opc()
             .get_reference_relationship(Some(&main), id)
     }
 
@@ -25742,8 +25735,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .map_err(|_| Error::Package("no main part".into()))?;
         self.package
-            .opc_mut()
-            .add_part_relationship_to_existing(&main, target, relationship_type, id)
+            .create_relationship_to_part(&main, target, relationship_type, id)
     }
 
     /// Create an [`ExtendedPart`] under `xl/udata/` with auto URI.

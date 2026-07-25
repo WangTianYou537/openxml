@@ -1267,6 +1267,146 @@ impl OpenXmlPackage {
         Some(removed)
     }
 
+    /// Get a reference relationship by id (C# `GetReferenceRelationship`).
+    pub fn get_reference_relationship(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::ReferenceRelationship> {
+        self.opc.get_reference_relationship(source, id)
+    }
+
+    /// Child parts as [`IdPartPair`] under `source` (package-level when `None`).
+    pub fn id_part_pairs(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::IdPartPair> {
+        self.opc.id_part_pairs(source)
+    }
+
+    /// Part URI for relationship id (C# `GetPartById`).
+    pub fn get_part_by_id(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::PackUri> {
+        self.opc.get_part_by_id(source, id)
+    }
+
+    /// Relationship id of a related part (C# `GetIdOfPart`).
+    pub fn get_id_of_part(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        part_uri: &crate::opc::PackUri,
+    ) -> Option<String> {
+        self.opc.get_id_of_part(source, part_uri)
+    }
+
+    /// Data-part reference relationships under `source` (package-level when `None`).
+    pub fn data_part_reference_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::DataPartReferenceRelationship> {
+        self.opc.data_part_reference_relationships(source)
+    }
+
+    /// Hyperlink relationships under `source` (package-level when `None`).
+    pub fn hyperlink_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::HyperlinkRelationship> {
+        self.opc.hyperlink_relationships(source)
+    }
+
+    /// Create a relationship from `source` to an existing internal part (C#
+    /// `CreateRelationshipToPart`), applying relationship filters and tracking
+    /// feature bags.
+    pub fn create_relationship_to_part(
+        &mut self,
+        source: &crate::opc::PackUri,
+        target: &crate::opc::PackUri,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> crate::error::Result<String> {
+        if !self.opc.has_part(target) {
+            return Err(crate::error::Error::PartNotFound(target.to_string()));
+        }
+        if let Some(existing) = self.opc.get_id_of_part(Some(source), target) {
+            if let Some(want) = id {
+                if existing != want {
+                    return Err(crate::error::Error::Package(format!(
+                        "part already related as `{existing}`, not `{want}`"
+                    )));
+                }
+            }
+            return Ok(existing);
+        }
+        // Filtered create with optional fixed id via opc helper when id is Some.
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            id.unwrap_or(""),
+            relationship_type,
+            target.as_str(),
+        )
+        .with_target_mode("Internal")
+        .with_source_uri(source.as_str());
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let target_uri = crate::opc::PackUri::new(&builder.target);
+        let rid = if builder.id.is_empty() {
+            self.opc.add_part_relationship(
+                source,
+                &builder.relationship_type,
+                &target_uri,
+                crate::opc::RelationshipTargetMode::Internal,
+            )
+        } else {
+            self.opc.create_relationship_to_part(
+                source,
+                &target_uri,
+                &builder.relationship_type,
+                Some(builder.id.as_str()),
+            )
+        };
+        self.part_relationships_feature()
+            .add(&rid, target_uri.as_str());
+        Ok(rid)
+    }
+
+    /// Change the relationship id of an existing relationship (C# `ChangeIdOfPart`)
+    /// and keep feature shells in sync.
+    pub fn change_id_of_part(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        part_uri: &crate::opc::PackUri,
+        new_id: &str,
+    ) -> crate::error::Result<String> {
+        let old_id = self.opc.change_id_of_part(source, part_uri, new_id)?;
+        if old_id != new_id {
+            if self.part_relationships_feature().remove(&old_id) {
+                self.part_relationships_feature()
+                    .add(new_id, part_uri.as_str());
+            }
+            if let Some((rel_type, target, external)) = self
+                .reference_relationships_feature()
+                .try_get(&old_id)
+                .map(|(t, tgt, e)| (t.to_string(), tgt.to_string(), e))
+            {
+                self.reference_relationships_feature().remove(&old_id);
+                self.reference_relationships_feature().add(
+                    new_id,
+                    rel_type,
+                    target,
+                    external,
+                );
+            }
+        }
+        Ok(old_id)
+    }
+
     /// Add a data-part reference relationship (C# `AddDataPartReferenceRelationship`) and
     /// track it on part/reference relationship feature shells.
     pub fn add_data_part_reference_relationship(
@@ -1850,7 +1990,7 @@ mod part_events_tests {
         let got = pkg.reference_relationships_feature().try_get(&id);
         assert!(got.is_some());
         assert_eq!(got.unwrap().1, "https://example.com?filtered=1");
-        let hls = pkg.opc().hyperlink_relationships(Some(&doc));
+        let hls = pkg.hyperlink_relationships(Some(&doc));
         assert_eq!(hls.len(), 1);
         assert_eq!(hls[0].target(), "https://example.com?filtered=1");
     }
@@ -1877,5 +2017,54 @@ mod part_events_tests {
             .is_some());
         assert!(!pkg.part_relationships_feature().contains_id(r.id()));
         assert!(!pkg.reference_relationships_feature().contains(r.id()));
+    }
+
+    #[test]
+    fn create_relationship_to_part_and_change_id_track_features() {
+        use crate::namespace::rel;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        pkg.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            b"<w:document/>".to_vec(),
+        );
+        pkg.set_part(
+            styles.clone(),
+            content_type::WORD_STYLES,
+            b"<w:styles/>".to_vec(),
+        );
+        let id = pkg
+            .create_relationship_to_part(&doc, &styles, rel::STYLES, None)
+            .expect("create rel");
+        assert!(pkg.part_relationships_feature().contains_id(&id));
+        assert_eq!(
+            pkg.part_relationships_feature().try_get(&id),
+            Some(styles.as_str())
+        );
+        assert_eq!(pkg.get_id_of_part(Some(&doc), &styles).as_deref(), Some(id.as_str()));
+        assert_eq!(
+            pkg.get_part_by_id(Some(&doc), &id).as_ref(),
+            Some(&styles)
+        );
+        let pairs = pkg.id_part_pairs(Some(&doc));
+        assert!(pairs.iter().any(|p| p.relationship_id == id && p.part_uri == styles));
+
+        let old = pkg
+            .change_id_of_part(Some(&doc), &styles, "rIdStyles")
+            .expect("change id");
+        assert_eq!(old, id);
+        assert!(!pkg.part_relationships_feature().contains_id(&id));
+        assert!(pkg.part_relationships_feature().contains_id("rIdStyles"));
+        assert_eq!(
+            pkg.part_relationships_feature().try_get("rIdStyles"),
+            Some(styles.as_str())
+        );
+        let got = pkg
+            .get_reference_relationship(Some(&doc), "rIdStyles")
+            .expect("ref");
+        assert_eq!(got.id, "rIdStyles");
     }
 }
