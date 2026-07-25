@@ -58,6 +58,31 @@ impl FeatureCollection {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
+    /// Get feature `T`, panicking if missing (C# `GetRequiredFeature` / `GetRequired`).
+    pub fn get_required<T: Any + Send + Sync>(&self) -> &T {
+        self.get::<T>().unwrap_or_else(|| {
+            panic!(
+                "required feature {} is not registered",
+                std::any::type_name::<T>()
+            )
+        })
+    }
+
+    /// Get mutable feature `T`, panicking if missing.
+    pub fn get_required_mut<T: Any + Send + Sync>(&mut self) -> &mut T {
+        let name = std::any::type_name::<T>();
+        self.get_mut::<T>()
+            .unwrap_or_else(|| panic!("required feature {name} is not registered"))
+    }
+
+    /// Get or insert default for `T` (C# `GetOrAddFeature` shell when `T: Default`).
+    pub fn get_or_add<T: Any + Send + Sync + Default>(&mut self) -> &mut T {
+        if !self.contains::<T>() {
+            self.set(T::default());
+        }
+        self.get_mut::<T>().expect("just inserted")
+    }
+
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
@@ -405,5 +430,21 @@ mod tests {
         events.raise(PackageEventType::Adding, "/word/styles.xml");
         events.raise(PackageEventType::Added, "/word/styles.xml");
         assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn get_or_add_and_required() {
+        let mut f = FeatureCollection::new();
+        let g = f.get_or_add::<ParagraphIdGenerator>();
+        assert_eq!(g.next_id().len(), 8);
+        assert!(f.contains::<ParagraphIdGenerator>());
+        let _ = f.get_required::<ParagraphIdGenerator>();
+    }
+
+    #[test]
+    #[should_panic(expected = "required feature")]
+    fn get_required_panics() {
+        let f = FeatureCollection::new();
+        let _ = f.get_required::<ParagraphIdGenerator>();
     }
 }

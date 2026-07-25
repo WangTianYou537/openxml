@@ -482,6 +482,20 @@ impl OpenXmlElement {
         !self.attributes.is_empty()
     }
 
+    /// Append an attribute treated as an extended/open attribute
+    /// (C# `AddExtendedAttribute` — same storage as ordinary attributes in this port).
+    pub fn add_extended_attribute(&mut self, attr: OpenXmlAttribute) {
+        // Replace same qname if present.
+        let q = attr.qualified_name();
+        self.attributes.retain(|a| a.qualified_name() != q);
+        self.attributes.push(attr);
+    }
+
+    /// All attributes as extended list (C# `ExtendedAttributes` enumerator shell).
+    pub fn extended_attributes(&self) -> impl Iterator<Item = &OpenXmlAttribute> {
+        self.attributes.iter()
+    }
+
         pub fn remove_attribute(&mut self, local_name: &str) -> Option<OpenXmlAttribute> {
         if let Some(i) = self.attributes.iter().position(|a| a.local_name == local_name) {
             Some(self.attributes.remove(i))
