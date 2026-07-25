@@ -25708,7 +25708,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .ok()?;
         self.package
-            .opc_mut()
             .delete_reference_relationship(Some(&main), id)
     }
 

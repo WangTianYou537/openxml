@@ -835,6 +835,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Package accessors + `sync_paragraph_id_generator_from_collection`
 - [x] `OpenXmlPackage::{add_hyperlink_relationship,add_data_part_reference_relationship}` filtered + feature tracking
 - [x] Word/Excel/PPT hyperlink + data-part reference adds route through package APIs
+- [x] `OpenXmlPackage::delete_reference_relationship` updates part/ref feature bags; documents route through it
 
 **Still intentionally deferred / partial:**
 

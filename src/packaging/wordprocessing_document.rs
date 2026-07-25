@@ -13273,7 +13273,6 @@ impl WordprocessingDocument {
     pub fn delete_reference_relationship(&mut self, id: &str) -> Option<crate::opc::Relationship> {
         let main = self.main_document_part.as_ref()?.uri().clone();
         self.package
-            .opc_mut()
             .delete_reference_relationship(Some(&main), id)
     }
 

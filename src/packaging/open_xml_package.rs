@@ -1193,6 +1193,19 @@ impl OpenXmlPackage {
         id
     }
 
+    /// Delete a reference relationship by id and drop it from feature shells
+    /// (C# `DeleteReferenceRelationship`).
+    pub fn delete_reference_relationship(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::Relationship> {
+        let removed = self.opc.delete_reference_relationship(source, id)?;
+        self.part_relationships_feature().remove(id);
+        self.reference_relationships_feature().remove(id);
+        Some(removed)
+    }
+
     /// Add a data-part reference relationship (C# `AddDataPartReferenceRelationship`) and
     /// track it on part/reference relationship feature shells.
     pub fn add_data_part_reference_relationship(
@@ -1789,5 +1802,11 @@ mod part_events_tests {
         assert!(pkg.part_relationships_feature().contains_id(r.id()));
         assert!(pkg.reference_relationships_feature().contains(r.id()));
         assert!(pkg.data_parts_feature().contains(media.uri.as_str()));
+
+        assert!(pkg
+            .delete_reference_relationship(Some(&doc), r.id())
+            .is_some());
+        assert!(!pkg.part_relationships_feature().contains_id(r.id()));
+        assert!(!pkg.reference_relationships_feature().contains(r.id()));
     }
 }
