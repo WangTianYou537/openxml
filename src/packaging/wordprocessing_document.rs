@@ -2381,10 +2381,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         Ok(true)
     }
@@ -9827,10 +9825,8 @@ impl WordprocessingDocument {
             return true;
         };
         let main_uri = main.part().uri.clone();
-        let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-        for id in ids {
-            rels.remove(&id);
-        }
+        self.package
+            .delete_reference_relationships(Some(&main_uri), &ids);
         true
     }
 
@@ -9858,10 +9854,8 @@ impl WordprocessingDocument {
         if ids.is_empty() {
             return false;
         }
-        let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-        for id in ids {
-            rels.remove(&id);
-        }
+        self.package
+            .delete_reference_relationships(Some(&main_uri), &ids);
         true
     }
 
@@ -10771,10 +10765,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -10870,10 +10862,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(drawing_uri);
         Ok(true)
@@ -10902,10 +10892,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -10967,10 +10955,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(chart_uri);
         Ok(true)
@@ -11009,10 +10995,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -16348,10 +16332,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -16564,10 +16546,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         // Also drop vbaData related from vbaProject
         let vba_uri = PackUri::new("/word/vbaProject.bin");
@@ -16581,10 +16561,8 @@ impl WordprocessingDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&vba_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&vba_uri), &ids);
             }
         }
         for uri in uris {
@@ -16680,10 +16658,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -16715,10 +16691,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -16853,10 +16827,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -17072,10 +17044,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -17193,10 +17163,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -17245,10 +17213,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in images {
             self.package.opc_mut().remove_part(&uri);
@@ -17587,10 +17553,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -17813,10 +17777,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -19372,10 +19334,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -19543,10 +19503,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         // Also clear rels between diagram parts
         for parent in &uris {
@@ -19557,10 +19515,8 @@ impl WordprocessingDocument {
                 .map(|rels| rels.iter().map(|r| r.id.clone()).collect())
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(parent);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(parent), &ids);
             }
         }
         for uri in uris {
@@ -19623,10 +19579,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -19657,10 +19611,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -19997,10 +19949,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -20046,10 +19996,8 @@ impl WordprocessingDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(parent);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(parent), &ids);
             }
         }
         for uri in uris {
@@ -20077,10 +20025,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -20113,10 +20059,8 @@ impl WordprocessingDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);

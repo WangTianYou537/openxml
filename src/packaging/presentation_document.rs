@@ -1727,10 +1727,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -1833,10 +1831,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -2006,10 +2002,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -2386,10 +2380,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -2452,10 +2444,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -2701,10 +2691,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         // also drop sheet/slide-level image rels pointing at media
         let part_uris: Vec<PackUri> = self.package.opc().part_uris();
@@ -2725,10 +2713,8 @@ impl PresentationDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels = self.package.opc_mut().part_relationships_mut(&part_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&part_uri), &ids);
         }
         for uri in images {
             self.package.opc_mut().remove_part(&uri);
@@ -9179,10 +9165,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -9265,10 +9249,8 @@ impl PresentationDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -9300,10 +9282,8 @@ impl PresentationDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&slide_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&slide_uri), &ids);
             }
         }
         for uri in media {
@@ -9372,10 +9352,8 @@ impl PresentationDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels = self.package.opc_mut().part_relationships_mut(&parent);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&parent), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -9434,10 +9412,8 @@ impl PresentationDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&slide_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&slide_uri), &ids);
             }
         }
         for uri in charts {
@@ -9559,10 +9535,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
             // Drop notesMasterIdLst / handoutMasterIdLst entries if present
             if let Some(data) = self.package.opc().get_part(&pres_uri).map(|d| d.to_vec()) {
                 if let Ok(mut root) = parse_element(&data) {
@@ -9922,10 +9896,8 @@ impl PresentationDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&parent);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&parent), &ids);
             }
         }
         for uri in uris {
@@ -9977,10 +9949,8 @@ impl PresentationDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&slide_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&slide_uri), &ids);
             }
         }
         for uri in uris {
@@ -10025,10 +9995,8 @@ impl PresentationDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&slide_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&slide_uri), &ids);
             }
         }
         for uri in uris {
@@ -10922,10 +10890,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -11011,10 +10977,8 @@ impl PresentationDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&slide_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&slide_uri), &ids);
             }
         }
         for uri in uris {
@@ -12490,10 +12454,8 @@ impl PresentationDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&pres_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -18074,10 +18036,8 @@ impl PresentationDocument {
                 continue;
             }
             n += ids.len();
-            let rels = self.package.opc_mut().part_relationships_mut(&slide_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&slide_uri), &ids);
         }
         Ok(n)
     }

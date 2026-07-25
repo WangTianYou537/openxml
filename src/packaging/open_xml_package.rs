@@ -380,6 +380,25 @@ impl OpenXmlPackage {
         n
     }
 
+    /// Delete reference relationships by id under `source` without cascading parts
+    /// (relationship-only cleanup; updates feature bags).
+    pub fn delete_reference_relationships(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        ids: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> usize {
+        let mut n = 0;
+        for id in ids {
+            if self
+                .delete_reference_relationship(source, id.as_ref())
+                .is_some()
+            {
+                n += 1;
+            }
+        }
+        n
+    }
+
     /// Remove a part and raise part Removing/Removed events (C# `DeletePart` + `IPartEventsFeature`).
     pub fn delete_part(&mut self, uri: &crate::opc::PackUri) -> Option<Vec<u8>> {
         let uri_str = uri.to_string();

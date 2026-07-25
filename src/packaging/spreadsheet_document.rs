@@ -3133,10 +3133,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
             if let Some(data) = self.package.opc().get_part(&wb_uri).map(|b| b.to_vec()) {
                 if let Ok(mut root) = parse_element(&data) {
                     root.children.retain(|c| c.local_name != "pivotCaches");
@@ -3364,10 +3362,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -3469,10 +3465,8 @@ impl SpreadsheetDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -3736,10 +3730,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -3912,10 +3904,8 @@ impl SpreadsheetDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&chart_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&chart_uri), &ids);
             }
         }
         for uri in uris {
@@ -4052,10 +4042,8 @@ impl SpreadsheetDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&parent);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&parent), &ids);
             }
         }
         for uri in uris {
@@ -4111,10 +4099,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -4150,10 +4136,8 @@ impl SpreadsheetDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&parent);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&parent), &ids);
             }
         }
         for uri in uris {
@@ -4234,10 +4218,8 @@ impl SpreadsheetDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -7959,10 +7941,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -7998,10 +7978,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -8073,10 +8051,8 @@ impl SpreadsheetDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -8310,10 +8286,8 @@ impl SpreadsheetDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(chart_uri);
         Ok(true)
@@ -8840,10 +8814,8 @@ impl SpreadsheetDocument {
                             .collect()
                     })
                     .unwrap_or_default();
-                let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&wb_uri), &ids);
             }
             self.package.opc_mut().remove_part(&uri);
         }
@@ -8875,10 +8847,8 @@ impl SpreadsheetDocument {
                             .collect()
                     })
                     .unwrap_or_default();
-                let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&wb_uri), &ids);
             }
             self.package.opc_mut().remove_part(&uri);
         }
@@ -8911,10 +8881,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         self.package.opc_mut().remove_part(&chain_uri);
         Ok(true)
@@ -11678,10 +11646,8 @@ impl SpreadsheetDocument {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -12263,10 +12229,8 @@ impl SpreadsheetDocument {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -12701,16 +12665,22 @@ impl SpreadsheetDocument {
         if !self.package.opc().has_part(link_uri) {
             return Ok(false);
         }
-        let rels = self.package.opc_mut().part_relationships_mut(link_uri);
-        let ids: Vec<String> = rels
-            .iter()
-            .filter(|r| r.relationship_type == path_rel)
-            .map(|r| r.id.clone())
-            .collect();
-        for id in &ids {
-            rels.remove(id);
-        }
-        rels.add(path_rel, target, RelationshipTargetMode::External);
+        let ids: Vec<String> = self
+            .package
+            .opc()
+            .part_relationships(link_uri)
+            .map(|rels| {
+                rels.iter()
+                    .filter(|r| r.relationship_type == path_rel)
+                    .map(|r| r.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        self.package
+            .delete_reference_relationships(Some(link_uri), &ids);
+        let _ = self
+            .package
+            .add_external_relationship(Some(link_uri), path_rel, target);
         Ok(true)
     }
 
@@ -12721,18 +12691,22 @@ impl SpreadsheetDocument {
         if !self.package.opc().has_part(link_uri) {
             return Ok(false);
         }
-        let rels = self.package.opc_mut().part_relationships_mut(link_uri);
-        let ids: Vec<String> = rels
-            .iter()
-            .filter(|r| r.relationship_type == path_rel)
-            .map(|r| r.id.clone())
-            .collect();
+        let ids: Vec<String> = self
+            .package
+            .opc()
+            .part_relationships(link_uri)
+            .map(|rels| {
+                rels.iter()
+                    .filter(|r| r.relationship_type == path_rel)
+                    .map(|r| r.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
         if ids.is_empty() {
             return Ok(false);
         }
-        for id in ids {
-            rels.remove(&id);
-        }
+        self.package
+            .delete_reference_relationships(Some(link_uri), &ids);
         Ok(true)
     }
 
@@ -21345,10 +21319,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&sheet_uri);
-                for id in ids {
-                    rels.remove(&id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&sheet_uri), &ids);
             }
         }
         for uri in uris {
@@ -24054,10 +24026,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             if ids.is_empty() {
                 continue;
             }
-            let rels_mut = self.package.opc_mut().part_relationships_mut(&src);
-            for id in ids {
-                rels_mut.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&src), &ids);
         }
         self.package.opc_mut().remove_part(&uri);
         Ok(true)
@@ -24087,10 +24057,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -24190,10 +24158,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -24362,10 +24328,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -24658,10 +24622,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -24720,10 +24682,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -24973,10 +24933,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&main_uri), &ids);
         }
         // also drop sheet/slide-level image rels pointing at media
         let part_uris: Vec<PackUri> = self.package.opc().part_uris();
@@ -24998,10 +24956,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             if ids.is_empty() {
                 continue;
             }
-            let rels = self.package.opc_mut().part_relationships_mut(&part_uri);
-            for id in ids {
-                rels.remove(&id);
-            }
+            self.package
+                .delete_reference_relationships(Some(&part_uri), &ids);
         }
         for uri in images {
             self.package.opc_mut().remove_part(&uri);
