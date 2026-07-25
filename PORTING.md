@@ -775,6 +775,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `XmlLineInfo` + reader `get_line_info` (Empty shell)
 - [x] `OpenXmlElement::copy_attributes_from` / `copy_children_from` (C# CloneImp helpers)
 - [x] `FeatureCollection::{get_required,get_or_add}` + `AddExtendedAttribute` shell
+- [x] `MarkupCompatibilityAttributes` + `OpenXmlQualifiedName` shells
 - [x] `OpenXmlDomReader::{read_first_child,read_next_sibling,load_current_element}`
 - [x] `OpenXmlPartReader::{read_first_child,read_next_sibling,has_attributes}`
 - [x] `OpenXmlPartWriter` WriteStartElement overloads + WriteStartDocument(standalone) + from Part/Dom reader

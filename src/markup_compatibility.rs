@@ -10,6 +10,61 @@ use std::collections::HashSet;
 
 const MC: &str = ns::MARKUP_COMPATIBILITY.uri;
 
+/// Markup Compatibility attribute bag (C# `MarkupCompatibilityAttributes`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MarkupCompatibilityAttributes {
+    pub ignorable: Option<String>,
+    pub process_content: Option<String>,
+    pub preserve_elements: Option<String>,
+    pub preserve_attributes: Option<String>,
+    pub must_understand: Option<String>,
+}
+
+impl MarkupCompatibilityAttributes {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ignorable.is_none()
+            && self.process_content.is_none()
+            && self.preserve_elements.is_none()
+            && self.preserve_attributes.is_none()
+            && self.must_understand.is_none()
+    }
+
+    /// Read MC attributes from an element (mc-prefixed or bare local names).
+    pub fn from_element(elem: &OpenXmlElement) -> Self {
+        Self {
+            ignorable: mc_attr(elem, "Ignorable"),
+            process_content: mc_attr(elem, "ProcessContent"),
+            preserve_elements: mc_attr(elem, "PreserveElements"),
+            preserve_attributes: mc_attr(elem, "PreserveAttributes"),
+            must_understand: mc_attr(elem, "MustUnderstand"),
+        }
+    }
+
+    /// Apply this bag onto `elem` as `mc:*` attributes (does not clear other attrs).
+    pub fn apply_to(&self, elem: &mut OpenXmlElement) {
+        let pairs = [
+            ("Ignorable", &self.ignorable),
+            ("ProcessContent", &self.process_content),
+            ("PreserveElements", &self.preserve_elements),
+            ("PreserveAttributes", &self.preserve_attributes),
+            ("MustUnderstand", &self.must_understand),
+        ];
+        for (local, val) in pairs {
+            if let Some(v) = val {
+                elem.set_attribute_ns("mc", MC, local, v.clone());
+            }
+        }
+        // Ensure mc ns decl present when any set
+        if !self.is_empty() && elem.lookup_namespace("mc").is_none() {
+            elem.add_namespace_declaration("mc", MC);
+        }
+    }
+}
+
 /// `mc:AlternateContent` root with the MC namespace declaration.
 pub fn alternate_content(
     children: impl IntoIterator<Item = OpenXmlElement>,
@@ -843,5 +898,26 @@ mod mc_attr_validate_tests {
             .with_attribute_qname("mc:MustUnderstand", "xyz");
         let errs = validate_mc_attributes(&el);
         assert!(errs.iter().any(|e| e.message.contains("MustUnderstand")));
+    }
+}
+
+#[cfg(test)]
+mod mc_attributes_bag_tests {
+    use super::*;
+
+    #[test]
+    fn mc_attributes_roundtrip() {
+        let mut el = OpenXmlElement::w("document")
+            .with_ns_decl("mc", MC)
+            .with_attribute_qname("mc:Ignorable", "w14")
+            .with_attribute_qname("mc:MustUnderstand", "w15");
+        let bag = MarkupCompatibilityAttributes::from_element(&el);
+        assert_eq!(bag.ignorable.as_deref(), Some("w14"));
+        assert_eq!(bag.must_understand.as_deref(), Some("w15"));
+
+        let mut el2 = OpenXmlElement::w("document");
+        bag.apply_to(&mut el2);
+        let bag2 = MarkupCompatibilityAttributes::from_element(&el2);
+        assert_eq!(bag, bag2);
     }
 }

@@ -73,6 +73,43 @@ pub enum OpenXmlMiscKind {
 ///
 /// Non-element nodes (comments, PIs, CDATA) use [`OpenXmlMiscKind`] and
 /// well-known `local_name` values (`#comment`, `#pi`, `#cdata-section`).
+/// Fully qualified name: namespace URI + local name (C# `OpenXmlQualifiedName` shell).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct OpenXmlQualifiedName {
+    pub namespace_uri: String,
+    pub local_name: String,
+}
+
+impl OpenXmlQualifiedName {
+    pub fn new(namespace_uri: impl Into<String>, local_name: impl Into<String>) -> Self {
+        Self {
+            namespace_uri: namespace_uri.into(),
+            local_name: local_name.into(),
+        }
+    }
+
+    pub fn from_element(elem: &OpenXmlElement) -> Self {
+        Self {
+            namespace_uri: elem.namespace_uri.clone(),
+            local_name: elem.local_name.clone(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.local_name.is_empty() && self.namespace_uri.is_empty()
+    }
+}
+
+impl std::fmt::Display for OpenXmlQualifiedName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.namespace_uri.is_empty() {
+            write!(f, "{}", self.local_name)
+        } else {
+            write!(f, "{}:{}", self.namespace_uri, self.local_name)
+        }
+    }
+}
+
 pub struct OpenXmlElement {
     /// Namespace prefix (e.g. `"w"`).
     pub prefix: String,
@@ -347,6 +384,11 @@ impl OpenXmlElement {
         } else {
             format!("{}:{}", self.prefix, self.local_name)
         }
+    }
+
+    /// Namespace URI + local name pair (C# `OpenXmlQualifiedName`).
+    pub fn xml_qualified_name(&self) -> OpenXmlQualifiedName {
+        OpenXmlQualifiedName::from_element(self)
     }
 
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
