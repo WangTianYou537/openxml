@@ -167,6 +167,159 @@ impl<'a> OpenXmlDomReader<'a> {
         }
         let _ = self.read(); // consume End
     }
+
+    /// Move to the first child of the current start element (C# `ReadFirstChild`).
+    ///
+    /// Must be called on a start element. If there is no child, moves to the
+    /// matching end element and returns `false`.
+    pub fn read_first_child(&mut self) -> bool {
+        if self.state != ElementState::Start {
+            return false;
+        }
+        loop {
+            let Some(frame) = self.stack.last_mut() else {
+                return false;
+            };
+            // Ensure we are positioned to read children from index 0.
+            let elem = frame.elem;
+            if elem.children.is_empty() {
+                frame.phase = Phase::Leave;
+                self.current = Some(elem);
+                self.state = ElementState::End;
+                return false;
+            }
+            // Push first child (or next non-misc if skipping misc)
+            let mut idx = 0usize;
+            while idx < elem.children.len() {
+                let child = &elem.children[idx];
+                if child.is_misc_node() && !self.read_misc_nodes {
+                    idx += 1;
+                    continue;
+                }
+                frame.phase = Phase::Children {
+                    child_index: idx + 1,
+                };
+                self.stack.push(Frame {
+                    elem: child,
+                    phase: Phase::Enter,
+                });
+                // Emit Enter for child
+                return self.read();
+            }
+            // only misc children skipped
+            frame.phase = Phase::Leave;
+            self.current = Some(elem);
+            self.state = ElementState::End;
+            return false;
+        }
+    }
+
+    /// Move to the next sibling element (C# `ReadNextSibling`).
+    ///
+    /// Skips the remainder of the current subtree and advances to the next
+    /// sibling start. If none, positions on the parent end element and returns
+    /// `false`.
+    pub fn read_next_sibling(&mut self) -> bool {
+        if self.is_eof() {
+            return false;
+        }
+        if self.stack.is_empty() {
+            self.eof = true;
+            self.state = ElementState::EOF;
+            return false;
+        }
+
+        // If on Start, skip children then treat as after End of current.
+        if self.state == ElementState::Start {
+            if let Some(frame) = self.stack.last_mut() {
+                frame.phase = Phase::Leave;
+            }
+            // pop current without requiring consumer to see End
+            let _ = self.stack.pop();
+        } else if self.state == ElementState::End || self.state == ElementState::Misc {
+            let _ = self.stack.pop();
+        } else {
+            return false;
+        }
+
+        // Parent frame should be in Children phase with next index.
+        loop {
+            if self.stack.is_empty() {
+                self.eof = true;
+                self.state = ElementState::EOF;
+                self.current = None;
+                return false;
+            }
+            let Some(frame) = self.stack.last_mut() else {
+                return false;
+            };
+            match frame.phase {
+                Phase::Children { child_index } => {
+                    let elem = frame.elem;
+                    let mut idx = child_index;
+                    while idx < elem.children.len() {
+                        let child = &elem.children[idx];
+                        if child.is_misc_node() && !self.read_misc_nodes {
+                            idx += 1;
+                            continue;
+                        }
+                        frame.phase = Phase::Children {
+                            child_index: idx + 1,
+                        };
+                        self.stack.push(Frame {
+                            elem: child,
+                            phase: Phase::Enter,
+                        });
+                        return self.read();
+                    }
+                    // no more siblings → parent End
+                    frame.phase = Phase::Leave;
+                    self.current = Some(elem);
+                    if elem.is_misc_node() && !self.read_misc_nodes {
+                        // continue unwinding
+                        let _ = self.stack.pop();
+                        continue;
+                    }
+                    self.state = ElementState::End;
+                    return false;
+                }
+                Phase::Enter => {
+                    // Shouldn't happen often; force children scan
+                    frame.phase = Phase::Children { child_index: 0 };
+                    continue;
+                }
+                Phase::Leave => {
+                    // already leaving parent
+                    self.current = Some(frame.elem);
+                    self.state = ElementState::End;
+                    return false;
+                }
+            }
+        }
+    }
+
+    /// Whether the current element has attributes (C# `HasAttributes`).
+    pub fn has_attributes(&self) -> bool {
+        self.current.map(|e| e.has_attributes()).unwrap_or(false)
+    }
+
+    /// Namespace URI of the current element.
+    pub fn namespace_uri(&self) -> Option<&str> {
+        self.current
+            .map(|e| e.namespace_uri.as_str())
+            .filter(|u| !u.is_empty())
+    }
+
+    /// Load a clone of the element at the current start cursor and advance to its end
+    /// (C# `LoadCurrentElement` subset — returns owned clone).
+    pub fn load_current_element(&mut self) -> Option<OpenXmlElement> {
+        if self.state != ElementState::Start && self.state != ElementState::Misc {
+            return None;
+        }
+        let cloned = self.current?.clone_node();
+        self.skip();
+        Some(cloned)
+    }
 }
 
 #[cfg(test)]
@@ -218,5 +371,38 @@ mod tests {
         assert!(r.is_end_element());
         assert_eq!(r.local_name(), Some("document"));
         assert!(!r.read());
+    }
+
+    #[test]
+    fn read_first_child_and_siblings() {
+        let root = OpenXmlElement::w("body")
+            .with_child(OpenXmlElement::w("p1"))
+            .with_child(OpenXmlElement::w("p2"))
+            .with_child(OpenXmlElement::w("p3"));
+        let mut r = OpenXmlDomReader::new(&root);
+        assert!(r.read());
+        assert_eq!(r.local_name(), Some("body"));
+        assert!(r.read_first_child());
+        assert_eq!(r.local_name(), Some("p1"));
+        assert!(r.is_start_element());
+        assert!(r.read_next_sibling());
+        assert_eq!(r.local_name(), Some("p2"));
+        assert!(r.read_next_sibling());
+        assert_eq!(r.local_name(), Some("p3"));
+        assert!(!r.read_next_sibling());
+        assert!(r.is_end_element());
+        assert_eq!(r.local_name(), Some("body"));
+    }
+
+    #[test]
+    fn load_current_element_clones() {
+        let root = OpenXmlElement::w("p").with_child(OpenXmlElement::w("r").with_text("x"));
+        let mut r = OpenXmlDomReader::new(&root);
+        assert!(r.read());
+        let loaded = r.load_current_element().unwrap();
+        assert_eq!(loaded.local_name, "p");
+        assert_eq!(loaded.children.len(), 1);
+        // cursor should be past the element (on end consumed by skip)
+        assert!(r.is_end_element() || r.is_eof());
     }
 }
