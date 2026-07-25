@@ -12,6 +12,10 @@ pub struct ValidationContext {
     /// When true, particle validators may record expected children (C# `CollectExpectedChildren`).
     pub collect_expected_children: bool,
     expected_children: Vec<String>,
+    /// Markup Compatibility context for the current pass (C# `MCContext` shell).
+    pub mc_context: Option<crate::markup_compatibility::McContext>,
+    /// Current element XPath / path for [`create_error`](Self::create_error).
+    pub current_path: String,
 }
 
 impl ValidationContext {
@@ -23,6 +27,8 @@ impl ValidationContext {
             errors: Vec::new(),
             collect_expected_children: false,
             expected_children: Vec::new(),
+            mc_context: None,
+            current_path: String::new(),
         }
     }
 
@@ -41,6 +47,57 @@ impl ValidationContext {
     pub fn clear(&mut self) {
         self.errors.clear();
         self.expected_children.clear();
+        self.current_path.clear();
+    }
+
+    pub fn set_current_path(&mut self, path: impl Into<String>) {
+        self.current_path = path.into();
+    }
+
+    pub fn current_path(&self) -> &str {
+        &self.current_path
+    }
+
+    pub fn set_mc_context(&mut self, mc: crate::markup_compatibility::McContext) {
+        self.mc_context = Some(mc);
+    }
+
+    pub fn clear_mc_context(&mut self) {
+        self.mc_context = None;
+    }
+
+    pub fn mc_context(&self) -> Option<&crate::markup_compatibility::McContext> {
+        self.mc_context.as_ref()
+    }
+
+    pub fn max_number_of_errors(&self) -> usize {
+        self.settings.max_number_of_errors
+    }
+
+    /// C# `ValidationContext.CreateError` shell.
+    pub fn create_error(
+        &mut self,
+        id: &str,
+        error_type: super::ValidationErrorType,
+        description: impl AsRef<str>,
+    ) -> bool {
+        let _ = error_type; // encoded in message id prefix for error_type() inference
+        let path = if self.current_path.is_empty() {
+            String::new()
+        } else {
+            self.current_path.clone()
+        };
+        self.add_error(super::ValidationError::with_id(path, id, description.as_ref()))
+    }
+
+    /// Add a schema error with id (C# `AddError` convenience).
+    pub fn add_error_with_id(
+        &mut self,
+        path: impl Into<String>,
+        id: &str,
+        description: impl AsRef<str>,
+    ) -> bool {
+        self.add_error(super::ValidationError::with_id(path, id, description.as_ref()))
     }
 
     /// True when the max-error budget is exhausted (C# `CheckIfCancelled` error-count half).
@@ -111,5 +168,32 @@ mod tests {
         assert!(ctx.check_max_errors());
         ctx.clear();
         assert!(ctx.valid());
+    }
+
+    #[test]
+    fn create_error_and_mc_context() {
+        let mut ctx = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        ctx.set_current_path("/w:document[1]");
+        assert!(ctx.create_error(
+            "Sch_InvalidElementContentExpectingComplexType",
+            crate::validation::ValidationErrorType::Schema,
+            "unexpected child",
+        ));
+        assert_eq!(ctx.errors().len(), 1);
+        assert_eq!(
+            ctx.errors()[0].id(),
+            Some("Sch_InvalidElementContentExpectingComplexType")
+        );
+        assert_eq!(ctx.errors()[0].path, "/w:document[1]");
+        assert_eq!(ctx.max_number_of_errors(), ValidationSettings::DEFAULT_MAX_ERRORS);
+
+        let mc = crate::markup_compatibility::McContext::new();
+        ctx.set_mc_context(mc);
+        assert!(ctx.mc_context().is_some());
+        ctx.clear_mc_context();
+        assert!(ctx.mc_context().is_none());
+
+        assert!(ctx.add_error_with_id("/x", "Sem_UniqueAttributeValue", "dup"));
+        assert_eq!(ctx.errors().len(), 2);
     }
 }

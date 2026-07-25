@@ -1082,6 +1082,7 @@ impl OpenXmlPackage {
         self.features.get::<crate::features::ApplicationTypeFeature>()
     }
 
+
     /// Main part feature metadata when registered (C# `IMainPartFeature`).
     pub fn main_part_feature(&self) -> Option<&crate::features::MainPartFeature> {
         self.features.get::<crate::features::MainPartFeature>()
@@ -3931,5 +3932,24 @@ mod part_events_tests {
         assert!(!pkg.has_hyperlink_relationship(Some(&doc), &eid));
         // External non-hyperlink is not a HyperlinkRelationship
         assert!(pkg.get_hyperlink_relationship(Some(&doc), &eid).is_none());
+
+        pkg.package_part_feature().set_uri(doc.as_str());
+        assert_eq!(
+            pkg.package_part_feature().uri(),
+            Some(doc.as_str())
+        );
+        assert!(pkg.package_part_feature().is_bound());
+        pkg.root_element_feature().register(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+            "Document",
+        );
+        assert!(pkg.root_element_feature().contains(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+        ));
+        assert!(pkg.is_known_data_part_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
+        ));
     }
 }

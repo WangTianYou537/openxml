@@ -1197,6 +1197,15 @@ impl PackagePartFeature {
     pub fn clear(&mut self) {
         self.part_uri = None;
     }
+
+    /// C# part URI when bound to a package part.
+    pub fn uri(&self) -> Option<&str> {
+        self.part_uri.as_deref()
+    }
+
+    pub fn is_bound(&self) -> bool {
+        self.part_uri.is_some()
+    }
 }
 
 /// Part URI allocation feature (C# `IPartUriFeature` shell wrapping [`crate::opc::PartUriHelper`]).
@@ -1560,6 +1569,18 @@ impl RootElementFeature {
 
     pub fn is_empty(&self) -> bool {
         self.by_qname.is_empty()
+    }
+
+    pub fn contains(&self, namespace_uri: &str, local_name: &str) -> bool {
+        self.try_create(namespace_uri, local_name).is_some()
+    }
+
+    pub fn clear(&mut self) {
+        self.by_qname.clear();
+    }
+
+    pub fn registered_type_names(&self) -> Vec<&str> {
+        self.by_qname.values().map(|s| s.as_str()).collect()
     }
 }
 
