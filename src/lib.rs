@@ -69,10 +69,11 @@ pub use features::{
     AnnotationsFeature, ApplicationType, ContentTypeFeature, DataPartsFeature, DisposableFeature,
     DocumentTypeFeature, FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature,
     PackageCapabilities, PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature,
-    PackageInitializerFeature, PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature,
-    ParagraphIdGenerator, PartEvents, PartFactoryFeature, PartRelationshipsFeature, PartRootEvents,
-    PartsFeature, PartUriFeature, ProgrammaticIdentifierFeature, ReferenceRelationshipsFeature,
-    RelationshipFilterFeature, SchemaTrackingFeature, StrictNamespaceFeature,
+    PackageFeature, PackageInitializerFeature, PackagePartFeature, PackageRelationshipBuilder,
+    PackageStreamFeature, ParagraphIdGenerator, PartEvents, PartFactoryFeature,
+    PartRelationshipsFeature, PartRootEvents, PartsFeature, PartUriFeature,
+    ProgrammaticIdentifierFeature, ReferenceRelationshipsFeature, RelationshipFilterFeature,
+    RootElementFeature, SaveFeature, SchemaTrackingFeature, StrictNamespaceFeature, TargetFeature,
     TypedPartFactoryFeature,
 };
 pub use file_format::FileFormatVersions;

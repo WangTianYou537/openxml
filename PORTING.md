@@ -827,6 +827,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `DataPartsFeature` / `PartRelationshipsFeature` / `ReferenceRelationshipsFeature` / `TypedPartFactoryFeature` shells
 - [x] Package accessors; track part/ref relationships on add_*; seed DataParts on `from_opc`; media create/delete updates bag
 - [x] Word/Excel/PPT `add_external_relationship` routes through filtered package API
+- [x] `TargetFeature` / `RootElementFeature` / `SaveFeature` / `PackageFeature` shells + package accessors
+- [x] `OpenXmlPackage::{save,save_as}` run `ISaveFeature` hooks before package events
 
 **Still intentionally deferred / partial:**
 

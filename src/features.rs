@@ -1013,6 +1013,156 @@ impl TypedPartFactoryFeature {
     }
 }
 
+/// Target path metadata for a part/container (C# `ITargetFeature` shell).
+#[derive(Debug, Clone, Default)]
+pub struct TargetFeature {
+    pub path: String,
+    pub extension: String,
+    pub name: String,
+}
+
+impl TargetFeature {
+    pub fn new(
+        path: impl Into<String>,
+        extension: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Self {
+            path: path.into(),
+            extension: extension.into(),
+            name: name.into(),
+        }
+    }
+
+    pub fn with_path(path: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            ..Default::default()
+        }
+    }
+}
+
+/// Root element factory by qualified name (C# `IRootElementFeature` shell).
+///
+/// Maps `"namespace_uri|local_name"` → type name string for element construction.
+#[derive(Debug, Default, Clone)]
+pub struct RootElementFeature {
+    by_qname: std::collections::HashMap<String, String>,
+}
+
+impl RootElementFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(
+        &mut self,
+        namespace_uri: impl Into<String>,
+        local_name: impl Into<String>,
+        type_name: impl Into<String>,
+    ) {
+        let key = format!("{}|{}", namespace_uri.into(), local_name.into());
+        self.by_qname.insert(key, type_name.into());
+    }
+
+    pub fn try_create(&self, namespace_uri: &str, local_name: &str) -> Option<&str> {
+        let key = format!("{namespace_uri}|{local_name}");
+        self.by_qname.get(&key).map(|s| s.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_qname.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_qname.is_empty()
+    }
+}
+
+/// Save callbacks for containers (C# `ISaveFeature` shell).
+///
+/// Registered hooks receive the container URI (or empty for package-level save).
+#[derive(Default)]
+pub struct SaveFeature {
+    hooks: Mutex<Vec<Box<dyn Fn(&str) + Send + Sync>>>,
+}
+
+impl std::fmt::Debug for SaveFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.hooks.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("SaveFeature").field("hooks", &n).finish()
+    }
+}
+
+impl SaveFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register<F>(&self, f: F)
+    where
+        F: Fn(&str) + Send + Sync + 'static,
+    {
+        if let Ok(mut g) = self.hooks.lock() {
+            g.push(Box::new(f));
+        }
+    }
+
+    /// Invoke all save hooks for `container_uri` (C# `ISaveFeature.Save`).
+    pub fn save(&self, container_uri: &str) {
+        if let Ok(g) = self.hooks.lock() {
+            for h in g.iter() {
+                h(container_uri);
+            }
+        }
+    }
+
+    pub fn hook_count(&self) -> usize {
+        self.hooks.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
+/// Package feature shell (C# `IPackageFeature` capabilities + reload token).
+#[derive(Debug, Clone)]
+pub struct PackageFeature {
+    pub capabilities: PackageCapabilities,
+    /// Times `reload` has been invoked (shell counter).
+    pub reload_count: u32,
+    pub path: Option<String>,
+}
+
+impl Default for PackageFeature {
+    fn default() -> Self {
+        Self {
+            capabilities: PackageCapabilities::CACHED | PackageCapabilities::RELOAD,
+            reload_count: 0,
+            path: None,
+        }
+    }
+}
+
+impl PackageFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_capabilities(capabilities: PackageCapabilities) -> Self {
+        Self {
+            capabilities,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+
+    pub fn reload(&mut self) {
+        self.reload_count = self.reload_count.saturating_add(1);
+    }
+}
+
 /// Package initializer callbacks (C# `IPackageInitializer` shell).
 ///
 /// Runs registered hooks after a package is constructed (builder path).
@@ -1516,5 +1666,54 @@ mod tests {
         );
         assert!(tf.contains("ImagePart"));
         assert!(!tf.is_empty());
+    }
+
+    #[test]
+    fn target_root_save_package_features() {
+        let t = TargetFeature::new("/word", "xml", "document");
+        assert_eq!(t.path, "/word");
+        assert_eq!(t.extension, "xml");
+        assert_eq!(t.name, "document");
+
+        let mut root = RootElementFeature::new();
+        root.register(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+            "Document",
+        );
+        assert_eq!(
+            root.try_create(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "document"
+            ),
+            Some("Document")
+        );
+        assert!(root
+            .try_create("http://other", "document")
+            .is_none());
+
+        let saved = Arc::new(Mutex::new(Vec::<String>::new()));
+        let save = SaveFeature::new();
+        let s = saved.clone();
+        save.register(move |uri| {
+            if let Ok(mut g) = s.lock() {
+                g.push(uri.to_string());
+            }
+        });
+        assert_eq!(save.hook_count(), 1);
+        save.save("/word/document.xml");
+        save.save("");
+        let got = saved.lock().unwrap().clone();
+        assert_eq!(got, vec!["/word/document.xml".to_string(), String::new()]);
+
+        let mut pkg = PackageFeature::with_capabilities(
+            PackageCapabilities::SAVE | PackageCapabilities::RELOAD,
+        )
+        .with_path("doc.docx");
+        assert!(pkg.capabilities.contains(PackageCapabilities::SAVE));
+        assert_eq!(pkg.path.as_deref(), Some("doc.docx"));
+        pkg.reload();
+        pkg.reload();
+        assert_eq!(pkg.reload_count, 2);
     }
 }

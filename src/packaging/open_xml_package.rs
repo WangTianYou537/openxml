@@ -876,6 +876,65 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Target path metadata (C# `ITargetFeature`).
+    pub fn target_feature(&mut self) -> &mut crate::features::TargetFeature {
+        if !self.features.contains::<crate::features::TargetFeature>() {
+            self.features.set(crate::features::TargetFeature::default());
+        }
+        self.features
+            .get_mut::<crate::features::TargetFeature>()
+            .expect("just inserted")
+    }
+
+    pub fn set_target_feature(&mut self, feature: crate::features::TargetFeature) {
+        self.features.set(feature);
+    }
+
+    /// Root element factory (C# `IRootElementFeature`).
+    pub fn root_element_feature(&mut self) -> &mut crate::features::RootElementFeature {
+        if !self
+            .features
+            .contains::<crate::features::RootElementFeature>()
+        {
+            self.features
+                .set(crate::features::RootElementFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::RootElementFeature>()
+            .expect("just inserted")
+    }
+
+    /// Save callbacks (C# `ISaveFeature`).
+    pub fn save_feature(&mut self) -> &crate::features::SaveFeature {
+        if !self.features.contains::<crate::features::SaveFeature>() {
+            self.features.set(crate::features::SaveFeature::new());
+        }
+        self.features
+            .get::<crate::features::SaveFeature>()
+            .expect("just inserted")
+    }
+
+    /// Run registered save hooks for a container URI (empty = package).
+    pub fn run_save_hooks(&mut self, container_uri: &str) {
+        if let Some(f) = self.features.get::<crate::features::SaveFeature>() {
+            f.save(container_uri);
+        }
+    }
+
+    /// Package feature shell (C# `IPackageFeature`).
+    pub fn package_feature(&mut self) -> &mut crate::features::PackageFeature {
+        if !self.features.contains::<crate::features::PackageFeature>() {
+            let mut f = crate::features::PackageFeature::with_capabilities(self.package_capabilities());
+            if let Some(p) = self.opc.path() {
+                f.path = Some(p.display().to_string());
+            }
+            self.features.set(f);
+        }
+        self.features
+            .get_mut::<crate::features::PackageFeature>()
+            .expect("just inserted")
+    }
+
     /// Record package source bytes on the stream feature (C# open-from-stream path).
     pub fn set_package_stream_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
         self.package_stream_feature().set_bytes(bytes);
@@ -1081,6 +1140,7 @@ impl OpenXmlPackage {
     /// Save the package to its associated path.
     pub fn save(&mut self) -> Result<()> {
         self.ensure_open()?;
+        self.run_save_hooks("");
         self.raise_package_event(crate::features::PackageEventType::Saving);
         self.opc.save()?;
         self.raise_package_event(crate::features::PackageEventType::Saved);
@@ -1090,6 +1150,7 @@ impl OpenXmlPackage {
     /// Save the package to a new path.
     pub fn save_as(&mut self, path: impl AsRef<Path>) -> Result<()> {
         self.ensure_open()?;
+        self.run_save_hooks("");
         self.raise_package_event(crate::features::PackageEventType::Saving);
         self.opc.save_as(path)?;
         self.raise_package_event(crate::features::PackageEventType::Saved);
@@ -1373,5 +1434,38 @@ mod part_events_tests {
         assert!(pkg.data_parts_feature().contains(media.uri.as_str()));
         assert!(pkg.delete_data_part(&media.uri).unwrap());
         assert!(!pkg.data_parts_feature().contains(media.uri.as_str()));
+    }
+
+    #[test]
+    fn target_root_save_package_feature_accessors() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        pkg.set_target_feature(crate::features::TargetFeature::new("/word", "xml", "document"));
+        assert_eq!(pkg.target_feature().name, "document");
+        pkg.root_element_feature().register(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+            "Document",
+        );
+        assert_eq!(
+            pkg.root_element_feature().try_create(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "document"
+            ),
+            Some("Document")
+        );
+        let n = Arc::new(AtomicUsize::new(0));
+        let c = n.clone();
+        pkg.save_feature().register(move |_uri| {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        pkg.run_save_hooks("/word/document.xml");
+        assert_eq!(n.load(Ordering::SeqCst), 1);
+        assert!(pkg
+            .package_feature()
+            .capabilities
+            .contains(crate::features::PackageCapabilities::CACHED));
+        pkg.package_feature().reload();
+        assert_eq!(pkg.package_feature().reload_count, 1);
     }
 }
