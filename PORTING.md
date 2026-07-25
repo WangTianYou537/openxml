@@ -746,6 +746,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartExtensionProvider`; `OpenXmlPart` UnloadRootElement / IsRootElementLoaded / GetParentParts
 - [x] `GetAllParts` BFS; DOM `OuterXml`/`InnerXml`, InsertBefore/After, RemoveChild, First/LastChild
 - [x] `StrictRelationshipFound` / strict namespace detect; `DeleteParts` batch; MC `ProcessAllParts`
+- [x] DOM path/sibling helpers: Next/PreviousSibling-at, Remove/Replace path, GetOrAddFirstChild, find_path
 
 **Still intentionally deferred / partial:**
 

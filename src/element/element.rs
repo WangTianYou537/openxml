@@ -676,6 +676,152 @@ impl OpenXmlElement {
         !self.children.is_empty()
     }
 
+    /// Index of the first direct child with `local_name`, if any.
+    pub fn child_index(&self, local_name: &str) -> Option<usize> {
+        self.children
+            .iter()
+            .position(|c| c.local_name == local_name)
+    }
+
+    /// Index of a child by pointer equality of address within this parent's `children` vec
+    /// is not available across clones; use index-based APIs instead.
+    ///
+    /// Return the child before the one at `index` (C# `PreviousSibling` from parent).
+    pub fn previous_sibling_at(&self, index: usize) -> Option<&OpenXmlElement> {
+        if index == 0 || index > self.children.len() {
+            None
+        } else {
+            self.children.get(index - 1)
+        }
+    }
+
+    /// Return the child after the one at `index` (C# `NextSibling` from parent).
+    pub fn next_sibling_at(&self, index: usize) -> Option<&OpenXmlElement> {
+        self.children.get(index + 1)
+    }
+
+    /// Mutable previous sibling of the child at `index`.
+    pub fn previous_sibling_at_mut(&mut self, index: usize) -> Option<&mut OpenXmlElement> {
+        if index == 0 || index > self.children.len() {
+            None
+        } else {
+            self.children.get_mut(index - 1)
+        }
+    }
+
+    /// Mutable next sibling of the child at `index`.
+    pub fn next_sibling_at_mut(&mut self, index: usize) -> Option<&mut OpenXmlElement> {
+        self.children.get_mut(index + 1)
+    }
+
+    /// Remove the child at `index` and return it (C# `Remove` when holding parent+index).
+    pub fn remove_at(&mut self, index: usize) -> Option<OpenXmlElement> {
+        self.remove_child_at(index)
+    }
+
+    /// Replace the child at `index` with `new_child` (C# `ReplaceChild` / `ReplaceWith` shell).
+    pub fn replace_with_at(
+        &mut self,
+        index: usize,
+        new_child: OpenXmlElement,
+    ) -> Option<OpenXmlElement> {
+        self.replace_child(index, new_child)
+    }
+
+    /// Insert `new_child` immediately before the child at `index` (C# `InsertBeforeSelf`
+    /// when `index` identifies "self" among parent's children).
+    pub fn insert_before_self_at(&mut self, index: usize, new_child: OpenXmlElement) -> bool {
+        self.insert_before(new_child, index)
+    }
+
+    /// Insert `new_child` immediately after the child at `index` (C# `InsertAfterSelf`).
+    pub fn insert_after_self_at(&mut self, index: usize, new_child: OpenXmlElement) -> bool {
+        self.insert_after(new_child, index)
+    }
+
+    /// Get-or-add the first child with `local_name` (C# `GetOrAddFirstChild` shell).
+    ///
+    /// If missing, `factory` builds the new child which is appended.
+    pub fn get_or_add_first_child_with<F>(&mut self, local_name: &str, factory: F) -> &mut OpenXmlElement
+    where
+        F: FnOnce() -> OpenXmlElement,
+    {
+        if let Some(i) = self.child_index(local_name) {
+            return &mut self.children[i];
+        }
+        self.children.push(factory());
+        let last = self.children.len() - 1;
+        &mut self.children[last]
+    }
+
+    /// Depth-first path of child indices from `self` to the first descendant matching
+    /// `pred`. Empty path means `self` itself matched. `None` if not found.
+    pub fn find_path(&self, pred: &dyn Fn(&OpenXmlElement) -> bool) -> Option<Vec<usize>> {
+        if pred(self) {
+            return Some(Vec::new());
+        }
+        for (i, c) in self.children.iter().enumerate() {
+            if let Some(mut sub) = c.find_path(pred) {
+                let mut path = vec![i];
+                path.append(&mut sub);
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    /// Resolve a child-index path; empty path returns `self`.
+    pub fn get_at_path(&self, path: &[usize]) -> Option<&OpenXmlElement> {
+        let mut cur = self;
+        for &i in path {
+            cur = cur.children.get(i)?;
+        }
+        Some(cur)
+    }
+
+    pub fn get_at_path_mut(&mut self, path: &[usize]) -> Option<&mut OpenXmlElement> {
+        let mut cur = self;
+        for &i in path {
+            cur = cur.children.get_mut(i)?;
+        }
+        Some(cur)
+    }
+
+    /// Remove the descendant at `path` (non-empty). Returns the removed node.
+    pub fn remove_at_path(&mut self, path: &[usize]) -> Option<OpenXmlElement> {
+        if path.is_empty() {
+            return None;
+        }
+        if path.len() == 1 {
+            return self.remove_child_at(path[0]);
+        }
+        let (last, parent_path) = path.split_last()?;
+        self.get_at_path_mut(parent_path)?.remove_child_at(*last)
+    }
+
+    /// Ancestors of the node at `path`, nearest parent first (C# `Ancestors` order
+    /// when navigating from a known root + child-index path). Does not include the
+    /// target; empty `path` yields no ancestors.
+    pub fn ancestors_along_path(&self, path: &[usize]) -> Vec<&OpenXmlElement> {
+        if path.is_empty() {
+            return Vec::new();
+        }
+        let mut chain: Vec<&OpenXmlElement> = Vec::with_capacity(path.len());
+        let mut cur = self;
+        // Collect root .. parent (all nodes visited before the final index).
+        for &i in &path[..path.len() - 1] {
+            chain.push(cur);
+            match cur.children.get(i) {
+                Some(child) => cur = child,
+                None => return Vec::new(),
+            }
+        }
+        chain.push(cur); // parent of target
+        chain.reverse(); // nearest parent first, like C# Ancestors()
+        chain
+    }
+
+
     /// Serialize this element to OuterXml (C# `OuterXml`).
     pub fn outer_xml(&self) -> crate::error::Result<String> {
         let bytes = super::writer::write_element_fragment(self)?;
@@ -874,5 +1020,37 @@ mod dom_mutation_tests {
         p.set_inner_xml(r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>z</w:t></w:r>"#).unwrap();
         assert_eq!(p.child_count(), 1);
         assert_eq!(p.first_child().unwrap().local_name, "r");
+    }
+}
+
+#[cfg(test)]
+mod path_nav_tests {
+    use super::*;
+
+    #[test]
+    fn path_remove_and_siblings() {
+        let mut body = OpenXmlElement::w("body");
+        body.append_child(OpenXmlElement::w("p").with_text("1"));
+        body.append_child(OpenXmlElement::w("p").with_text("2"));
+        body.append_child(OpenXmlElement::w("p").with_text("3"));
+        assert_eq!(body.next_sibling_at(0).and_then(|e| e.text_value()), Some("2"));
+        assert_eq!(body.previous_sibling_at(2).and_then(|e| e.text_value()), Some("2"));
+        assert!(body.insert_after_self_at(0, OpenXmlElement::w("p").with_text("1b")));
+        assert_eq!(body.child_count(), 4);
+
+        let path = body
+            .find_path(&|e| e.text_value() == Some("2"))
+            .expect("path");
+        assert_eq!(path, vec![2]);
+        let removed = body.remove_at_path(&path).unwrap();
+        assert_eq!(removed.text_value(), Some("2"));
+        assert_eq!(body.child_count(), 3);
+
+        let p = body.get_or_add_first_child_with("sectPr", || OpenXmlElement::w("sectPr"));
+        assert_eq!(p.local_name, "sectPr");
+        assert_eq!(body.child_count(), 4);
+        // second call returns existing
+        let _ = body.get_or_add_first_child_with("sectPr", || OpenXmlElement::w("sectPr"));
+        assert_eq!(body.child_count(), 4);
     }
 }
