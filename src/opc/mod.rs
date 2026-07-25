@@ -14,6 +14,7 @@ mod media;
 mod package;
 mod part_uri;
 mod properties;
+mod reference_relationship;
 mod relationships;
 mod uri;
 
@@ -29,5 +30,9 @@ pub use package::{CompressionOption, OpcPackage, PackageMode};
 // Lazy open helpers are methods on OpcPackage: open_lazy / open_bytes_lazy / open_reader_lazy.
 pub use part_uri::{PartUriHelper, RelatedPart};
 pub use properties::PackageProperties;
+pub use reference_relationship::{
+    AudioReferenceRelationship, HyperlinkRelationship, MediaReferenceRelationship,
+    ReferenceRelationship, VideoReferenceRelationship,
+};
 pub use relationships::{Relationship, RelationshipTargetMode, Relationships};
 pub use uri::{pack_uri, resolve_uri, PackUri};

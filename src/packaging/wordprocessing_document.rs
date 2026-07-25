@@ -13095,6 +13095,16 @@ impl WordprocessingDocument {
         )
     }
 
+    /// Hyperlink relationships on the main document (C# `HyperlinkRelationships`).
+    pub fn hyperlink_relationships(&self) -> Vec<crate::opc::HyperlinkRelationship> {
+        let Some(main) = self.main_document_part.as_ref() else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .hyperlink_relationships(Some(main.uri()))
+    }
+
 
     /// Add an arbitrary extended part related from the main document.
     ///

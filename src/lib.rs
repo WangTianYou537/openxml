@@ -70,8 +70,10 @@ pub use features::{
 };
 pub use file_format::FileFormatVersions;
 pub use opc::{
-    add_media_part, CompressionOption, CustomProperties, CustomProperty, CustomPropertyValue,
-    ExtendedProperties, MediaKind, MediaPartInfo, PackageProperties, PartUriHelper, RelatedPart,
+    add_media_part, AudioReferenceRelationship, CompressionOption, CustomProperties,
+    CustomProperty, CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind,
+    MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartUriHelper,
+    ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
 };
 pub use packaging::{
     add_typed_part, add_typed_part_element, default_settings, default_styles, find_typed_parts,

@@ -740,6 +740,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PackageEvents` / `PackageEventType` feature hub (C# `IPackageEventsFeature` shell); raised on package save/close
 - [x] `PartUriHelper` + `RelatedPart` / `related_parts` / `parts_of_relationship_type` (C# PartUriHelper + GetPartsOfType shell)
 - [x] `TypedPart` runtime handle over generated `PartInfo` (add/find/save/children; constraint-checked)
+- [x] `ReferenceRelationship` / `HyperlinkRelationship` / audio·video·media reference types
 
 **Still intentionally deferred / partial:**
 

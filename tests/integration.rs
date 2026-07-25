@@ -3278,6 +3278,24 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn hyperlink_relationship_typed() {
+    use officexml::namespace::rel;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    let _ = doc
+        .add_external_relationship(rel::HYPERLINK, "https://contoso.example/a")
+        .unwrap();
+    let hls = doc.hyperlink_relationships();
+    assert_eq!(hls.len(), 1);
+    assert!(hls[0].is_external());
+    assert!(hls[0].target().contains("contoso"));
+}
+
 #[test]
 fn typed_part_add_styles() {
     use officexml::element::OpenXmlElement;
