@@ -1,6 +1,5 @@
 /target
 **/*.rs.bk
-Cargo.lock
 *.docx
 *.xlsx
 *.pptx

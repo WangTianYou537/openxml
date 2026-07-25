@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install fonts (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            fonts-liberation \
+            fonts-dejavu-core \
+            fonts-noto-cjk \
+            fonttools \
+            python3
+
+      - name: Build library + svg2pptx
+        run: cargo build --locked --bin svg2pptx
+
+      - name: Test
+        run: cargo test --locked --all-targets
+
+      - name: CLI smoke (multi-slide)
+        shell: bash
+        run: |
+          cargo run --locked --bin svg2pptx -- \
+            -o multi.pptx \
+            tests/fixtures/svg/basic-geometry-path.svg \
+            tests/fixtures/svg/gradients-patterns.svg
+          test -f multi.pptx

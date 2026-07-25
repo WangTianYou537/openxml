@@ -33,6 +33,17 @@ svg2pptx --font-shape a.svg b.svg          # writes a.pptx
 
 Optional embed fonts: place `NotoSansSC-Regular.ttf` / `NotoSansSC-Bold.ttf` under `assets/fonts/`. Subset mode needs Python + `fontTools` (`scripts/subset_ttf.py`).
 
+## GitHub Releases
+
+CI runs on every push to `main`. Pushing a tag `v*` (e.g. `v0.1.0`) builds multi-platform `svg2pptx` binaries and publishes a GitHub Release.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+
+
 ## Status
 
 | Area | Status |
