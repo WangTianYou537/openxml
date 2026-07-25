@@ -175,6 +175,15 @@ impl OpenXmlPackage {
         n
     }
 
+    /// Recursively delete parts of a relationship type (C# `DeletePartsRecursivelyOfType`).
+    pub fn delete_parts_recursively_of_relationship_type(
+        &mut self,
+        relationship_type: &str,
+    ) -> usize {
+        self.opc
+            .delete_parts_recursively_of_relationship_type_all(relationship_type)
+    }
+
     /// Remove a part and raise part Removing/Removed events (C# `DeletePart` + `IPartEventsFeature`).
     pub fn delete_part(&mut self, uri: &crate::opc::PackUri) -> Option<Vec<u8>> {
         let uri_str = uri.to_string();

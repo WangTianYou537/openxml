@@ -822,6 +822,57 @@ impl OpcPackage {
         n
     }
 
+    /// Recursively delete parts linked by `relationship_type` (C# `DeletePartsRecursivelyOfTypeBase`).
+    ///
+    /// At each container (package root when `source` is `None`, otherwise that part), removes
+    /// direct children of `relationship_type`, then walks remaining child parts and repeats.
+    pub fn delete_parts_recursively_of_relationship_type(
+        &mut self,
+        source: Option<&PackUri>,
+        relationship_type: &str,
+    ) -> usize {
+        let mut n = self.delete_parts_of_relationship_type(source, relationship_type);
+        // Remaining internal children after the type-specific delete.
+        let child_uris: Vec<PackUri> = {
+            let rels_iter: Box<dyn Iterator<Item = &Relationship>> = match source {
+                Some(s) => match self.part_relationships(s) {
+                    Some(rels) => Box::new(rels.iter()),
+                    None => Box::new(std::iter::empty()),
+                },
+                None => Box::new(self.package_rels.iter()),
+            };
+            let mut uris = Vec::new();
+            for rel in rels_iter {
+                if rel.target_mode != RelationshipTargetMode::Internal {
+                    continue;
+                }
+                if let Ok(u) = self.resolve_relationship(source, rel) {
+                    if self.has_part(&u) {
+                        uris.push(u);
+                    }
+                }
+            }
+            uris.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+            uris.dedup();
+            uris
+        };
+        for child in child_uris {
+            n += self.delete_parts_recursively_of_relationship_type(
+                Some(&child),
+                relationship_type,
+            );
+        }
+        n
+    }
+
+    /// Package-wide recursive delete by relationship type (starts at package relationships).
+    pub fn delete_parts_recursively_of_relationship_type_all(
+        &mut self,
+        relationship_type: &str,
+    ) -> usize {
+        self.delete_parts_recursively_of_relationship_type(None, relationship_type)
+    }
+
     /// Add an external relationship from `source` (or package-level if `None`).
     ///
     /// Mirrors C# `OpenXmlPartContainer.AddExternalRelationship`.
@@ -1447,8 +1498,6 @@ mod tests {
 
 
     #[test]
-
-    #[test]
     fn delete_parts_batch() {
         let mut pkg = OpcPackage::create();
         let a = PackUri::new("/word/a.xml");
@@ -1460,6 +1509,7 @@ mod tests {
         assert!(!pkg.has_part(&b));
     }
 
+    #[test]
     fn lazy_open_defers_parts() {
         let mut pkg = OpcPackage::create();
         pkg.set_part(
@@ -1492,4 +1542,29 @@ mod tests {
         let opened = OpcPackage::open_bytes(&again).unwrap();
         assert!(opened.has_part(&PackUri::new("/word/styles.xml")));
     }
+
+    #[test]
+    fn delete_parts_recursively_of_rel_type() {
+        let mut pkg = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        let header = PackUri::new("/word/header1.xml");
+        let header_styles = PackUri::new("/word/headerStyles.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        pkg.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        pkg.set_part(header.clone(), content_type::WORD_HEADER, b"<w:hdr/>".to_vec());
+        pkg.set_part(header_styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        pkg.add_package_relationship(rel::OFFICE_DOCUMENT, &doc, RelationshipTargetMode::Internal);
+        pkg.add_part_relationship(&doc, rel::STYLES, &styles, RelationshipTargetMode::Internal);
+        pkg.add_part_relationship(&doc, rel::HEADER, &header, RelationshipTargetMode::Internal);
+        // Nested styles under header — only reachable via recursive walk
+        pkg.add_part_relationship(&header, rel::STYLES, &header_styles, RelationshipTargetMode::Internal);
+        let n = pkg.delete_parts_recursively_of_relationship_type_all(rel::STYLES);
+        assert!(n >= 2, "deleted count {n}");
+        assert!(!pkg.has_part(&styles));
+        assert!(!pkg.has_part(&header_styles));
+        assert!(pkg.has_part(&doc));
+        assert!(pkg.has_part(&header));
+    }
+
 }

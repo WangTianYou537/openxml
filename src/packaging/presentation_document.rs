@@ -2960,6 +2960,15 @@ impl PresentationDocument {
             .delete_parts_of_content_type(content_type)
     }
 
+    /// Recursively delete parts of a relationship type (C# `DeletePartsRecursivelyOfType` stand-in).
+    pub fn delete_parts_recursively_of_relationship_type(
+        &mut self,
+        relationship_type: &str,
+    ) -> usize {
+        self.package
+            .delete_parts_recursively_of_relationship_type(relationship_type)
+    }
+
     /// Add an external relationship from the presentation part.
     pub fn add_external_relationship(
         &mut self,

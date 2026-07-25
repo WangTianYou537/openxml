@@ -113,7 +113,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | **ExtendedPart** 任意扩展部件 | 有 | ✅ ExtendedPart 类型 + create_extended_part | ✅ |
 | **AddPart / 跨包 copy_part_from** | 有 | ✅ import_part + recursive copy_part_from | ✅ |
 | **Excel/PPT PartContainer helpers** | 有 | ✅ delete_parts / ChangeId / IdPartPair / media / ExtendedPart / AddNewPart | ✅ |
-| **DeletePartsRecursivelyOfType** | 有 | 无递归按类型删除 | 低 |
+| **DeletePartsRecursivelyOfType** | 有 | ✅ `delete_parts_recursively_of_relationship_type`（按 relationship type 递归） | ✅ |
 | **CreateFromTemplate** | Word/Excel/PPT | ✅ Word/Excel/PPT `create_from_template` / clone | ✅ |
 | **ChangeDocumentType** | 有 | ✅ Word `change_document_type` | ✅ |
 | **Package 加密检测** | `IsEncryptedOfficeFile` | ✅ `is_encrypted_office_*` + `Error::EncryptedPackage` | ✅ |

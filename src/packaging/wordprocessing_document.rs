@@ -13038,6 +13038,16 @@ impl WordprocessingDocument {
             .delete_parts_of_content_type(content_type)
     }
 
+    /// Recursively delete parts of a relationship type from the package root
+    /// (C# `DeletePartsRecursivelyOfType` stand-in by relationship URI).
+    pub fn delete_parts_recursively_of_relationship_type(
+        &mut self,
+        relationship_type: &str,
+    ) -> usize {
+        self.package
+            .delete_parts_recursively_of_relationship_type(relationship_type)
+    }
+
     /// Add an external relationship from the main document part.
     pub fn add_external_relationship(
         &mut self,
