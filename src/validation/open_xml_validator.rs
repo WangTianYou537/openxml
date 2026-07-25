@@ -5,7 +5,7 @@
 
 use super::{
     validate_alternate_content, validate_mc_attributes, validate_package, validate_package_constraints,
-    validate_word_document, validate_word_document_full, ValidationError,
+    validate_word_document, validate_word_document_full, ValidationCache, ValidationError,
 };
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
@@ -52,6 +52,8 @@ impl Default for ValidationSettings {
 /// Settings / facade for package and element validation (C# `OpenXmlValidator`).
 pub struct OpenXmlValidator {
     settings: ValidationSettings,
+    /// Version-scoped particle/memo cache (C# `ValidationCache`).
+    cache: ValidationCache,
     /// Optional per-error callback (C# `ValidationErrorEventArgs` subscriber).
     error_callback: Option<Box<dyn FnMut(&ValidationError) + Send>>,
 }
@@ -62,6 +64,7 @@ impl std::fmt::Debug for OpenXmlValidator {
             .field("file_format", &self.settings.file_format)
             .field("max_number_of_errors", &self.settings.max_number_of_errors)
             .field("has_error_callback", &self.error_callback.is_some())
+            .field("cache_version", &self.cache.version())
             .finish()
     }
 }
@@ -75,8 +78,10 @@ impl Default for OpenXmlValidator {
 impl OpenXmlValidator {
     /// Defaults to [`FileFormatVersions::OFFICE2007`] and max 1000 errors.
     pub fn new() -> Self {
+        let settings = ValidationSettings::default();
         Self {
-            settings: ValidationSettings::default(),
+            cache: ValidationCache::new(settings.file_format),
+            settings,
             error_callback: None,
         }
     }
@@ -84,13 +89,16 @@ impl OpenXmlValidator {
     pub fn with_file_format(file_format: FileFormatVersions) -> Self {
         Self {
             settings: ValidationSettings::new(file_format),
+            cache: ValidationCache::new(file_format),
             error_callback: None,
         }
     }
 
     pub fn with_settings(settings: ValidationSettings) -> Self {
+        let cache = ValidationCache::new(settings.file_format);
         Self {
             settings,
+            cache,
             error_callback: None,
         }
     }
@@ -99,7 +107,16 @@ impl OpenXmlValidator {
         self.settings
     }
 
+    pub fn cache(&self) -> &ValidationCache {
+        &self.cache
+    }
+
+    pub fn cache_mut(&mut self) -> &mut ValidationCache {
+        &mut self.cache
+    }
+
     pub fn set_settings(&mut self, settings: ValidationSettings) {
+        self.cache.set_version(settings.file_format);
         self.settings = settings;
     }
 
@@ -109,6 +126,7 @@ impl OpenXmlValidator {
 
     pub fn set_file_format(&mut self, file_format: FileFormatVersions) {
         self.settings.file_format = file_format;
+        self.cache.set_version(file_format);
     }
 
     pub fn max_number_of_errors(&self) -> usize {
@@ -333,5 +351,6 @@ mod tests {
         assert_eq!(v.max_number_of_errors(), 42);
         v.set_file_format(FileFormatVersions::OFFICE2010);
         assert_eq!(v.settings().file_format, FileFormatVersions::OFFICE2010);
+        assert_eq!(v.cache().version(), FileFormatVersions::OFFICE2010);
     }
 }

@@ -18,6 +18,7 @@ mod schematron_constraints;
 mod schematron_rules;
 mod schematron_validate;
 mod semantic;
+mod validation_cache;
 
 pub use digsig::{add_digital_signature_part, clear_digital_signatures, digital_signature_parts, ensure_digital_signature_origin, has_digital_signature_origin, validate_digital_signatures};
 pub use digsig_crypto::{
@@ -36,6 +37,7 @@ pub use package_validator::{
     validate_part_constraints,
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
+pub use validation_cache::ValidationCache;
 pub use particle::{validate_particle, validate_word_particles, Occurs, Particle};
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,

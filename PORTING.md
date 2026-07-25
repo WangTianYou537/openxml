@@ -791,6 +791,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `FileFormatVersions::{any,ensure_supported,office_year}` + `OpenXmlElement::child_elements`
 - [x] `OpenXmlElementContext` XmlnsUri/XmlnsPrefix/LazySteps + `OpenXmlSimpleType::{has_value,is_in_version}`
 - [x] `OpenXmlElement::{is_leaf_element,is_leaf_text_element,is_composite_element,xml_space,set_xml_space,preserves_space}`
+- [x] `ValidationCache` + OpenXmlValidator cache; Reader/Writer `Create` factories
 
 **Still intentionally deferred / partial:**
 

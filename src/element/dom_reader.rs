@@ -43,6 +43,16 @@ impl<'a> OpenXmlDomReader<'a> {
         }
     }
 
+    /// C# `OpenXmlReader.Create(OpenXmlElement)`.
+    pub fn create(root: &'a OpenXmlElement) -> Self {
+        Self::new(root)
+    }
+
+    /// C# `OpenXmlReader.Create(OpenXmlElement, readMiscNodes)`.
+    pub fn create_with_misc(root: &'a OpenXmlElement, read_misc_nodes: bool) -> Self {
+        Self::new(root).with_read_misc_nodes(read_misc_nodes)
+    }
+
     pub fn with_read_misc_nodes(mut self, yes: bool) -> Self {
         self.read_misc_nodes = yes;
         self

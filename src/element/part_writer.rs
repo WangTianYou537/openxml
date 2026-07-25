@@ -25,6 +25,16 @@ impl<W: Write> OpenXmlPartWriter<W> {
         }
     }
 
+    /// C# `OpenXmlWriter.Create(Stream)` shell.
+    pub fn create(writer: W) -> Self {
+        Self::new(writer)
+    }
+
+    /// C# `OpenXmlWriter.Create` without XML declaration.
+    pub fn create_without_declaration(writer: W) -> Self {
+        Self::new(writer).without_declaration()
+    }
+
     pub fn without_declaration(mut self) -> Self {
         self.write_declaration = false;
         self

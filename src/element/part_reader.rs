@@ -51,6 +51,16 @@ impl<'a> OpenXmlPartReader<&'a [u8]> {
     pub fn from_bytes(data: &'a [u8]) -> Self {
         Self::from_reader(data)
     }
+
+    /// C# `OpenXmlReader.Create(partStream)` shell over bytes.
+    pub fn create(data: &'a [u8]) -> Self {
+        Self::from_bytes(data)
+    }
+
+    /// C# `OpenXmlReader.Create(..., readMiscNodes)`.
+    pub fn create_with_misc(data: &'a [u8], read_misc_nodes: bool) -> Self {
+        Self::from_bytes(data).with_read_misc_nodes(read_misc_nodes)
+    }
 }
 
 impl<R: BufRead> OpenXmlPartReader<R> {
