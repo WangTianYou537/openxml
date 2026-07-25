@@ -20,7 +20,10 @@ mod xml_path;
 
 pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind, OpenXmlQualifiedName};
 pub use dom_reader::OpenXmlDomReader;
-pub use element_context::{ElementEvent, ElementEventKind, OpenXmlElementContext, OpenXmlLoadMode};
+pub use element_context::{
+    ElementEvent, ElementEventKind, OpenXmlElementContext, OpenXmlLoadMode, LAZY_STEPS, XMLNS_PREFIX,
+    XMLNS_URI,
+};
 pub use equality::{
     element_hash, element_hash_with, elements_equal, elements_equal_with, ElementComparer,
     EqualityOptions,

@@ -7,6 +7,13 @@ use crate::file_format::FileFormatVersions;
 use crate::packaging::{MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings};
 use std::sync::{Arc, Mutex};
 
+/// XML namespace URI for `xmlns` declarations (C# `OpenXmlElementContext.XmlnsUri`).
+pub const XMLNS_URI: &str = "http://www.w3.org/2000/xmlns/";
+/// Prefix used for namespace declarations (C# `OpenXmlElementContext.XmlnsPrefix`).
+pub const XMLNS_PREFIX: &str = "xmlns";
+/// Lazy load population depth (C# `OpenXmlElementContext.LazySteps`).
+pub const LAZY_STEPS: u32 = 3;
+
 /// How deeply to materialize the DOM when loading (C# `OpenXmlLoadMode`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OpenXmlLoadMode {
@@ -93,6 +100,26 @@ impl OpenXmlElementContext {
         self.mc_settings.mode != MarkupCompatibilityProcessMode::NoProcess
     }
 
+    /// Whether `ns_uri` is the XMLNS namespace (C# `IsXmlnsUri`).
+    pub fn is_xmlns_uri(ns_uri: &str) -> bool {
+        ns_uri == XMLNS_URI
+    }
+
+    /// Effective lazy population depth when [`OpenXmlLoadMode::Lazy`].
+    pub fn lazy_steps(&self) -> u32 {
+        let _ = self;
+        LAZY_STEPS
+    }
+
+    /// Target file format from MC settings.
+    pub fn target_file_format_versions(&self) -> FileFormatVersions {
+        self.mc_settings.target_file_format_versions
+    }
+
+    pub fn set_mc_settings(&mut self, settings: MarkupCompatibilityProcessSettings) {
+        self.mc_settings = settings;
+    }
+
     pub fn subscribe<F>(&self, f: F) -> usize
     where
         F: Fn(&ElementEvent) + Send + Sync + 'static,
@@ -156,5 +183,15 @@ mod tests {
         ctx.raise_kind(ElementEventKind::Inserted, "w:p", Some("w:body".into()));
         assert_eq!(n.load(Ordering::SeqCst), 1);
         assert_eq!(ctx.load_mode, OpenXmlLoadMode::Lazy);
+    }
+
+    #[test]
+    fn xmlns_constants_and_lazy_steps() {
+        assert_eq!(XMLNS_PREFIX, "xmlns");
+        assert!(OpenXmlElementContext::is_xmlns_uri(XMLNS_URI));
+        assert!(!OpenXmlElementContext::is_xmlns_uri("http://example.com"));
+        let ctx = OpenXmlElementContext::new();
+        assert_eq!(ctx.lazy_steps(), LAZY_STEPS);
+        assert_eq!(ctx.lazy_steps(), 3);
     }
 }

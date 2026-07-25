@@ -9,6 +9,18 @@ use std::str::FromStr;
 pub trait OpenXmlSimpleType: Sized {
     fn as_inner_text(&self) -> String;
     fn from_inner_text(text: &str) -> Option<Self>;
+
+    /// Whether the value is considered present (C# `HasValue` shell — always true for owned values).
+    fn has_value(&self) -> bool {
+        true
+    }
+
+    /// Whether this value is allowed in `file_format` (C# `IsInVersion` shell).
+    ///
+    /// Default: always true. Enum wrappers may override via free functions.
+    fn is_in_version(&self, _file_format: crate::file_format::FileFormatVersions) -> bool {
+        true
+    }
 }
 
 /// String simple type.
@@ -394,5 +406,8 @@ mod tests {
         assert_eq!(p.0, 50.0);
         assert!(parse_on_off_lenient("on"));
         assert!(!parse_on_off_lenient("nope"));
+        let s = StringValue::from("hi");
+        assert!(s.has_value());
+        assert!(s.is_in_version(crate::file_format::FileFormatVersions::OFFICE2007));
     }
 }
