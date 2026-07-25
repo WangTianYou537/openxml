@@ -68,7 +68,9 @@ pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, ApplicationType, DisposableFeature, DocumentTypeFeature, FeatureCollection,
     MainPartFeature, PackageCapabilities, PackageEvent, PackageEventType, PackageEvents,
-    ParagraphIdGenerator, PartEvents, PartRootEvents, SchemaTrackingFeature, StrictNamespaceFeature,
+    PackageFactoryFeature, PackageRelationshipBuilder, ParagraphIdGenerator, PartEvents,
+    PartRootEvents, ProgrammaticIdentifierFeature, RelationshipFilterFeature,
+    SchemaTrackingFeature, StrictNamespaceFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

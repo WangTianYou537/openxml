@@ -166,6 +166,7 @@ impl PresentationDocument {
         let opc = OpcPackage::create_file(path.as_ref());
         let mut package = OpenXmlPackage::from_opc(opc, settings);
         package.set_application_type(crate::features::ApplicationType::POWERPOINT);
+        package.set_package_factory_feature("PresentationDocument");
         package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
             "PresentationDocument",
         ));
@@ -188,6 +189,7 @@ impl PresentationDocument {
         let opc = OpcPackage::create();
         let mut package = OpenXmlPackage::from_opc(opc, OpenSettings::default());
         package.set_application_type(crate::features::ApplicationType::POWERPOINT);
+        package.set_package_factory_feature("PresentationDocument");
         package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
             "PresentationDocument",
         ));
@@ -286,6 +288,7 @@ impl PresentationDocument {
     fn from_opc(opc: OpcPackage, settings: OpenSettings) -> Result<Self> {
         let mut package = OpenXmlPackage::from_opc(opc, settings);
         package.set_application_type(crate::features::ApplicationType::POWERPOINT);
+        package.set_package_factory_feature("PresentationDocument");
         package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
             "PresentationDocument",
         ));

@@ -100,6 +100,7 @@ impl OpenXmlPart {
                 });
             }
         }
+        self.standalone_declaration = parse_xml_standalone(data);
         let mut element = parse_element(data)?;
         // Optional MC processing on load
         use crate::packaging::open_xml_package::MarkupCompatibilityProcessMode;
@@ -295,6 +296,31 @@ impl OpenXmlPart {
         );
         Ok(())
     }
+}
+
+/// Parse `standalone` from a leading XML declaration, if present.
+fn parse_xml_standalone(xml: &[u8]) -> Option<bool> {
+    let s = std::str::from_utf8(xml).ok()?;
+    let trimmed = s.trim_start();
+    if !trimmed.starts_with("<?xml") {
+        return None;
+    }
+    let end = trimmed.find("?>")?;
+    let decl = &trimmed[..end];
+    // Match standalone="yes|no" (case-insensitive value)
+    let lower = decl.to_ascii_lowercase();
+    if let Some(idx) = lower.find("standalone") {
+        let rest = &decl[idx + "standalone".len()..];
+        let rest = rest.trim_start();
+        let rest = rest.strip_prefix('=')?.trim_start();
+        let quote = rest.chars().next()?;
+        if quote != '"' && quote != '\'' {
+            return None;
+        }
+        let val = rest[1..].split(quote).next()?.trim();
+        return Some(val.eq_ignore_ascii_case("yes"));
+    }
+    None
 }
 
 /// Application-specific extended part (C# `ExtendedPart`).
@@ -572,5 +598,25 @@ mod tests {
         let s = std::str::from_utf8(bytes).unwrap();
         assert!(s.contains(r#"standalone="yes""#));
         assert!(s.contains("document"));
+    }
+
+    #[test]
+    fn load_captures_standalone_declaration() {
+        let mut opc = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        opc.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="no"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.to_vec(),
+        );
+        let pkg = OpenXmlPackage::from_opc(opc, Default::default());
+        let mut part = OpenXmlPart::new(
+            doc,
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        assert_eq!(part.standalone_declaration(), Some(true)); // default before load
+        let _ = part.root(&pkg).unwrap();
+        assert_eq!(part.standalone_declaration(), Some(false));
     }
 }

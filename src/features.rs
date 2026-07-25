@@ -417,6 +417,136 @@ impl std::ops::BitOrAssign for PackageCapabilities {
     }
 }
 
+/// Mutable relationship builder snapshot used by filters (C# `PackageRelationshipBuilder` shell).
+#[derive(Debug, Clone)]
+pub struct PackageRelationshipBuilder {
+    pub id: String,
+    pub relationship_type: String,
+    pub target: String,
+    pub target_mode: String,
+    pub source_uri: Option<String>,
+}
+
+impl PackageRelationshipBuilder {
+    pub fn new(
+        id: impl Into<String>,
+        relationship_type: impl Into<String>,
+        target: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            relationship_type: relationship_type.into(),
+            target: target.into(),
+            target_mode: "Internal".into(),
+            source_uri: None,
+        }
+    }
+
+    pub fn with_target_mode(mut self, mode: impl Into<String>) -> Self {
+        self.target_mode = mode.into();
+        self
+    }
+
+    pub fn with_source_uri(mut self, uri: impl Into<String>) -> Self {
+        self.source_uri = Some(uri.into());
+        self
+    }
+}
+
+/// Relationship filter pipeline (C# `IRelationshipFilterFeature`).
+///
+/// Filters run in registration order and may rewrite relationship fields before they are committed.
+#[derive(Default)]
+pub struct RelationshipFilterFeature {
+    filters: Mutex<Vec<Box<dyn Fn(&mut PackageRelationshipBuilder) + Send>>>,
+}
+
+impl std::fmt::Debug for RelationshipFilterFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.filters.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("RelationshipFilterFeature")
+            .field("filters", &n)
+            .finish()
+    }
+}
+
+impl RelationshipFilterFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a filter (C# `AddFilter`).
+    pub fn add_filter<F>(&self, f: F)
+    where
+        F: Fn(&mut PackageRelationshipBuilder) + Send + 'static,
+    {
+        if let Ok(mut g) = self.filters.lock() {
+            g.push(Box::new(f));
+        }
+    }
+
+    /// Apply all filters to `builder` in registration order.
+    pub fn apply(&self, builder: &mut PackageRelationshipBuilder) {
+        if let Ok(g) = self.filters.lock() {
+            for f in g.iter() {
+                f(builder);
+            }
+        }
+    }
+
+    pub fn filter_count(&self) -> usize {
+        self.filters.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
+/// Package factory feature marker (C# `IPackageFactoryFeature<TPackage>` shell).
+///
+/// Holds a type-erased document kind name so packages can advertise which factory
+/// created them without a full generic factory graph.
+#[derive(Debug, Clone, Default)]
+pub struct PackageFactoryFeature {
+    pub package_kind: String,
+}
+
+impl PackageFactoryFeature {
+    pub fn new(package_kind: impl Into<String>) -> Self {
+        Self {
+            package_kind: package_kind.into(),
+        }
+    }
+}
+
+/// Programmatic identifier used when generating part/relationship ids
+/// (C# `IProgrammaticIdentifierFeature` shell).
+#[derive(Debug)]
+pub struct ProgrammaticIdentifierFeature {
+    pub identifier: String,
+    next: Mutex<u32>,
+}
+
+impl Default for ProgrammaticIdentifierFeature {
+    fn default() -> Self {
+        Self::new("R")
+    }
+}
+
+impl ProgrammaticIdentifierFeature {
+    pub fn new(identifier: impl Into<String>) -> Self {
+        Self {
+            identifier: identifier.into(),
+            next: Mutex::new(1),
+        }
+    }
+
+    /// Next id of the form `{identifier}{n}` (hex), e.g. `R00000001`.
+    pub fn next_id(&self) -> String {
+        let mut g = self.next.lock().unwrap_or_else(|e| e.into_inner());
+        let n = *g;
+        *g = g.wrapping_add(1);
+        format!("{}{:08X}", self.identifier, n)
+    }
+}
+
 /// Application host type flags (C# `ApplicationType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ApplicationType {
@@ -730,5 +860,27 @@ mod tests {
         assert_eq!(track.relationships.len(), 1);
         assert!(!StrictNamespaceFeature::new(false).found);
         assert!(StrictNamespaceFeature::new(true).found);
+    }
+
+    #[test]
+    fn relationship_filter_and_programmatic_id() {
+        let filters = RelationshipFilterFeature::new();
+        filters.add_filter(|b| {
+            b.relationship_type = "rewritten".into();
+        });
+        filters.add_filter(|b| {
+            b.id = format!("X{}", b.id);
+        });
+        assert_eq!(filters.filter_count(), 2);
+        let mut b = PackageRelationshipBuilder::new("rId1", "orig", "/word/styles.xml");
+        filters.apply(&mut b);
+        assert_eq!(b.relationship_type, "rewritten");
+        assert_eq!(b.id, "XrId1");
+
+        let ids = ProgrammaticIdentifierFeature::new("R");
+        assert_eq!(ids.next_id(), "R00000001");
+        assert_eq!(ids.next_id(), "R00000002");
+        let factory = PackageFactoryFeature::new("WordprocessingDocument");
+        assert_eq!(factory.package_kind, "WordprocessingDocument");
     }
 }

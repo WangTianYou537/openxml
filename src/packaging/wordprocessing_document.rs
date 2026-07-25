@@ -112,6 +112,7 @@ impl WordprocessingDocument {
         let opc = OpcPackage::create_file(path.as_ref());
         let mut package = OpenXmlPackage::from_opc(opc, settings);
         package.set_application_type(crate::features::ApplicationType::WORD);
+        package.set_package_factory_feature("WordprocessingDocument");
         package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
             "WordprocessingDocument",
         ));
@@ -127,6 +128,7 @@ impl WordprocessingDocument {
         let opc = OpcPackage::create();
         let mut package = OpenXmlPackage::from_opc(opc, OpenSettings::default());
         package.set_application_type(crate::features::ApplicationType::WORD);
+        package.set_package_factory_feature("WordprocessingDocument");
         package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
             "WordprocessingDocument",
         ));
@@ -233,6 +235,7 @@ impl WordprocessingDocument {
     fn from_opc(opc: OpcPackage, settings: OpenSettings) -> Result<Self> {
         let mut package = OpenXmlPackage::from_opc(opc, settings);
         package.set_application_type(crate::features::ApplicationType::WORD);
+        package.set_package_factory_feature("WordprocessingDocument");
         package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
             "WordprocessingDocument",
         ));

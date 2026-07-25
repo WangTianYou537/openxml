@@ -581,6 +581,45 @@ impl OpenXmlPackage {
             .set(crate::features::StrictNamespaceFeature::new(found));
     }
 
+    /// Relationship filter pipeline (C# `IRelationshipFilterFeature`).
+    pub fn relationship_filter(&mut self) -> &crate::features::RelationshipFilterFeature {
+        if !self
+            .features
+            .contains::<crate::features::RelationshipFilterFeature>()
+        {
+            self.features
+                .set(crate::features::RelationshipFilterFeature::new());
+        }
+        self.features
+            .get::<crate::features::RelationshipFilterFeature>()
+            .expect("just inserted")
+    }
+
+    /// Package factory marker (C# `IPackageFactoryFeature` shell).
+    pub fn package_factory_feature(&self) -> Option<&crate::features::PackageFactoryFeature> {
+        self.features
+            .get::<crate::features::PackageFactoryFeature>()
+    }
+
+    pub fn set_package_factory_feature(&mut self, kind: impl Into<String>) {
+        self.features
+            .set(crate::features::PackageFactoryFeature::new(kind));
+    }
+
+    /// Programmatic id generator (C# `IProgrammaticIdentifierFeature`).
+    pub fn programmatic_identifier(&mut self) -> &crate::features::ProgrammaticIdentifierFeature {
+        if !self
+            .features
+            .contains::<crate::features::ProgrammaticIdentifierFeature>()
+        {
+            self.features
+                .set(crate::features::ProgrammaticIdentifierFeature::default());
+        }
+        self.features
+            .get::<crate::features::ProgrammaticIdentifierFeature>()
+            .expect("just inserted")
+    }
+
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
     pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()
@@ -785,5 +824,31 @@ mod part_events_tests {
         pkg.register_dispose(move || f.store(true, Ordering::SeqCst));
         pkg.close(false).unwrap();
         assert!(fired.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn relationship_filter_and_factory_feature() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        pkg.set_package_factory_feature("WordprocessingDocument");
+        assert_eq!(
+            pkg.package_factory_feature()
+                .map(|f| f.package_kind.as_str()),
+            Some("WordprocessingDocument")
+        );
+        pkg.relationship_filter().add_filter(|b| {
+            b.target = b.target.replace("styles", "styles2");
+        });
+        let mut b = crate::features::PackageRelationshipBuilder::new(
+            "rId1",
+            "rel",
+            "/word/styles.xml",
+        );
+        pkg.relationship_filter().apply(&mut b);
+        assert_eq!(b.target, "/word/styles2.xml");
+        let id1 = pkg.programmatic_identifier().next_id();
+        let id2 = pkg.programmatic_identifier().next_id();
+        assert_ne!(id1, id2);
+        assert!(id1.starts_with('R'));
     }
 }
