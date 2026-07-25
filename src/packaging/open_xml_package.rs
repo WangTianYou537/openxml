@@ -1140,6 +1140,30 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Set the programmatic id used for Flat OPC / id generation
+    /// (C# `IProgrammaticIdentifierFeature.ProgramId`).
+    pub fn set_program_id(&mut self, id: impl Into<String>) {
+        if !self
+            .features
+            .contains::<crate::features::ProgrammaticIdentifierFeature>()
+        {
+            self.features
+                .set(crate::features::ProgrammaticIdentifierFeature::new(id));
+        } else if let Some(f) = self
+            .features
+            .get_mut::<crate::features::ProgrammaticIdentifierFeature>()
+        {
+            f.set_program_id(id);
+        }
+    }
+
+    /// Current programmatic id, if registered.
+    pub fn program_id(&self) -> Option<&str> {
+        self.features
+            .get::<crate::features::ProgrammaticIdentifierFeature>()
+            .map(|f| f.program_id())
+    }
+
     /// Content-type constancy flag (C# `IContentTypeFeature`).
     pub fn content_type_feature(&self) -> crate::features::ContentTypeFeature {
         self.features

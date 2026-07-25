@@ -394,6 +394,43 @@ impl OpenXmlPart {
         package.create_relationship_to_part(&self.uri, target, relationship_type, id)
     }
 
+    /// Change the relationship id of a child part (C# `ChangeIdOfPart`).
+    pub fn change_id_of_part(
+        &self,
+        package: &mut OpenXmlPackage,
+        part_uri: &PackUri,
+        new_id: &str,
+    ) -> Result<String> {
+        package.change_id_of_part(Some(&self.uri), part_uri, new_id)
+    }
+
+    /// Delete a child part by relationship id (C# `DeletePart(string id)`).
+    pub fn delete_part_by_id(
+        &self,
+        package: &mut OpenXmlPackage,
+        id: &str,
+    ) -> bool {
+        package.delete_part_by_id(Some(&self.uri), id)
+    }
+
+    /// Delete a reference relationship by id (C# `DeleteReferenceRelationship`).
+    pub fn delete_reference_relationship(
+        &self,
+        package: &mut OpenXmlPackage,
+        id: &str,
+    ) -> Option<crate::opc::Relationship> {
+        package.delete_reference_relationship(Some(&self.uri), id)
+    }
+
+    /// Delete an external relationship by id (C# `DeleteExternalRelationship`).
+    pub fn delete_external_relationship(
+        &self,
+        package: &mut OpenXmlPackage,
+        id: &str,
+    ) -> Option<crate::opc::Relationship> {
+        package.delete_external_relationship(Some(&self.uri), id)
+    }
+
     /// Add an extended part under this part (C# `AddExtendedPart`).
     pub fn add_extended_part(
         &self,
@@ -842,5 +879,12 @@ mod open_xml_part_container_tests {
         assert!(part.annotations::<u32>(&pkg).is_empty());
         pkg.set_content_type_constant(true);
         assert!(pkg.content_type_is_constant());
+        let prev = part
+            .change_id_of_part(&mut pkg, &child, "rIdChild")
+            .expect("change id");
+        assert_eq!(prev, rid);
+        assert_eq!(part.get_part_by_id(&pkg, "rIdChild"), Some(child.clone()));
+        assert!(part.delete_part_by_id(&mut pkg, "rIdChild"));
+        assert!(!part.is_child_part(&pkg, &child));
     }
 }

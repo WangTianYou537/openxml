@@ -689,6 +689,21 @@ impl ProgrammaticIdentifierFeature {
         *g = g.wrapping_add(1);
         format!("{}{:08X}", self.identifier, n)
     }
+
+    /// Program id string (C# `IProgrammaticIdentifierFeature.ProgramId`).
+    pub fn program_id(&self) -> &str {
+        &self.identifier
+    }
+
+    pub fn set_program_id(&mut self, id: impl Into<String>) {
+        self.identifier = id.into();
+    }
+
+    /// Reset the monotonic counter used by [`next_id`](Self::next_id).
+    pub fn reset_counter(&self, start: u32) {
+        let mut g = self.next.lock().unwrap_or_else(|e| e.into_inner());
+        *g = start.max(1);
+    }
 }
 
 /// Whether content types are fixed for the package (C# `IContentTypeFeature`).
