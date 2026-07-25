@@ -229,6 +229,80 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         Ok(())
     }
 
+    /// Move to the first child of the current start element (C# `ReadFirstChild`).
+    ///
+    /// Returns `false` and positions on the matching end when there is no child.
+    pub fn read_first_child(&mut self) -> Result<bool> {
+        if self.state != ElementState::Start {
+            return Ok(false);
+        }
+        let parent_depth = self.depth;
+        // Empty element (start not pushed to stack): no children.
+        if self.open_stack.len() < parent_depth {
+            self.state = ElementState::End;
+            return Ok(false);
+        }
+        while self.read()? {
+            match self.state {
+                ElementState::Start if self.depth == parent_depth + 1 => {
+                    return Ok(true);
+                }
+                ElementState::End if self.depth < parent_depth => {
+                    return Ok(false);
+                }
+                ElementState::End if self.depth + 1 == parent_depth => {
+                    // closed parent with no element child (maybe only text)
+                    return Ok(false);
+                }
+                ElementState::EOF => return Ok(false),
+                ElementState::LeafText | ElementState::Misc => continue,
+                _ => continue,
+            }
+        }
+        Ok(false)
+    }
+
+    /// Move to the next sibling element (C# `ReadNextSibling`).
+    ///
+    /// Skips the rest of the current element and advances to the next start at
+    /// the same depth. If none, positions on the parent end and returns `false`.
+    pub fn read_next_sibling(&mut self) -> Result<bool> {
+        if self.is_eof() {
+            return Ok(false);
+        }
+
+        let target_depth = match self.state {
+            ElementState::Start => {
+                let d = self.depth;
+                self.skip()?;
+                d
+            }
+            ElementState::End => {
+                // Finished current element; siblings start at depth + 1.
+                self.depth + 1
+            }
+            _ => return Ok(false),
+        };
+
+        while self.read()? {
+            match self.state {
+                ElementState::Start if self.depth == target_depth => return Ok(true),
+                ElementState::End if self.depth + 1 == target_depth => return Ok(false),
+                ElementState::End if self.depth < target_depth.saturating_sub(1) => {
+                    return Ok(false);
+                }
+                ElementState::EOF => return Ok(false),
+                _ => continue,
+            }
+        }
+        Ok(false)
+    }
+
+    /// Whether the current start element has attributes (C# `HasAttributes`) (C# `HasAttributes`).
+    pub fn has_attributes(&self) -> bool {
+        !self.attributes.is_empty()
+    }
+
     /// Load the current start element and all its descendants into a DOM tree
     /// (C# `LoadCurrentElement`). Advances the reader to the matching end.
     pub fn load_current_element(&mut self) -> Result<Option<OpenXmlElement>> {
@@ -368,5 +442,21 @@ mod tests {
         assert!(r.read().unwrap()); // text
         assert_eq!(r.element_state(), ElementState::LeafText);
         assert_eq!(r.get_text(), "Hi");
+    }
+
+    #[test]
+    fn part_reader_first_child_siblings() {
+        let xml = br#"<body><p>a</p><p>b</p><p>c</p></body>"#;
+        let mut r = OpenXmlPartReader::from_bytes(xml);
+        assert!(r.read().unwrap());
+        assert_eq!(r.local_name(), "body");
+        assert!(r.read_first_child().unwrap());
+        assert_eq!(r.local_name(), "p");
+        assert!(r.read_next_sibling().unwrap());
+        assert_eq!(r.local_name(), "p");
+        assert!(r.read_next_sibling().unwrap());
+        assert_eq!(r.local_name(), "p");
+        assert!(!r.read_next_sibling().unwrap());
+        assert!(r.element_state() == ElementState::End || r.local_name() == "body");
     }
 }
