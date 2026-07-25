@@ -321,6 +321,125 @@ impl OpenXmlPart {
         );
         Ok(())
     }
+
+    /// Child parts as [`IdPartPair`] (C# `OpenXmlPartContainer.Parts`).
+    pub fn id_part_pairs(&self, package: &OpenXmlPackage) -> Vec<crate::opc::IdPartPair> {
+        package.id_part_pairs(Some(&self.uri))
+    }
+
+    /// Resolve a child part URI by relationship id (C# `GetPartById` / `TryGetPartById`).
+    pub fn get_part_by_id(
+        &self,
+        package: &OpenXmlPackage,
+        id: &str,
+    ) -> Option<crate::opc::PackUri> {
+        package.try_get_part_by_id(Some(&self.uri), id)
+    }
+
+    /// Relationship id of a related child part (C# `GetIdOfPart`).
+    pub fn get_id_of_part(
+        &self,
+        package: &OpenXmlPackage,
+        part_uri: &PackUri,
+    ) -> Option<String> {
+        package.get_id_of_part(Some(&self.uri), part_uri)
+    }
+
+    /// Whether `child` is related from this part (C# `IsChildPart` shell).
+    pub fn is_child_part(&self, package: &OpenXmlPackage, child: &PackUri) -> bool {
+        package.is_child_part(&self.uri, child)
+    }
+
+    /// External relationships from this part (C# `ExternalRelationships`).
+    pub fn external_relationships(
+        &self,
+        package: &OpenXmlPackage,
+    ) -> Vec<crate::opc::Relationship> {
+        package.external_relationships(Some(&self.uri))
+    }
+
+    /// Hyperlink relationships from this part (C# `HyperlinkRelationships`).
+    pub fn hyperlink_relationships(
+        &self,
+        package: &OpenXmlPackage,
+    ) -> Vec<crate::opc::HyperlinkRelationship> {
+        package.hyperlink_relationships(Some(&self.uri))
+    }
+
+    /// Data-part reference relationships from this part.
+    pub fn data_part_reference_relationships(
+        &self,
+        package: &OpenXmlPackage,
+    ) -> Vec<crate::opc::DataPartReferenceRelationship> {
+        package.data_part_reference_relationships(Some(&self.uri))
+    }
+
+    /// Related parts filtered by relationship type (C# `GetPartsOfType` shell).
+    pub fn get_parts_of_relationship_type(
+        &self,
+        package: &OpenXmlPackage,
+        relationship_type: &str,
+    ) -> Vec<crate::opc::RelatedPart> {
+        package.get_parts_of_relationship_type(Some(&self.uri), relationship_type)
+    }
+
+    /// Create a relationship from this part to an existing internal part.
+    pub fn create_relationship_to_part(
+        &self,
+        package: &mut OpenXmlPackage,
+        target: &PackUri,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> Result<String> {
+        package.create_relationship_to_part(&self.uri, target, relationship_type, id)
+    }
+
+    /// Add an extended part under this part (C# `AddExtendedPart`).
+    pub fn add_extended_part(
+        &self,
+        package: &mut OpenXmlPackage,
+        relationship_type: &str,
+        content_type: &str,
+        target_ext: &str,
+        data: impl Into<Vec<u8>>,
+        relationship_id: Option<&str>,
+    ) -> Result<(String, PackUri)> {
+        package.add_extended_part(
+            &self.uri,
+            relationship_type,
+            content_type,
+            target_ext,
+            data,
+            relationship_id,
+        )
+    }
+
+    /// Mark content type as dirty when callers change bytes without going through feed_data.
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
+    /// Clear the dirty flag without unloading the root.
+    pub fn clear_dirty(&mut self) {
+        self.dirty = false;
+    }
+
+    /// Default target feature for this part (C# `ITargetFeature` defaults: path `.`, ext `.xml`).
+    pub fn default_target_feature(&self) -> crate::features::TargetFeature {
+        let name = self
+            .uri
+            .as_str()
+            .rsplit('/')
+            .next()
+            .unwrap_or("")
+            .to_string();
+        let (stem, ext) = if let Some((s, e)) = name.rsplit_once('.') {
+            (s.to_string(), format!(".{e}"))
+        } else {
+            (name, ".xml".to_string())
+        };
+        crate::features::TargetFeature::new(".", ext, stem)
+    }
 }
 
 /// Parse `standalone` from a leading XML declaration, if present.
@@ -643,5 +762,53 @@ mod tests {
         assert_eq!(part.standalone_declaration(), Some(true)); // default before load
         let _ = part.root(&pkg).unwrap();
         assert_eq!(part.standalone_declaration(), Some(false));
+    }
+}
+
+#[cfg(test)]
+mod open_xml_part_container_tests {
+    use super::*;
+    use crate::packaging::{OpenSettings, OpenXmlPackage};
+
+    #[test]
+    fn open_xml_part_container_helpers() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let uri = PackUri::new("/word/document.xml");
+        pkg.set_part(
+            uri.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        let part = OpenXmlPart::new(
+            uri.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+        );
+        let (rid, child) = part
+            .add_extended_part(
+                &mut pkg,
+                "http://example.com/rel",
+                "application/octet-stream",
+                "bin",
+                b"data",
+                None,
+            )
+            .expect("ext");
+        assert!(part.is_child_part(&pkg, &child));
+        assert_eq!(part.get_part_by_id(&pkg, &rid), Some(child.clone()));
+        assert_eq!(part.get_id_of_part(&pkg, &child).as_deref(), Some(rid.as_str()));
+        assert!(!part.id_part_pairs(&pkg).is_empty());
+        assert!(part
+            .get_parts_of_relationship_type(&pkg, "http://example.com/rel")
+            .iter()
+            .any(|p| p.uri == child));
+        let tf = part.default_target_feature();
+        assert_eq!(tf.path, ".");
+        assert_eq!(tf.extension, ".xml");
+        assert_eq!(tf.name, "document");
+        assert!(part.external_relationships(&pkg).is_empty());
+        assert!(part.hyperlink_relationships(&pkg).is_empty());
+        assert!(part.data_part_reference_relationships(&pkg).is_empty());
     }
 }

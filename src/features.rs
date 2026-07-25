@@ -1380,6 +1380,24 @@ impl TargetFeature {
             ..Default::default()
         }
     }
+
+    /// Copy with a replaced extension (C# `UpdatedExtensionTargetFeature` shell).
+    pub fn with_extension(&self, extension: impl Into<String>) -> Self {
+        Self {
+            path: self.path.clone(),
+            extension: extension.into(),
+            name: self.name.clone(),
+        }
+    }
+
+    /// Copy with a replaced name.
+    pub fn with_name(&self, name: impl Into<String>) -> Self {
+        Self {
+            path: self.path.clone(),
+            extension: self.extension.clone(),
+            name: name.into(),
+        }
+    }
 }
 
 /// Root element factory by qualified name (C# `IRootElementFeature` shell).
