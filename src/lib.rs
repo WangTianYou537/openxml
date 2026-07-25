@@ -66,7 +66,7 @@ pub mod wordprocessing;
 pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, OpenXmlPartWriterSettings, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
 pub use error::{Error, OpenXmlPackageException, Result};
 pub use features::{
-    AnnotationsFeature, ApplicationType, ContainerDisposableFeature, ContentTypeFeature,
+    AnnotationsFeature, ApplicationType, ApplicationTypeFeature, ContainerDisposableFeature, ContentTypeFeature,
     DataPartsFeature, DisposableFeature, DocumentTypeFeature, ElementEventsFeature,
     DefaultFeatures, ElementMetadata, ElementMetadataFactoryFeature, FeatureCollection, FeatureCollectionDebugView,
     FeatureEventArgs, FeatureEventHub, FilePackageFeature, KnownDataPartFeature, LockFeature,

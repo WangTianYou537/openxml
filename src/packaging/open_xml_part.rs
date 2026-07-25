@@ -413,6 +413,24 @@ impl OpenXmlPart {
         package.delete_part_by_id(Some(&self.uri), id)
     }
 
+    /// Delete multiple child parts by relationship id (C# `DeleteParts`).
+    pub fn delete_parts_by_ids(
+        &self,
+        package: &mut OpenXmlPackage,
+        ids: &[&str],
+    ) -> usize {
+        package.delete_parts_by_ids(Some(&self.uri), ids)
+    }
+
+    /// Delete multiple child parts by URI (C# `DeleteParts` via parts).
+    pub fn delete_parts(
+        &self,
+        package: &mut OpenXmlPackage,
+        uris: &[PackUri],
+    ) -> usize {
+        package.delete_parts(uris)
+    }
+
     /// Delete a reference relationship by id (C# `DeleteReferenceRelationship`).
     pub fn delete_reference_relationship(
         &self,
@@ -474,6 +492,24 @@ impl OpenXmlPart {
         id: &str,
     ) -> Option<crate::opc::ReferenceRelationship> {
         package.get_reference_relationship(Some(&self.uri), id)
+    }
+
+    /// Get an external relationship by id from this part (C# `GetExternalRelationship`).
+    pub fn get_external_relationship(
+        &self,
+        package: &OpenXmlPackage,
+        id: &str,
+    ) -> Option<crate::opc::ExternalRelationship> {
+        package.get_external_relationship(Some(&self.uri), id)
+    }
+
+    /// Get a hyperlink relationship by id from this part.
+    pub fn get_hyperlink_relationship(
+        &self,
+        package: &OpenXmlPackage,
+        id: &str,
+    ) -> Option<crate::opc::HyperlinkRelationship> {
+        package.get_hyperlink_relationship(Some(&self.uri), id)
     }
 
     /// Add an extended part under this part (C# `AddExtendedPart`).
@@ -937,6 +973,8 @@ mod open_xml_part_container_tests {
             "https://example.com",
         );
         assert!(part.get_reference_relationship(&pkg, &eid).is_some());
+        assert!(part.get_external_relationship(&pkg, &eid).is_some());
+        assert!(part.get_hyperlink_relationship(&pkg, &eid).is_some());
         assert!(part.delete_external_relationship(&mut pkg, &eid).is_some());
         pkg.set_program_id("Word.Document");
         assert_eq!(pkg.program_id(), Some("Word.Document"));

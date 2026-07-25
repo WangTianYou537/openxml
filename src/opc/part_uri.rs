@@ -215,6 +215,43 @@ pub struct RelatedPart {
     pub content_type: Option<String>,
 }
 
+impl RelatedPart {
+    pub fn new(
+        id: impl Into<String>,
+        uri: PackUri,
+        relationship_type: impl Into<String>,
+        content_type: Option<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            uri,
+            relationship_type: relationship_type.into(),
+            content_type,
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn uri(&self) -> &PackUri {
+        &self.uri
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
+
+    pub fn content_type(&self) -> Option<&str> {
+        self.content_type.as_deref()
+    }
+
+    /// Convert to [`super::IdPartPair`] (drops relationship/content type).
+    pub fn to_id_part_pair(&self) -> crate::opc::IdPartPair {
+        crate::opc::IdPartPair::new(self.id.clone(), self.uri.clone())
+    }
+}
+
 impl OpcPackage {
     /// List internal child parts related from `source` (package-level if `None`).
     ///
@@ -544,5 +581,24 @@ mod reserve_uri_tests {
         h.clear();
         assert_eq!(h.reserved_count(), 0);
         let _ = OpcPackage::create();
+    }
+
+    #[test]
+    fn related_part_accessors_and_id_part_pair() {
+        let uri = PackUri::new("/word/styles.xml");
+        let r = RelatedPart::new(
+            "rId1",
+            uri.clone(),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+            Some("application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml".into()),
+        );
+        assert_eq!(r.id(), "rId1");
+        assert_eq!(r.uri(), &uri);
+        assert!(r.relationship_type().ends_with("/styles"));
+        assert!(r.content_type().unwrap().contains("styles"));
+        let pair = r.to_id_part_pair();
+        assert_eq!(pair.relationship_id(), "rId1");
+        assert_eq!(pair.part_uri(), &uri);
+        assert_eq!(pair.open_xml_part_uri(), &uri);
     }
 }

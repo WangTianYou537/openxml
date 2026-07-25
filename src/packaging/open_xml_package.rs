@@ -1061,15 +1061,25 @@ impl OpenXmlPackage {
 
     /// Application host type when registered (C# `IApplicationTypeFeature`).
     pub fn application_type(&self) -> crate::features::ApplicationType {
+        if let Some(f) = self.features.get::<crate::features::ApplicationTypeFeature>() {
+            return f.r#type();
+        }
         self.features
             .get::<crate::features::ApplicationType>()
             .copied()
             .unwrap_or(crate::features::ApplicationType::NONE)
     }
 
-    /// Set application host type on the feature bag.
+    /// Set application host type on the feature bag (also seeds `ApplicationTypeFeature`).
     pub fn set_application_type(&mut self, app: crate::features::ApplicationType) {
         self.features.set(app);
+        self.features
+            .set(crate::features::ApplicationTypeFeature::new(app));
+    }
+
+    /// Application type feature shell when registered (C# `IApplicationTypeFeature`).
+    pub fn application_type_feature(&self) -> Option<&crate::features::ApplicationTypeFeature> {
+        self.features.get::<crate::features::ApplicationTypeFeature>()
     }
 
     /// Main part feature metadata when registered (C# `IMainPartFeature`).
@@ -2748,6 +2758,50 @@ impl OpenXmlPackage {
         Some(removed)
     }
 
+    /// Get an external relationship by id (C# `GetExternalRelationship`).
+    pub fn get_external_relationship(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::ExternalRelationship> {
+        let rel = match source {
+            Some(s) => self.opc.part_relationships(s)?.get(id),
+            None => self.opc.package_relationships().get(id),
+        }?;
+        crate::opc::ExternalRelationship::from_relationship(rel)
+    }
+
+    /// Get a hyperlink relationship by id under `source` (C# hyperlink lookup shell).
+    pub fn get_hyperlink_relationship(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::HyperlinkRelationship> {
+        let rel = match source {
+            Some(s) => self.opc.part_relationships(s)?.get(id),
+            None => self.opc.package_relationships().get(id),
+        }?;
+        crate::opc::HyperlinkRelationship::from_relationship(rel)
+    }
+
+    /// Whether `id` names an external relationship under `source`.
+    pub fn has_external_relationship(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> bool {
+        self.get_external_relationship(source, id).is_some()
+    }
+
+    /// Whether `id` names a hyperlink relationship under `source`.
+    pub fn has_hyperlink_relationship(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> bool {
+        self.get_hyperlink_relationship(source, id).is_some()
+    }
+
     /// Child parts under `source` filtered by relationship type
     /// (C# `GetPartsOfType` by relationship shell).
     pub fn get_parts_of_relationship_type(
@@ -3836,5 +3890,46 @@ mod part_events_tests {
         assert!(!pkg.data_parts().is_empty());
         let as_media: crate::opc::MediaDataPart = pkg.get_data_part(&media.uri).unwrap().clone();
         assert!(as_media.is_media_data_part() || as_media.kind().is_some());
+    }
+
+    #[test]
+    fn get_external_and_hyperlink_relationship_lookups() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            doc.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        pkg.set_application_type(crate::features::ApplicationType::WORD);
+        assert!(pkg.application_type_feature().is_some());
+        assert_eq!(
+            pkg.application_type_feature().unwrap().r#type(),
+            crate::features::ApplicationType::WORD
+        );
+        let eid = pkg.add_external_relationship(
+            Some(&doc),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
+            "https://example.com/obj",
+        );
+        let ext = pkg
+            .get_external_relationship(Some(&doc), &eid)
+            .expect("external");
+        assert_eq!(ext.id(), eid);
+        assert_eq!(ext.target_uri(), "https://example.com/obj");
+        assert!(pkg.has_external_relationship(Some(&doc), &eid));
+        assert!(!pkg.has_external_relationship(Some(&doc), "missing"));
+
+        let hid = pkg.add_hyperlink_relationship(&doc, "https://example.com/h", true);
+        let h = pkg
+            .get_hyperlink_relationship(Some(&doc), &hid)
+            .expect("hyperlink");
+        assert_eq!(h.id(), hid);
+        assert!(h.is_external());
+        assert!(pkg.has_hyperlink_relationship(Some(&doc), &hid));
+        assert!(!pkg.has_hyperlink_relationship(Some(&doc), &eid));
+        // External non-hyperlink is not a HyperlinkRelationship
+        assert!(pkg.get_hyperlink_relationship(Some(&doc), &eid).is_none());
     }
 }

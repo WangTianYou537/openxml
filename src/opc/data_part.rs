@@ -135,6 +135,21 @@ impl IdPartPair {
             part_uri,
         }
     }
+
+    /// C# `IdPartPair.RelationshipId`.
+    pub fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    /// C# `IdPartPair.OpenXmlPart` URI shell (Rust stores the part URI).
+    pub fn part_uri(&self) -> &PackUri {
+        &self.part_uri
+    }
+
+    /// Alias matching C# property name when only the URI is available.
+    pub fn open_xml_part_uri(&self) -> &PackUri {
+        &self.part_uri
+    }
 }
 
 impl From<&super::part_uri::RelatedPart> for IdPartPair {

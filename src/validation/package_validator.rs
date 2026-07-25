@@ -23,6 +23,9 @@ pub struct OpenXmlPackageValidationResult {
     pub relationship_type: Option<String>,
     pub part_uri: Option<String>,
     pub sub_part_uri: Option<String>,
+    /// Data-part reference relationship id when the fault is a media/audio/video ref
+    /// (C# `DataPartReferenceRelationship` shell).
+    pub data_part_reference_id: Option<String>,
 }
 
 impl OpenXmlPackageValidationResult {
@@ -35,6 +38,7 @@ impl OpenXmlPackageValidationResult {
             relationship_type: None,
             part_uri: None,
             sub_part_uri: None,
+            data_part_reference_id: None,
         }
     }
 
@@ -53,12 +57,31 @@ impl OpenXmlPackageValidationResult {
         self
     }
 
+    pub fn with_data_part_reference_id(mut self, id: impl Into<String>) -> Self {
+        self.data_part_reference_id = Some(id.into());
+        self
+    }
+
     pub fn into_validation_error(self) -> ValidationError {
-        ValidationError {
+        let mut err = ValidationError {
             path: self.part_uri.clone().unwrap_or_default(),
             message: self.message,
             ..Default::default()
+        };
+        if let Some(sub) = self.sub_part_uri {
+            err = err.with_related_part_uri(sub);
         }
+        err
+    }
+
+    /// Message id when present (C# `OpenXmlPackageValidationResult.MessageId`).
+    pub fn message_id_str(&self) -> Option<&str> {
+        self.message_id.as_deref()
+    }
+
+    /// Relationship type associated with this result.
+    pub fn relationship_type_str(&self) -> Option<&str> {
+        self.relationship_type.as_deref()
     }
 
     pub fn part_is_not_allowed(
@@ -109,6 +132,17 @@ impl OpenXmlPackageValidationResult {
         )
         .with_part_uri(part_uri)
         .with_relationship_type(relationship_type)
+    }
+
+    /// Like [`data_part_reference_is_not_allowed`](Self::data_part_reference_is_not_allowed)
+    /// but records the offending relationship id.
+    pub fn data_part_reference_is_not_allowed_with_id(
+        part_uri: impl Into<String>,
+        relationship_type: impl Into<String>,
+        relationship_id: impl Into<String>,
+    ) -> Self {
+        Self::data_part_reference_is_not_allowed(part_uri, relationship_type)
+            .with_data_part_reference_id(relationship_id)
     }
 }
 
@@ -598,14 +632,38 @@ mod tests {
             "http://example/rel",
         );
         assert_eq!(r.message_id.as_deref(), Some(message_id::PART_IS_NOT_ALLOWED));
+        assert_eq!(r.message_id_str(), Some(message_id::PART_IS_NOT_ALLOWED));
+        assert_eq!(r.relationship_type_str(), Some("http://example/rel"));
         assert_eq!(r.part_uri.as_deref(), Some("/word/document.xml"));
-        let e = r.into_validation_error();
+        let e = r
+            .clone()
+            .with_sub_part_uri("/word/styles.xml")
+            .into_validation_error();
         assert!(e.message.contains("PartIsNotAllowed"));
+        assert_eq!(e.related_part_uri.as_deref(), Some("/word/styles.xml"));
         assert_eq!(
             OpenXmlPackageValidationResult::required_part_do_not_exist("/a", "r")
                 .message_id
                 .as_deref(),
             Some(message_id::REQUIRED_PART_DO_NOT_EXIST)
+        );
+        let invalid = OpenXmlPackageValidationResult::invalid_content_type_part(
+            "/word/styles.xml",
+            "expected styles",
+        );
+        assert_eq!(
+            invalid.message_id_str(),
+            Some(message_id::INVALID_CONTENT_TYPE_PART)
+        );
+        let dpr = OpenXmlPackageValidationResult::data_part_reference_is_not_allowed_with_id(
+            "/ppt/slides/slide1.xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video",
+            "rIdVid",
+        );
+        assert_eq!(dpr.data_part_reference_id.as_deref(), Some("rIdVid"));
+        assert_eq!(
+            dpr.message_id_str(),
+            Some(message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED)
         );
     }
 }

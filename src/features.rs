@@ -2347,6 +2347,55 @@ impl std::ops::BitOrAssign for ApplicationType {
     }
 }
 
+/// Application host type feature bag entry (C# `IApplicationTypeFeature` shell).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ApplicationTypeFeature {
+    pub application_type: ApplicationType,
+}
+
+impl ApplicationTypeFeature {
+    pub fn new(application_type: ApplicationType) -> Self {
+        Self { application_type }
+    }
+
+    pub fn none() -> Self {
+        Self::new(ApplicationType::NONE)
+    }
+
+    pub fn word() -> Self {
+        Self::new(ApplicationType::WORD)
+    }
+
+    pub fn excel() -> Self {
+        Self::new(ApplicationType::EXCEL)
+    }
+
+    pub fn powerpoint() -> Self {
+        Self::new(ApplicationType::POWERPOINT)
+    }
+
+    /// C# `IApplicationTypeFeature.Type`.
+    pub fn r#type(&self) -> ApplicationType {
+        self.application_type
+    }
+
+    pub fn set_type(&mut self, application_type: ApplicationType) {
+        self.application_type = application_type;
+    }
+
+    pub fn is_word(&self) -> bool {
+        self.application_type.contains(ApplicationType::WORD)
+    }
+
+    pub fn is_excel(&self) -> bool {
+        self.application_type.contains(ApplicationType::EXCEL)
+    }
+
+    pub fn is_powerpoint(&self) -> bool {
+        self.application_type.contains(ApplicationType::POWERPOINT)
+    }
+}
+
 /// Tracks dispose callbacks for package/part close (C# `IDisposableFeature` shell).
 #[derive(Default)]
 pub struct DisposableFeature {
@@ -2582,6 +2631,14 @@ mod tests {
         assert!(t.intersects(ApplicationType::EXCEL));
         assert!(!t.contains(ApplicationType::POWERPOINT));
         assert!(ApplicationType::ALL.contains(ApplicationType::POWERPOINT));
+        let af = ApplicationTypeFeature::word();
+        assert!(af.is_word());
+        assert!(!af.is_excel());
+        assert_eq!(af.r#type(), ApplicationType::WORD);
+        let mut af2 = ApplicationTypeFeature::none();
+        af2.set_type(ApplicationType::EXCEL);
+        assert!(af2.is_excel());
+        assert!(ApplicationTypeFeature::powerpoint().is_powerpoint());
 
         let count = Arc::new(AtomicUsize::new(0));
         let mut d = DisposableFeature::new();

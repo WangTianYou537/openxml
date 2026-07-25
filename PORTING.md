@@ -909,6 +909,12 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 
 - [x] `PartUriHelper::reserve_uri` / package `reserve_part_uri` (C# `ReserveUri`)
 
+- [x] `ApplicationTypeFeature` (C# `IApplicationTypeFeature`) + package `application_type_feature`
+- [x] `OpenXmlPackage::{get,has}_{external,hyperlink}_relationship` + OpenXmlPart mirrors
+- [x] `IdPartPair` / `RelatedPart` accessors; `RelatedPart::to_id_part_pair`
+- [x] `OpenXmlPackageValidationResult` data_part_reference_id + message_id helpers
+- [x] `OpenXmlPart::{delete_parts,delete_parts_by_ids}`
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
