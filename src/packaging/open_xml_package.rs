@@ -36,6 +36,48 @@ impl Default for MarkupCompatibilityProcessSettings {
     }
 }
 
+impl MarkupCompatibilityProcessSettings {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_mode(mut self, mode: MarkupCompatibilityProcessMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    pub fn with_target_file_format_versions(
+        mut self,
+        versions: FileFormatVersions,
+    ) -> Self {
+        self.target_file_format_versions = versions;
+        self
+    }
+
+    /// C# ctor `(processMode, targetFileFormatVersions)`.
+    pub fn create(
+        mode: MarkupCompatibilityProcessMode,
+        target_file_format_versions: FileFormatVersions,
+    ) -> Self {
+        Self {
+            mode,
+            target_file_format_versions,
+        }
+    }
+
+    pub fn process_mode(&self) -> MarkupCompatibilityProcessMode {
+        self.mode
+    }
+
+    pub fn target_file_format_versions(&self) -> FileFormatVersions {
+        self.target_file_format_versions
+    }
+
+    pub fn is_processing_enabled(&self) -> bool {
+        self.mode != MarkupCompatibilityProcessMode::NoProcess
+    }
+}
+
 /// SDK behavioral compatibility level (C# `CompatibilityLevel`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CompatibilityLevel {
@@ -4070,6 +4112,25 @@ mod part_events_tests {
         let s2 = OpenSettings::from_other(&s);
         assert_eq!(s2.max_characters_in_part, 1000);
         assert!(!s2.auto_save);
+        let mc = MarkupCompatibilityProcessSettings::create(
+            MarkupCompatibilityProcessMode::ProcessAllParts,
+            crate::file_format::FileFormatVersions::OFFICE2013,
+        );
+        assert!(mc.is_processing_enabled());
+        assert_eq!(mc.process_mode(), MarkupCompatibilityProcessMode::ProcessAllParts);
+        assert_eq!(
+            mc.target_file_format_versions(),
+            crate::file_format::FileFormatVersions::OFFICE2013
+        );
+        let s3 = OpenSettings::new().with_markup_compatibility(
+            MarkupCompatibilityProcessSettings::new()
+                .with_mode(MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly)
+                .with_target_file_format_versions(crate::file_format::FileFormatVersions::OFFICE2010),
+        );
+        assert_eq!(
+            s3.markup_compatibility.mode,
+            MarkupCompatibilityProcessMode::ProcessLoadedPartsOnly
+        );
     }
 
     #[test]

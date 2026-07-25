@@ -512,6 +512,24 @@ impl OpenXmlPart {
         package.get_hyperlink_relationship(Some(&self.uri), id)
     }
 
+    /// Relationships of a given type from this part.
+    pub fn relationships_by_type(
+        &self,
+        package: &OpenXmlPackage,
+        relationship_type: &str,
+    ) -> Vec<crate::opc::Relationship> {
+        package.relationships_by_type(Some(&self.uri), relationship_type)
+    }
+
+    /// First relationship of a given type from this part.
+    pub fn relationship_by_type(
+        &self,
+        package: &OpenXmlPackage,
+        relationship_type: &str,
+    ) -> Option<crate::opc::Relationship> {
+        package.relationship_by_type(Some(&self.uri), relationship_type)
+    }
+
     /// Add an extended part under this part (C# `AddExtendedPart`).
     pub fn add_extended_part(
         &self,
@@ -975,6 +993,18 @@ mod open_xml_part_container_tests {
         assert!(part.get_reference_relationship(&pkg, &eid).is_some());
         assert!(part.get_external_relationship(&pkg, &eid).is_some());
         assert!(part.get_hyperlink_relationship(&pkg, &eid).is_some());
+        assert!(!part
+            .relationships_by_type(
+                &pkg,
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            )
+            .is_empty());
+        assert!(part
+            .relationship_by_type(
+                &pkg,
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            )
+            .is_some());
         assert!(part.delete_external_relationship(&mut pkg, &eid).is_some());
         pkg.set_program_id("Word.Document");
         assert_eq!(pkg.program_id(), Some("Word.Document"));
