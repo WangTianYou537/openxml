@@ -132,6 +132,8 @@ impl WordprocessingDocumentBuilder {
         for mw in self.middleware {
             mw(&mut doc)?;
         }
+        // C# package initializer feature after middleware pipeline.
+        doc.package_mut().run_package_initializers();
         Ok(doc)
     }
 
@@ -214,6 +216,7 @@ impl SpreadsheetDocumentBuilder {
         for mw in self.middleware {
             mw(&mut doc)?;
         }
+        doc.package_mut().run_package_initializers();
         Ok(doc)
     }
 }
@@ -286,6 +289,7 @@ impl PresentationDocumentBuilder {
         for mw in self.middleware {
             mw(&mut doc)?;
         }
+        doc.package_mut().run_package_initializers();
         Ok(doc)
     }
 }
@@ -334,6 +338,26 @@ mod tests {
             .build()
             .unwrap();
         assert!(ran.load(Ordering::SeqCst));
+        assert!(doc.main_document_part().is_some());
+    }
+
+    #[test]
+    fn word_builder_runs_package_initializers() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let n = Arc::new(AtomicUsize::new(0));
+        let c = n.clone();
+        let doc = word()
+            .paragraph("x")
+            .use_middleware(move |d| {
+                d.package_mut().package_initializer().register(move || {
+                    c.fetch_add(1, Ordering::SeqCst);
+                });
+                Ok(())
+            })
+            .build()
+            .unwrap();
+        assert_eq!(n.load(Ordering::SeqCst), 1);
         assert!(doc.main_document_part().is_some());
     }
 
