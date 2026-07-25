@@ -2147,6 +2147,37 @@ impl OpenXmlPackage {
         crate::opc::packages_equal(self.opc(), other.opc())
     }
 
+    /// External relationships under `source` (package-level when `None`)
+    /// (C# `OpenXmlPartContainer.ExternalRelationships`).
+    pub fn external_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::Relationship> {
+        self.opc
+            .external_relationships(source)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    /// Clone package bytes into a new feature-seeded package (C# `Clone` to memory shell).
+    pub fn clone_package(&self) -> crate::error::Result<Self> {
+        let bytes = self.to_bytes()?;
+        let opc = crate::opc::OpcPackage::open_bytes(bytes)?;
+        Ok(Self::from_opc(opc, self.settings.clone()))
+    }
+
+    /// Clone package to a filesystem path and open the clone (C# `Clone(path)` shell).
+    pub fn clone_package_to_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> crate::error::Result<Self> {
+        let bytes = self.to_bytes()?;
+        std::fs::write(path.as_ref(), &bytes).map_err(crate::error::Error::Io)?;
+        let opc = crate::opc::OpcPackage::open(path.as_ref())?;
+        Ok(Self::from_opc(opc, self.settings.clone()))
+    }
+
 
 
     pub(crate) fn ensure_open(&self) -> Result<()> {
@@ -2940,5 +2971,38 @@ mod part_events_tests {
             .unwrap();
         assert!(uri.as_str().contains("/word/media/image"));
         assert!(pkg.part_uri_feature().is_reserved(&uri));
+    }
+
+    #[test]
+    fn clone_package_and_external_relationships() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            doc.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        let _ = pkg.add_package_relationship(
+            crate::namespace::rel::OFFICE_DOCUMENT,
+            &doc,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        let eid = pkg.add_external_relationship(
+            Some(&doc),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://example.com",
+        );
+        let externals = pkg.external_relationships(Some(&doc));
+        assert!(externals.iter().any(|r| r.id == eid));
+        let cloned = pkg.clone_package().expect("clone");
+        assert!(cloned.opc().has_part(&doc));
+        assert!(cloned
+            .features()
+            .contains::<crate::features::PackageFeature>());
+        assert!(cloned
+            .external_relationships(Some(&doc))
+            .iter()
+            .any(|r| r.target == "https://example.com"));
     }
 }

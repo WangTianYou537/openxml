@@ -865,6 +865,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartUriFeature::{create_part_uri,ensure_unique_part_uri}` + `OpenXmlPackage::create_part_uri`
 - [x] `OpenXmlPackage` compression_option / package_properties getters / has_package_properties
 
+- [x] `OpenXmlPackage::{external_relationships,clone_package,clone_package_to_path}` (C# ExternalRelationships / Clone shells)
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
