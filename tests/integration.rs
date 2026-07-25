@@ -17214,3 +17214,64 @@ fn excel_table_slicer_af_clears() {
     assert!(wb.set_auto_filter_custom_and("S", 0, true).unwrap());
     assert!(wb.clear_auto_filter_custom_and("S", 0).unwrap());
 }
+
+
+#[test]
+fn open_stream_roundtrip_word() {
+    use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+    use officexml::wordprocessing::{body, document, paragraph, run, text};
+    use std::io::Cursor;
+
+    let mut doc = WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part().set_document(document(vec![body(vec![
+        paragraph(vec![run(vec![text("stream-io")])]),
+    ])]));
+    let bytes = doc.to_bytes().unwrap();
+    let mut opened =
+        WordprocessingDocument::open_stream(Cursor::new(bytes.clone()), false).unwrap();
+    let texts = opened.paragraph_texts().unwrap();
+    assert!(texts.iter().any(|t| t.contains("stream-io")), "{texts:?}");
+
+    let mut out = Cursor::new(Vec::new());
+    opened.write_to(&mut out).unwrap();
+    assert!(out.get_ref().starts_with(b"PK"));
+}
+
+#[test]
+fn misc_node_comment_roundtrip_in_document_xml() {
+    use officexml::element::{parse_element, write_element, OpenXmlMiscKind};
+
+    let xml = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <!-- generator note -->
+  <w:body><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body>
+</w:document>"#;
+    let root = parse_element(xml).unwrap();
+    assert!(root
+        .children
+        .iter()
+        .any(|c| c.misc_kind() == OpenXmlMiscKind::Comment));
+    let out = write_element(&root).unwrap();
+    let s = String::from_utf8_lossy(&out);
+    assert!(s.contains("<!-- generator note -->"), "{s}");
+}
+
+#[test]
+fn compression_option_not_compressed_still_valid_zip() {
+    use officexml::opc::CompressionOption;
+    use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+    use officexml::wordprocessing::{body, document, paragraph, run, text};
+
+    let mut doc = WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document)
+        .unwrap();
+    doc.package_mut()
+        .opc_mut()
+        .set_compression_option(CompressionOption::NotCompressed);
+    doc.add_main_document_part().set_document(document(vec![body(vec![
+        paragraph(vec![run(vec![text("zip")])]),
+    ])]));
+    let bytes = doc.to_bytes().unwrap();
+    assert!(bytes.starts_with(b"PK"));
+    let mut reopened = WordprocessingDocument::open_bytes(&bytes).unwrap();
+    assert!(reopened.paragraph_texts().unwrap().iter().any(|t| t.contains("zip")));
+}

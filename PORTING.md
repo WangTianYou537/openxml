@@ -257,6 +257,10 @@ src/
 - [x] doc vars/customXml/glossary flags + DV/calc chain + animation/hf flags
 - [x] CF/sparkline/sort/DV clear flags + footnote/endnote/comment counts
 - [x] Excel slicer/timeline/connections/queryTable/pivot counts + presence flags
+- [x] OpenXmlMiscNode parity (comment / PI / CDATA via `OpenXmlMiscKind`)
+- [x] Stream open/save: `open_stream` / `open_stream_with_settings` / `write_to` (Word/Excel/PPT)
+- [x] `CompressionOption` on OPC package + `OpenSettings.compression`
+
 - [x] Word people/mail-merge/web settings/printer settings presence flags
 - [x] PPT handout master / user tags / slide sync presence flags
 - [x] Excel clear_sparklines / clear_print_area/titles / clear_sheet_tab_color

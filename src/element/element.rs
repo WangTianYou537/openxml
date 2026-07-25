@@ -47,17 +47,38 @@ impl OpenXmlAttribute {
     }
 }
 
+/// Kind of non-element DOM node (mirrors C# `OpenXmlMiscNode` / `XmlNodeType`).
+///
+/// Regular elements use [`OpenXmlMiscKind::None`]. Misc nodes are stored in the
+/// same tree as elements (C# also subclasses `OpenXmlElement`) so existing
+/// traversal APIs keep working; writers emit them as comments / PIs / CDATA.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OpenXmlMiscKind {
+    /// Ordinary element node.
+    #[default]
+    None,
+    /// XML comment (`<!-- … -->`).
+    Comment,
+    /// Processing instruction (`<?target data?>`).
+    ProcessingInstruction,
+    /// CDATA section (stored separately from ordinary text).
+    CData,
+}
+
 /// An Open XML DOM element.
 ///
 /// This is a general-purpose element node. Strongly-typed wrappers
 /// (e.g. `wordprocessing::Paragraph`) build on top of this.
+///
+/// Non-element nodes (comments, PIs, CDATA) use [`OpenXmlMiscKind`] and
+/// well-known `local_name` values (`#comment`, `#pi`, `#cdata-section`).
 #[derive(Clone)]
 pub struct OpenXmlElement {
     /// Namespace prefix (e.g. `"w"`).
     pub prefix: String,
     /// Namespace URI.
     pub namespace_uri: String,
-    /// Local name (e.g. `"p"`).
+    /// Local name (e.g. `"p"`). For misc nodes: `#comment`, `#pi`, `#cdata-section`.
     pub local_name: String,
     /// Element attributes (excluding xmlns declarations stored separately).
     pub attributes: Vec<OpenXmlAttribute>,
@@ -66,10 +87,12 @@ pub struct OpenXmlElement {
     pub namespace_declarations: Vec<(String, String)>,
     /// Child elements.
     pub children: Vec<OpenXmlElement>,
-    /// Text content for leaf-text elements (e.g. `w:t`).
+    /// Text content for leaf-text elements (e.g. `w:t`), or misc node payload.
     pub text: Option<String>,
     /// Raw outer XML when the element was not fully parsed (optional).
     pub raw_outer_xml: Option<Arc<str>>,
+    /// Non-element node kind (comment / PI / CDATA). Default: ordinary element.
+    pub misc_kind: OpenXmlMiscKind,
 }
 
 impl fmt::Debug for OpenXmlElement {
@@ -98,7 +121,75 @@ impl OpenXmlElement {
             children: Vec::new(),
             text: None,
             raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::None,
         }
+    }
+
+    /// XML comment node (`<!-- text -->`). C# `OpenXmlMiscNode(XmlNodeType.Comment)`.
+    pub fn comment(text: impl Into<String>) -> Self {
+        Self {
+            prefix: String::new(),
+            namespace_uri: String::new(),
+            local_name: "#comment".into(),
+            attributes: Vec::new(),
+            namespace_declarations: Vec::new(),
+            children: Vec::new(),
+            text: Some(text.into()),
+            raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::Comment,
+        }
+    }
+
+    /// Processing instruction (`<?target data?>`).
+    pub fn processing_instruction(target: impl Into<String>, data: impl Into<String>) -> Self {
+        let target = target.into();
+        let data = data.into();
+        Self {
+            prefix: String::new(),
+            namespace_uri: String::new(),
+            local_name: "#pi".into(),
+            attributes: vec![OpenXmlAttribute::new("target", target)],
+            namespace_declarations: Vec::new(),
+            children: Vec::new(),
+            text: Some(data),
+            raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::ProcessingInstruction,
+        }
+    }
+
+    /// CDATA section node.
+    pub fn cdata(text: impl Into<String>) -> Self {
+        Self {
+            prefix: String::new(),
+            namespace_uri: String::new(),
+            local_name: "#cdata-section".into(),
+            attributes: Vec::new(),
+            namespace_declarations: Vec::new(),
+            children: Vec::new(),
+            text: Some(text.into()),
+            raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::CData,
+        }
+    }
+
+    /// Whether this node is a non-element misc node (comment / PI / CDATA).
+    pub fn is_misc_node(&self) -> bool {
+        self.misc_kind != OpenXmlMiscKind::None
+    }
+
+    pub fn misc_kind(&self) -> OpenXmlMiscKind {
+        self.misc_kind
+    }
+
+    /// PI target, if this is a processing instruction.
+    pub fn pi_target(&self) -> Option<&str> {
+        if self.misc_kind != OpenXmlMiscKind::ProcessingInstruction {
+            return None;
+        }
+        self.attributes
+            .iter()
+            .find(|a| a.local_name == "target")
+            .map(|a| a.value.as_str())
     }
 
     /// Create an element in the WordprocessingML namespace.
@@ -420,6 +511,7 @@ impl PartialEq for OpenXmlElement {
             && self.namespace_declarations == other.namespace_declarations
             && self.children == other.children
             && self.text == other.text
+            && self.misc_kind == other.misc_kind
     }
 }
 

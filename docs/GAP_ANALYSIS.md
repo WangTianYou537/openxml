@@ -65,11 +65,11 @@
 | 缺口 | C# 位置 | 说明 | 优先级 |
 |------|---------|------|--------|
 | **强类型元素类** | 生成 `Paragraph : OpenXmlCompositeElement` 等 | Rust 仅有 `paragraph()` 工厂返回通用 DOM，无 `struct Paragraph` 属性访问器 | 高（API 体验） |
-| **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | 统一为一种元素；注释/PI 等杂项节点支持弱 | 中 |
+| **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | ✅ `OpenXmlMiscKind`（Comment/PI/CData）挂在统一 DOM | 🟡 Leaf/Unknown 仍合并 |
 | **OpenXmlReader / OpenXmlWriter 流式** | `OpenXmlReader.cs`, `OpenXmlPartReader` | 大部件必须整树进内存 | 高（大文件） |
 | **OpenXmlLoadMode** | Full / Lazy（默认缓存 OuterXml） | 无惰性加载 | 高 |
 | **MaxCharactersInPart** | OpenSettings DoS 防护 | ✅ 有 DoS 防护 | ✅ |
-| **CompressionOption** | 包压缩选项 | 固定 zip deflate | 低 |
+| **CompressionOption** | 包压缩选项 | ✅ `CompressionOption` + `OpenSettings.compression` | ✅ |
 | **元素事件** | `ElementEventArgs`, Features `ElementEvents` | 无变更通知 | 低 |
 | **Equality** | `Equality/OpenXmlElementEqualityComparer` | ✅ `elements_equal` / `EqualityOptions` | ✅ |
 | **Annotations** | `AnnotationsFeature` | 无元素注解字典 | 低 |
@@ -106,7 +106,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 
 | 缺口 | C# | 说明 | 优先级 |
 |------|-----|------|--------|
-| **流式/可写流包** | `StreamPackageFeature`, `IPackageStreamFeature` | Rust 始终整包 `Vec<u8>` | 高 |
+| **流式/可写流包** | `StreamPackageFeature`, `IPackageStreamFeature` | ✅ `open_stream`/`write_to` + lazy ZIP；非完全流式写入 | 🟡 |
 | **OpenSettings** | AutoSave, MaxCharactersInPart, MC process mode, CompatibilityLevel | Rust 仅部分 AutoSave 语义 | 中 |
 | **DataPart / MediaDataPart** | 音视频等媒体数据部件 | ✅ media data parts + PPT attach helpers | ✅ |
 | **ExternalRelationship 专用类型** | Hyperlink/Audio/Video reference types | 超链接有；音视频引用无 | 中 |

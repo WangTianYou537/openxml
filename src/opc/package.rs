@@ -21,6 +21,24 @@ pub enum PackageMode {
     ReadWrite,
 }
 
+/// ZIP compression level for ordinary (non-media, non-font) parts.
+///
+/// Mirrors C# `System.IO.Packaging.CompressionOption` used by `OpenXmlPackage`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CompressionOption {
+    /// No compression (`Stored`) for all parts.
+    NotCompressed,
+    /// Fast deflate (zip crate default level).
+    Fast,
+    /// Normal deflate (default; C# `CompressionOption.Normal`).
+    #[default]
+    Normal,
+    /// Maximum deflate effort.
+    Maximum,
+    /// Alias of [`Fast`] (C# `SuperFast`).
+    SuperFast,
+}
+
 /// How part bytes are stored.
 #[derive(Debug, Clone)]
 enum PartData {
@@ -49,6 +67,8 @@ pub struct OpcPackage {
     /// Part URI → that part's relationships.
     part_rels: IndexMap<PackUri, Relationships>,
     dirty: bool,
+    /// Compression for non-media/non-font parts when serializing.
+    compression: CompressionOption,
 }
 
 impl OpcPackage {
@@ -63,6 +83,7 @@ impl OpcPackage {
             package_rels: Relationships::new(),
             part_rels: IndexMap::new(),
             dirty: true,
+            compression: CompressionOption::Normal,
         }
     }
 
@@ -220,6 +241,7 @@ impl OpcPackage {
             package_rels,
             part_rels,
             dirty: false,
+            compression: CompressionOption::Normal,
         })
     }
 
@@ -559,15 +581,43 @@ impl OpcPackage {
         Ok(())
     }
 
+    /// ZIP compression option for ordinary parts (C# `OpenXmlPackage.CompressionOption`).
+    pub fn compression_option(&self) -> CompressionOption {
+        self.compression
+    }
+
+    pub fn set_compression_option(&mut self, option: CompressionOption) {
+        self.compression = option;
+        self.dirty = true;
+    }
+
+    /// Write the package ZIP to any `Write` sink (C# stream save surface).
+    pub fn write_to<W: Write>(&self, mut writer: W) -> Result<()> {
+        let bytes = self.to_bytes()?;
+        writer.write_all(&bytes)?;
+        Ok(())
+    }
+
+    fn deflate_options(&self) -> SimpleFileOptions {
+        let method = match self.compression {
+            CompressionOption::NotCompressed => CompressionMethod::Stored,
+            CompressionOption::Fast
+            | CompressionOption::Normal
+            | CompressionOption::Maximum
+            | CompressionOption::SuperFast => CompressionMethod::Deflated,
+        };
+        SimpleFileOptions::default()
+            .compression_method(method)
+            .unix_permissions(0o644)
+    }
+
     /// Serialize the package to ZIP bytes.
     ///
     /// Lazy parts are decompressed on the fly for the write (the package itself is not mutated).
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let cursor = Cursor::new(Vec::new());
         let mut zip = ZipWriter::new(cursor);
-        let options = SimpleFileOptions::default()
-            .compression_method(CompressionMethod::Deflated)
-            .unix_permissions(0o644);
+        let options = self.deflate_options();
         // Office stores media (images, etc.) uncompressed (Stored).
         let media_options = SimpleFileOptions::default()
             .compression_method(CompressionMethod::Stored)

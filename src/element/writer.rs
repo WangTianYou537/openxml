@@ -1,8 +1,8 @@
 //! OpenXmlElement → XML writer.
 
-use super::element::OpenXmlElement;
+use super::element::{OpenXmlElement, OpenXmlMiscKind};
 use crate::error::Result;
-use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesCData, BytesDecl, BytesEnd, BytesPI, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 use std::io::Cursor;
 
@@ -28,6 +28,31 @@ fn write_node<W: std::io::Write>(
     elem: &OpenXmlElement,
     is_root: bool,
 ) -> Result<()> {
+    match elem.misc_kind {
+        OpenXmlMiscKind::Comment => {
+            let body = elem.text.as_deref().unwrap_or("");
+            writer.write_event(Event::Comment(BytesText::new(body)))?;
+            return Ok(());
+        }
+        OpenXmlMiscKind::ProcessingInstruction => {
+            let target = elem.pi_target().unwrap_or("");
+            let data = elem.text.as_deref().unwrap_or("");
+            let raw = if data.is_empty() {
+                target.to_string()
+            } else {
+                format!("{target} {data}")
+            };
+            writer.write_event(Event::PI(BytesPI::new(raw.as_str())))?;
+            return Ok(());
+        }
+        OpenXmlMiscKind::CData => {
+            let body = elem.text.as_deref().unwrap_or("");
+            writer.write_event(Event::CData(BytesCData::new(body)))?;
+            return Ok(());
+        }
+        OpenXmlMiscKind::None => {}
+    }
+
     let qname = elem.qualified_name();
     let mut start = BytesStart::new(qname.clone());
 
@@ -103,5 +128,20 @@ mod tests {
         let xml = write_element(&elem).unwrap();
         let parsed = parse_element(&xml).unwrap();
         assert_eq!(parsed.inner_text(), "Hello & world");
+    }
+
+    #[test]
+    fn roundtrip_comment() {
+        let elem = OpenXmlElement::new("", "", "root")
+            .with_child(OpenXmlElement::comment(" hello "))
+            .with_child(OpenXmlElement::new("", "", "child"));
+        let xml = write_element(&elem).unwrap();
+        let s = String::from_utf8_lossy(&xml);
+        assert!(s.contains("<!-- hello -->"), "{s}");
+        let parsed = parse_element(&xml).unwrap();
+        assert!(parsed
+            .children
+            .iter()
+            .any(|c| c.misc_kind() == OpenXmlMiscKind::Comment));
     }
 }

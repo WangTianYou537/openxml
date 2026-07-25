@@ -42,6 +42,8 @@ pub struct OpenSettings {
     pub max_characters_in_part: u64,
     /// Markup Compatibility processing.
     pub markup_compatibility: MarkupCompatibilityProcessSettings,
+    /// ZIP compression for ordinary parts (C# `OpenXmlPackage.CompressionOption`).
+    pub compression: crate::opc::CompressionOption,
 }
 
 impl Default for OpenSettings {
@@ -50,6 +52,7 @@ impl Default for OpenSettings {
             auto_save: true,
             max_characters_in_part: 0,
             markup_compatibility: MarkupCompatibilityProcessSettings::default(),
+            compression: crate::opc::CompressionOption::Normal,
         }
     }
 }
@@ -67,13 +70,20 @@ pub struct OpenXmlPackage {
 }
 
 impl OpenXmlPackage {
-    pub(crate) fn from_opc(opc: OpcPackage, settings: OpenSettings) -> Self {
+    pub(crate) fn from_opc(mut opc: OpcPackage, settings: OpenSettings) -> Self {
+        opc.set_compression_option(settings.compression);
         Self {
             opc,
             settings,
             closed: false,
             features: FeatureCollection::new(),
         }
+    }
+
+    /// Write package bytes to a stream (after callers flush typed dirty parts).
+    pub fn write_to<W: std::io::Write>(&mut self, writer: W) -> Result<()> {
+        self.ensure_open()?;
+        self.opc.write_to(writer)
     }
 
     pub fn settings(&self) -> &OpenSettings {

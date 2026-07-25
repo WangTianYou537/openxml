@@ -1,12 +1,16 @@
 //! XML → OpenXmlElement parser.
 
-use super::element::{OpenXmlAttribute, OpenXmlElement};
+use super::element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
 use crate::error::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::name::QName;
 use quick_xml::Reader;
 
 /// Parse an XML document (or fragment with a single root) into an `OpenXmlElement`.
+///
+/// Comments and processing instructions under the root are preserved as
+/// [`OpenXmlMiscKind`] children (C# `OpenXmlMiscNode` parity). Whitespace-only
+/// text between elements is still dropped unless the parent is a text element.
 pub fn parse_element(xml: impl AsRef<[u8]>) -> Result<OpenXmlElement> {
     let mut reader = Reader::from_reader(xml.as_ref());
     reader.config_mut().trim_text(false);
@@ -52,8 +56,42 @@ pub fn parse_element(xml: impl AsRef<[u8]>) -> Result<OpenXmlElement> {
                 text_buf.push_str(&decoded);
             }
             Event::CData(t) => {
-                let decoded = String::from_utf8_lossy(t.as_ref());
-                text_buf.push_str(&decoded);
+                flush_text(&mut stack, &mut text_buf);
+                let data = String::from_utf8_lossy(t.as_ref()).into_owned();
+                // Prefer a dedicated CDATA misc child when nested; for leaf text
+                // parents still append as element text if no siblings yet.
+                if let Some(parent) = stack.last_mut() {
+                    if parent.children.is_empty()
+                        && parent.text.is_none()
+                        && is_text_element(&parent.local_name)
+                    {
+                        parent.text = Some(data);
+                    } else {
+                        parent.children.push(OpenXmlElement::cdata(data));
+                    }
+                }
+            }
+            Event::Comment(c) => {
+                flush_text(&mut stack, &mut text_buf);
+                let data = String::from_utf8_lossy(c.as_ref()).into_owned();
+                if let Some(parent) = stack.last_mut() {
+                    parent.children.push(OpenXmlElement::comment(data));
+                }
+                // Comments before/after root are dropped (no place to hang them).
+            }
+            Event::PI(p) => {
+                flush_text(&mut stack, &mut text_buf);
+                // quick-xml: PI target is before first space; rest is data
+                let raw = String::from_utf8_lossy(p.as_ref());
+                let (target, data) = match raw.split_once(|c: char| c.is_whitespace()) {
+                    Some((t, d)) => (t.to_string(), d.trim_start().to_string()),
+                    None => (raw.into_owned(), String::new()),
+                };
+                if let Some(parent) = stack.last_mut() {
+                    parent
+                        .children
+                        .push(OpenXmlElement::processing_instruction(target, data));
+                }
             }
             Event::Eof => break,
             _ => {}
@@ -107,6 +145,7 @@ fn element_from_start(e: &quick_xml::events::BytesStart<'_>, _empty: bool) -> Re
         children: Vec::new(),
         text: None,
         raw_outer_xml: None,
+        misc_kind: OpenXmlMiscKind::None,
     };
 
     for a in e.attributes().with_checks(false) {
@@ -175,5 +214,31 @@ mod tests {
         let body = root.child("body").unwrap();
         let p = body.child("p").unwrap();
         assert!(p.child("r").is_some());
+    }
+
+    #[test]
+    fn parse_preserves_comment_and_pi() {
+        let xml = br#"<?xml version="1.0"?>
+        <root>
+          <!-- note -->
+          <?mso-application progid="Word.Document"?>
+          <child/>
+        </root>"#;
+        let root = parse_element(xml).unwrap();
+        let kinds: Vec<_> = root.children.iter().map(|c| c.misc_kind()).collect();
+        assert!(kinds.contains(&OpenXmlMiscKind::Comment));
+        assert!(kinds.contains(&OpenXmlMiscKind::ProcessingInstruction));
+        let comment = root
+            .children
+            .iter()
+            .find(|c| c.misc_kind() == OpenXmlMiscKind::Comment)
+            .unwrap();
+        assert_eq!(comment.text_value().unwrap().trim(), "note");
+        let pi = root
+            .children
+            .iter()
+            .find(|c| c.misc_kind() == OpenXmlMiscKind::ProcessingInstruction)
+            .unwrap();
+        assert_eq!(pi.pi_target(), Some("mso-application"));
     }
 }

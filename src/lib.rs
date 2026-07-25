@@ -63,12 +63,13 @@ pub mod spreadsheet;
 pub mod validation;
 pub mod wordprocessing;
 
+pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
 pub use error::{Error, Result};
 pub use features::{FeatureCollection, ParagraphIdGenerator};
 pub use file_format::FileFormatVersions;
 pub use opc::{
-    add_media_part, CustomProperties, CustomProperty, CustomPropertyValue, ExtendedProperties,
-    MediaKind, MediaPartInfo, PackageProperties,
+    add_media_part, CompressionOption, CustomProperties, CustomProperty, CustomPropertyValue,
+    ExtendedProperties, MediaKind, MediaPartInfo, PackageProperties,
 };
 pub use packaging::{
     default_settings, default_styles, footer, footer_reference, header, header_reference,

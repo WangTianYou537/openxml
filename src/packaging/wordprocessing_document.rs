@@ -192,6 +192,34 @@ impl WordprocessingDocument {
         Self::from_opc(opc, settings)
     }
 
+    /// Open a Word package from any `Read + Seek` stream (C# `Open(Stream, …)`).
+    pub fn open_stream<R: std::io::Read + std::io::Seek>(
+        reader: R,
+        is_editable: bool,
+    ) -> Result<Self> {
+        Self::open_stream_with_settings(reader, is_editable, OpenSettings::default())
+    }
+
+    /// Open from a stream with custom [`OpenSettings`].
+    pub fn open_stream_with_settings<R: std::io::Read + std::io::Seek>(
+        reader: R,
+        is_editable: bool,
+        mut settings: OpenSettings,
+    ) -> Result<Self> {
+        if !is_editable {
+            settings.auto_save = false;
+        }
+        let opc = OpcPackage::open_reader(reader)?;
+        Self::from_opc(opc, settings)
+    }
+
+    /// Write the package ZIP to a stream (C# stream save).
+    pub fn write_to<W: std::io::Write>(&mut self, writer: W) -> Result<()> {
+        self.flush_parts()?;
+        self.package.write_to(writer)
+    }
+
+
     fn from_opc(opc: OpcPackage, settings: OpenSettings) -> Result<Self> {
         let package = OpenXmlPackage::from_opc(opc, settings);
         let main_uri = package.opc().main_part_uri(rel::OFFICE_DOCUMENT).ok();

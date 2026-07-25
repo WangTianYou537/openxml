@@ -13,7 +13,7 @@ mod streaming;
 mod typed;
 mod writer;
 
-pub use element::{OpenXmlAttribute, OpenXmlElement};
+pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
 pub use equality::{elements_equal, elements_equal_with, EqualityOptions};
 pub use typed::{
     Body, Cell, Comment, Document, Footer, Header, Hyperlink, Notes, Paragraph, Run, Slide, Style,
