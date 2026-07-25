@@ -297,6 +297,78 @@ impl From<Vec<String>> for ListValue {
     }
 }
 
+
+/// Typed enumeration wrapper (C# `EnumValue<T>` shell).
+///
+/// `T` must convert to/from the OOXML lexical form via [`OpenXmlSimpleType`]
+/// or custom `as_str` / `from_str` functions provided by the enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnumValue<T>(pub T);
+
+impl<T: Copy> EnumValue<T> {
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    pub fn value(self) -> T {
+        self.0
+    }
+}
+
+impl<T: OpenXmlSimpleType + Copy> OpenXmlSimpleType for EnumValue<T> {
+    fn as_inner_text(&self) -> String {
+        self.0.as_inner_text()
+    }
+    fn from_inner_text(text: &str) -> Option<Self> {
+        T::from_inner_text(text).map(Self)
+    }
+}
+
+/// String-backed enum helper for generated enumerations.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct StringEnumValue {
+    pub value: String,
+}
+
+impl OpenXmlSimpleType for StringEnumValue {
+    fn as_inner_text(&self) -> String {
+        self.value.clone()
+    }
+    fn from_inner_text(text: &str) -> Option<Self> {
+        Some(Self {
+            value: text.to_string(),
+        })
+    }
+}
+
+impl From<&str> for StringEnumValue {
+    fn from(s: &str) -> Self {
+        Self {
+            value: s.to_string(),
+        }
+    }
+}
+
+/// Percentage value (OOXML often stores as integer thousandths or with `%`).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct PercentageValue(pub f64);
+
+impl OpenXmlSimpleType for PercentageValue {
+    fn as_inner_text(&self) -> String {
+        // Prefer plain number; writers may append %
+        format!("{}", self.0)
+    }
+    fn from_inner_text(text: &str) -> Option<Self> {
+        let t = text.trim().trim_end_matches('%');
+        t.parse().ok().map(Self)
+    }
+}
+
+/// ST_OnOff style that also accepts empty as false (common in Word).
+pub fn parse_on_off_lenient(text: &str) -> bool {
+    OnOffValue::from_inner_text(text).map(|v| v.0).unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,5 +384,15 @@ mod tests {
     fn int_roundtrip() {
         let v = Int32Value(42);
         assert_eq!(Int32Value::from_inner_text(&v.as_inner_text()).unwrap().0, 42);
+    }
+
+    #[test]
+    fn enum_and_percentage() {
+        let e = EnumValue(OnOffValue(true));
+        assert_eq!(e.as_inner_text(), "1");
+        let p = PercentageValue::from_inner_text("50%").unwrap();
+        assert_eq!(p.0, 50.0);
+        assert!(parse_on_off_lenient("on"));
+        assert!(!parse_on_off_lenient("nope"));
     }
 }

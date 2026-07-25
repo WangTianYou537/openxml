@@ -17,7 +17,7 @@ mod schematron_rules;
 mod schematron_validate;
 mod semantic;
 
-pub use digsig::validate_digital_signatures;
+pub use digsig::{add_digital_signature_part, clear_digital_signatures, digital_signature_parts, ensure_digital_signature_origin, has_digital_signature_origin, validate_digital_signatures};
 pub use digsig_crypto::{
     build_signature_xml, build_signature_xml_with_value, build_signed_signature_xml, digest_hex,
     extract_signed_info_xml, rsa_sha256_sign, rsa_sha256_verify, signature_part_uris,

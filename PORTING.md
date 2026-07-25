@@ -757,6 +757,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] OpenXmlPartReader cursor (Read/GetText/LoadCurrentElement/ElementState)
 - [x] OpenXmlElementContext / LoadMode / element mutation events feature
 - [x] FileFormatVersions::at_least / and_earlier; package compare_packages / PackageDiff
+- [x] Digsig packaging helpers: ensure origin, add/list/clear signature parts (no full crypto)
 
 **Still intentionally deferred / partial:**
 
