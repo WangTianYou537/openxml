@@ -3282,6 +3282,19 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn get_all_parts_bfs_word() {
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    doc.add_default_styles().unwrap();
+    let parts = doc.package().get_all_parts();
+    assert!(parts.iter().any(|(u, _)| u.as_str().contains("document")));
+    assert!(parts.iter().any(|(u, _)| u.as_str().contains("styles")));
+}
+
 #[test]
 fn part_extension_provider_roundtrip() {
     use officexml::PartExtensionProvider;

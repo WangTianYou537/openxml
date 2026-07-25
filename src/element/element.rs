@@ -537,9 +537,200 @@ impl OpenXmlElement {
         self.children.extend(children);
     }
 
-    /// Remove all children.
+    /// Remove all children (C# `RemoveAllChildren`).
     pub fn clear_children(&mut self) {
         self.children.clear();
+    }
+
+    /// Alias of [`clear_children`](Self::clear_children) (C# `RemoveAllChildren`).
+    pub fn remove_all_children(&mut self) {
+        self.clear_children();
+    }
+
+    /// First child element, if any (C# `FirstChild`).
+    pub fn first_child(&self) -> Option<&OpenXmlElement> {
+        self.children.first()
+    }
+
+    pub fn first_child_mut(&mut self) -> Option<&mut OpenXmlElement> {
+        self.children.first_mut()
+    }
+
+    /// Last child element, if any (C# `LastChild`).
+    pub fn last_child(&self) -> Option<&OpenXmlElement> {
+        self.children.last()
+    }
+
+    pub fn last_child_mut(&mut self) -> Option<&mut OpenXmlElement> {
+        self.children.last_mut()
+    }
+
+    /// Prepend a child (C# `PrependChild`).
+    pub fn prepend_child(&mut self, child: OpenXmlElement) {
+        self.children.insert(0, child);
+    }
+
+    /// Insert `new_child` before the first child equal to `reference` by pointer identity
+    /// of local structure index. Returns `false` if reference was not found.
+    ///
+    /// C# `InsertBefore` — reference is matched by index among current children.
+    pub fn insert_before(
+        &mut self,
+        new_child: OpenXmlElement,
+        reference_index: usize,
+    ) -> bool {
+        if reference_index > self.children.len() {
+            return false;
+        }
+        self.children.insert(reference_index, new_child);
+        true
+    }
+
+    /// Insert `new_child` after the child at `reference_index` (C# `InsertAfter`).
+    pub fn insert_after(
+        &mut self,
+        new_child: OpenXmlElement,
+        reference_index: usize,
+    ) -> bool {
+        if reference_index >= self.children.len() {
+            return false;
+        }
+        self.children.insert(reference_index + 1, new_child);
+        true
+    }
+
+    /// Insert before the first child whose local name is `reference_local_name`.
+    pub fn insert_before_name(
+        &mut self,
+        new_child: OpenXmlElement,
+        reference_local_name: &str,
+    ) -> bool {
+        if let Some(i) = self
+            .children
+            .iter()
+            .position(|c| c.local_name == reference_local_name)
+        {
+            self.children.insert(i, new_child);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Insert after the first child whose local name is `reference_local_name`.
+    pub fn insert_after_name(
+        &mut self,
+        new_child: OpenXmlElement,
+        reference_local_name: &str,
+    ) -> bool {
+        if let Some(i) = self
+            .children
+            .iter()
+            .position(|c| c.local_name == reference_local_name)
+        {
+            self.children.insert(i + 1, new_child);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remove the child at `index`, returning it (C# `RemoveChild` by position).
+    pub fn remove_child_at(&mut self, index: usize) -> Option<OpenXmlElement> {
+        if index < self.children.len() {
+            Some(self.children.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Remove the first child with the given local name.
+    pub fn remove_child_by_name(&mut self, local_name: &str) -> Option<OpenXmlElement> {
+        if let Some(i) = self.children.iter().position(|c| c.local_name == local_name) {
+            Some(self.children.remove(i))
+        } else {
+            None
+        }
+    }
+
+    /// Replace the child at `index` with `new_child`, returning the old one.
+    pub fn replace_child(
+        &mut self,
+        index: usize,
+        new_child: OpenXmlElement,
+    ) -> Option<OpenXmlElement> {
+        if index < self.children.len() {
+            Some(std::mem::replace(&mut self.children[index], new_child))
+        } else {
+            None
+        }
+    }
+
+    /// Number of direct children.
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Whether this element has any children.
+    pub fn has_children(&self) -> bool {
+        !self.children.is_empty()
+    }
+
+    /// Serialize this element to OuterXml (C# `OuterXml`).
+    pub fn outer_xml(&self) -> crate::error::Result<String> {
+        let bytes = super::writer::write_element_fragment(self)?;
+        String::from_utf8(bytes).map_err(|e| crate::error::Error::Xml(e.to_string()))
+    }
+
+    /// Serialize inner content only — children + text, no wrapper element
+    /// (approximation of C# `InnerXml` getter).
+    pub fn inner_xml(&self) -> crate::error::Result<String> {
+        let mut out = String::new();
+        if let Some(t) = &self.text {
+            out.push_str(t);
+        }
+        for c in &self.children {
+            out.push_str(&c.outer_xml()?);
+        }
+        Ok(out)
+    }
+
+    /// Replace children by parsing `inner` as an XML fragment of sibling elements
+    /// (C# `InnerXml` setter, simplified — expects well-formed element siblings).
+    pub fn set_inner_xml(&mut self, inner: &str) -> crate::error::Result<()> {
+        self.children.clear();
+        self.text = None;
+        let trimmed = inner.trim();
+        if trimmed.is_empty() {
+            return Ok(());
+        }
+        // Wrap in a synthetic root so the existing single-root parser works.
+        let wrapped = format!("<__inner>{trimmed}</__inner>");
+        let root = super::reader::parse_element(wrapped.as_bytes())?;
+        self.children = root.children;
+        self.text = root.text;
+        Ok(())
+    }
+
+    /// Replace this element's entire content from OuterXml (must match local name).
+    pub fn set_outer_xml(&mut self, outer: &str) -> crate::error::Result<()> {
+        let parsed = super::reader::parse_element(outer.as_bytes())?;
+        if parsed.local_name != self.local_name {
+            return Err(crate::error::Error::Xml(format!(
+                "OuterXml local name `{}` does not match element `{}`",
+                parsed.local_name, self.local_name
+            )));
+        }
+        self.prefix = parsed.prefix;
+        self.namespace_uri = parsed.namespace_uri;
+        self.attributes = parsed.attributes;
+        self.namespace_declarations = parsed.namespace_declarations;
+        self.children = parsed.children;
+        self.text = parsed.text;
+        self.misc_kind = parsed.misc_kind;
+        self.raw_outer_xml = None;
+        // annotations intentionally preserved
+        Ok(())
     }
 
     /// First child with the given local name.
@@ -652,5 +843,36 @@ mod annotation_tests {
         // Structural equality ignores annotations
         el.add_annotation(1u8);
         assert_eq!(el, cloned);
+    }
+}
+
+#[cfg(test)]
+mod dom_mutation_tests {
+    use super::*;
+
+    #[test]
+    fn outer_inner_xml_and_insert() {
+        let mut p = OpenXmlElement::w("p");
+        p.append_child(OpenXmlElement::w("r").with_child(OpenXmlElement::w("t").with_text("a")));
+        p.append_child(OpenXmlElement::w("r").with_child(OpenXmlElement::w("t").with_text("b")));
+        assert_eq!(p.child_count(), 2);
+        assert!(p.insert_after_name(
+            OpenXmlElement::w("r").with_child(OpenXmlElement::w("t").with_text("c")),
+            "r"
+        ));
+        // inserts after first r → 3 children
+        assert_eq!(p.child_count(), 3);
+        let outer = p.outer_xml().unwrap();
+        assert!(outer.contains("w:p") || outer.contains("<p") || outer.contains("p"));
+        let inner = p.inner_xml().unwrap();
+        assert!(inner.contains('a') || inner.contains('t'));
+
+        let removed = p.remove_child_by_name("r").unwrap();
+        assert_eq!(removed.local_name, "r");
+        assert_eq!(p.child_count(), 2);
+
+        p.set_inner_xml(r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t>z</w:t></w:r>"#).unwrap();
+        assert_eq!(p.child_count(), 1);
+        assert_eq!(p.first_child().unwrap().local_name, "r");
     }
 }

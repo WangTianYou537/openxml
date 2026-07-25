@@ -744,6 +744,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Element + package `Annotations` (C# AnnotationsFeature); `ChangeIdOfPart` / `GetPartById` / `GetIdOfPart`
 - [x] `DataPart` / `DataPartReferenceRelationship` / `IdPartPair`; `CreateMediaDataPart`, `DeleteUnusedDataParts`, `DeleteReferenceRelationship`
 - [x] `PartExtensionProvider`; `OpenXmlPart` UnloadRootElement / IsRootElementLoaded / GetParentParts
+- [x] `GetAllParts` BFS; DOM `OuterXml`/`InnerXml`, InsertBefore/After, RemoveChild, First/LastChild
 
 **Still intentionally deferred / partial:**
 

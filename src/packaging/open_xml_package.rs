@@ -135,6 +135,13 @@ impl OpenXmlPackage {
             .to_string()
     }
 
+    /// All parts reachable from package relationships, BFS order
+    /// (C# `OpenXmlPackageExtensions.GetAllParts`).
+    pub fn get_all_parts(&self) -> Vec<(crate::opc::PackUri, String)> {
+        self.opc.get_all_parts()
+    }
+
+
 
     /// Ensure a [`crate::features::PackageEvents`] feature exists.
     pub fn package_events(&mut self) -> &crate::features::PackageEvents {

@@ -425,3 +425,81 @@ impl OpcPackage {
         false
     }
 }
+
+
+impl OpcPackage {
+    /// Breadth-first traversal of all parts reachable from package relationships
+    /// (C# `OpenXmlPackageExtensions.GetAllParts`).
+    ///
+    /// Returns `(uri, content_type)` pairs; content type may be empty if missing.
+    pub fn get_all_parts(&self) -> Vec<(PackUri, String)> {
+        use std::collections::{HashSet, VecDeque};
+        let mut visited: HashSet<String> = HashSet::new();
+        let mut out = Vec::new();
+        let mut queue: VecDeque<PackUri> = VecDeque::new();
+
+        for rel in self.package_relationships().iter() {
+            if rel.target_mode != super::RelationshipTargetMode::Internal {
+                continue;
+            }
+            if let Ok(u) = self.resolve_relationship(None, rel) {
+                if self.has_part(&u) && visited.insert(u.as_str().to_string()) {
+                    queue.push_back(u);
+                }
+            }
+        }
+
+        while let Some(uri) = queue.pop_front() {
+            let ct = self
+                .content_types()
+                .content_type_for(uri.as_str())
+                .unwrap_or("")
+                .to_string();
+            out.push((uri.clone(), ct));
+            if let Some(rels) = self.part_relationships(&uri) {
+                for rel in rels.iter() {
+                    if rel.target_mode != super::RelationshipTargetMode::Internal {
+                        continue;
+                    }
+                    if let Ok(child) = self.resolve_relationship(Some(&uri), rel) {
+                        if self.has_part(&child) && visited.insert(child.as_str().to_string()) {
+                            queue.push_back(child);
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// BFS part URIs only.
+    pub fn get_all_part_uris(&self) -> Vec<PackUri> {
+        self.get_all_parts().into_iter().map(|(u, _)| u).collect()
+    }
+}
+
+#[cfg(test)]
+mod get_all_parts_tests {
+    use super::*;
+    use crate::namespace::{content_type, rel};
+    use crate::opc::RelationshipTargetMode;
+
+    #[test]
+    fn get_all_parts_bfs() {
+        let mut pkg = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        let theme = PackUri::new("/word/theme/theme1.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        pkg.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        pkg.set_part(theme.clone(), content_type::THEME, b"<a:theme/>".to_vec());
+        pkg.add_package_relationship(rel::OFFICE_DOCUMENT, &doc, RelationshipTargetMode::Internal);
+        pkg.add_part_relationship(&doc, rel::STYLES, &styles, RelationshipTargetMode::Internal);
+        pkg.add_part_relationship(&doc, rel::THEME, &theme, RelationshipTargetMode::Internal);
+        let all = pkg.get_all_part_uris();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0], doc);
+        assert!(all.contains(&styles));
+        assert!(all.contains(&theme));
+    }
+}
