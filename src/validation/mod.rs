@@ -92,7 +92,9 @@ pub use semantic::{
 };
 
 /// Re-export Markup Compatibility AlternateContent structural validation.
-pub use crate::markup_compatibility::validate_alternate_content;
+pub use crate::markup_compatibility::{
+    validate_alternate_content, validate_mc_attributes,
+};
 
 use crate::element::OpenXmlElement;
 use std::collections::HashMap;

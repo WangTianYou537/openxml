@@ -187,7 +187,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | Semantic constraints | 21 约束类 + `data/schematrons.json`（**948** 条） | ✅ 可抽取子集 ~771（63 rel + 115 unique + 236 range + 184 length + 15 pattern + 37 enum + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count + 17 fixed-val + 7 fixed-ne + 12 multi-ne + 9 both-present + 7 finite + 5 required-attr + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count） | 🟡 |
 | Package structure | `PackageValidator` | ✅ `validate_package`（main + rel 目标）+ `validate_package_constraints`（约束图） | 🟡 |
 | OpenXmlValidator 门面 | 统一入口 + settings + 错误事件 | `validate` / `validate_full` 文档向 | 🟡 |
-| MC 校验 | `AlternateContentValidator`, compatibility attrs | ✅ `validate_alternate_content`（AC/Choice/Fallback 结构 + Requires） | 🟡 |
+| MC 校验 | `AlternateContentValidator`, compatibility attrs | ✅ `validate_alternate_content` + **`validate_mc_attributes`**（Ignorable/Preserve*/ProcessContent/MustUnderstand） | 🟡 |
 
 ---
 
@@ -200,6 +200,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | ProcessContent / PreserveElements / PreserveAttributes | ✅ |
 | FileFormatVersions + 前缀引入版本表 | ✅ |
 | Strict→Transitional 命名空间与关系 | ✅ |
+| CompatibilityRuleAttributes 校验 | ✅ `validate_mc_attributes` |
 | OpenSettings 驱动的打开时 MC 处理模式 | ✅ `MarkupCompatibilityProcessMode` |
 | 反向 Transitional→Strict | ❌（C# 也主要推 Strict→Transitional） |
 

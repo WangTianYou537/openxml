@@ -657,3 +657,191 @@ mod ac_validate_tests {
         assert!(errs.iter().any(|e| e.message.contains("after Fallback")));
     }
 }
+
+/// Validate Markup Compatibility rule attributes on `root` and descendants
+/// (C# `CompatibilityRuleAttributesValidator` subset).
+///
+/// - `mc:Ignorable` prefixes must resolve to namespaces
+/// - `PreserveAttributes` / `PreserveElements` / `ProcessContent` require Ignorable
+///   on the same element and only reference ignorable namespaces
+/// - `mc:MustUnderstand` prefixes must resolve
+pub fn validate_mc_attributes(root: &OpenXmlElement) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    walk_mc_attrs(root, "root", &mut errors);
+    errors
+}
+
+fn mc_attr_value(elem: &OpenXmlElement, local: &str) -> Option<String> {
+    // Prefer mc-prefixed / MC-namespaced attributes, then bare local name.
+    for a in &elem.attributes {
+        if a.local_name == local
+            && (a.prefix.as_deref() == Some("mc") || a.namespace_uri.as_deref() == Some(MC))
+        {
+            return Some(a.value.clone());
+        }
+    }
+    for a in &elem.attributes {
+        if a.local_name == local && a.prefix.is_none() {
+            return Some(a.value.clone());
+        }
+    }
+    None
+}
+
+fn walk_mc_attrs(elem: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
+    validate_mc_attrs_on(elem, path, errors);
+    for (i, child) in elem.children.iter().enumerate() {
+        let p = format!("{path}/{}[{i}]", child.local_name);
+        walk_mc_attrs(child, &p, errors);
+    }
+}
+
+fn validate_mc_attrs_on(elem: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
+    let ignorable = mc_attr_value(elem, "Ignorable");
+    let mut ignorable_ns: Option<std::collections::HashSet<String>> = None;
+
+    if let Some(ref ign) = ignorable {
+        let mut set = std::collections::HashSet::new();
+        for prefix in ign.split_whitespace() {
+            if prefix.is_empty() {
+                continue;
+            }
+            match resolve_prefix_ns(elem, prefix) {
+                Some(uri) => {
+                    set.insert(uri);
+                }
+                None => {
+                    errors.push(ValidationError {
+                        path: path.to_string(),
+                        message: format!(
+                            "MC_InvalidIgnorableAttribute: prefix `{prefix}` in Ignorable=\"{ign}\" is not defined"
+                        ),
+                    });
+                }
+            }
+        }
+        ignorable_ns = Some(set);
+    }
+
+    for (attr_local, err_id) in [
+        ("PreserveAttributes", "MC_InvalidPreserveAttributesAttribute"),
+        ("PreserveElements", "MC_InvalidPreserveElementsAttribute"),
+        ("ProcessContent", "MC_InvalidProcessContentAttribute"),
+    ] {
+        if let Some(list) = mc_attr_value(elem, attr_local) {
+            match &ignorable_ns {
+                None => {
+                    errors.push(ValidationError {
+                        path: path.to_string(),
+                        message: format!(
+                            "{err_id}: {attr_local}=\"{list}\" requires mc:Ignorable on the same element"
+                        ),
+                    });
+                }
+                Some(ns_set) => {
+                    if let Some(bad) = validate_qname_list_against_ignorable(elem, &list, ns_set) {
+                        errors.push(ValidationError {
+                            path: path.to_string(),
+                            message: format!(
+                                "{err_id}: `{bad}` in {attr_local}=\"{list}\" is not in an Ignorable namespace"
+                            ),
+                        });
+                    }
+                }
+            }
+            if attr_local == "ProcessContent" {
+                for a in &elem.attributes {
+                    if is_xml_lang_or_space(a) {
+                        errors.push(ValidationError {
+                            path: path.to_string(),
+                            message: "MC_InvalidXmlAttributeWithProcessContent: xml:lang/space with ProcessContent".into(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(mu) = mc_attr_value(elem, "MustUnderstand") {
+        for prefix in mu.split_whitespace() {
+            if prefix.is_empty() {
+                continue;
+            }
+            if resolve_prefix_ns(elem, prefix).is_none() {
+                errors.push(ValidationError {
+                    path: path.to_string(),
+                    message: format!(
+                        "MC_InvalidMustUnderstandAttribute: prefix `{prefix}` in MustUnderstand=\"{mu}\" is not defined"
+                    ),
+                });
+            }
+        }
+    }
+}
+
+/// Returns the first bad token if any QName in `list` is outside ignorable namespaces.
+fn validate_qname_list_against_ignorable(
+    elem: &OpenXmlElement,
+    list: &str,
+    ignorable_namespaces: &std::collections::HashSet<String>,
+) -> Option<String> {
+    for token in list.split_whitespace() {
+        if token.is_empty() {
+            continue;
+        }
+        // forms: "prefix:local", "prefix:*", or bare (invalid for non-default)
+        let prefix = if let Some((p, _)) = token.split_once(':') {
+            p
+        } else {
+            // unprefixed — not belonging to an ignorable ns
+            return Some(token.to_string());
+        };
+        let Some(uri) = resolve_prefix_ns(elem, prefix) else {
+            return Some(token.to_string());
+        };
+        if !ignorable_namespaces.contains(&uri) {
+            return Some(token.to_string());
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod mc_attr_validate_tests {
+    use super::*;
+
+    #[test]
+    fn ignorable_undefined_prefix() {
+        let el = OpenXmlElement::w("document")
+            .with_attribute_qname("mc:Ignorable", "w99");
+        let errs = validate_mc_attributes(&el);
+        assert!(errs.iter().any(|e| e.message.contains("InvalidIgnorable")));
+    }
+
+    #[test]
+    fn preserve_without_ignorable() {
+        let el = OpenXmlElement::w("document")
+            .with_attribute_qname("mc:PreserveElements", "w14:docId");
+        let errs = validate_mc_attributes(&el);
+        assert!(errs.iter().any(|e| e.message.contains("PreserveElements")));
+    }
+
+    #[test]
+    fn valid_ignorable_and_preserve() {
+        let el = OpenXmlElement::w("document")
+            .with_ns_decl("w14", "http://schemas.microsoft.com/office/word/2010/wordml")
+            .with_ns_decl("mc", MC)
+            .with_attribute_qname("mc:Ignorable", "w14")
+            .with_attribute_qname("mc:PreserveElements", "w14:docId");
+        let errs = validate_mc_attributes(&el);
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn must_understand_undefined() {
+        let el = OpenXmlElement::w("document")
+            .with_attribute_qname("mc:MustUnderstand", "xyz");
+        let errs = validate_mc_attributes(&el);
+        assert!(errs.iter().any(|e| e.message.contains("MustUnderstand")));
+    }
+}

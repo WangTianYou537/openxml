@@ -4,7 +4,7 @@
 //! with a max-error budget and target [`FileFormatVersions`].
 
 use super::{
-    validate_alternate_content, validate_package, validate_package_constraints,
+    validate_alternate_content, validate_mc_attributes, validate_package, validate_package_constraints,
     validate_word_document, validate_word_document_full, ValidationError,
 };
 use crate::element::OpenXmlElement;
@@ -112,6 +112,7 @@ impl OpenXmlValidator {
             validate_word_document(element)
         };
         errors.extend(validate_alternate_content(element));
+        errors.extend(validate_mc_attributes(element));
         let _ = self.file_format;
         Ok(self.cap(errors))
     }
