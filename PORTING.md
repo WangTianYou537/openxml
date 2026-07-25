@@ -870,6 +870,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `MediaDataPartType` table + `OpenXmlPackage::create_media_data_part_typed[_with_data]`
 - [x] Package relationship list wrappers + auto_save/MC/compatibility settings accessors
 
+- [x] `OpenXmlPackageException` shell + known ExceptionMessages helpers
+- [x] `OpenXmlPackageValidationResult` shell (C# packaging validation event)
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

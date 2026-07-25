@@ -15,6 +15,53 @@ use crate::opc::{media_rel, OpcPackage, PackUri, RelationshipTargetMode};
 use crate::packaging::PartConstraintFeature;
 use std::collections::{HashMap, HashSet};
 
+/// C# `OpenXmlPackageValidationResult` shell (internal packaging validation event).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OpenXmlPackageValidationResult {
+    pub message: String,
+    pub message_id: Option<String>,
+    pub relationship_type: Option<String>,
+    pub part_uri: Option<String>,
+    pub sub_part_uri: Option<String>,
+}
+
+impl OpenXmlPackageValidationResult {
+    pub fn new(message_id: impl Into<String>, detail: impl Into<String>) -> Self {
+        let message_id = message_id.into();
+        let detail = detail.into();
+        Self {
+            message: format!("{message_id}: {detail}"),
+            message_id: Some(message_id),
+            relationship_type: None,
+            part_uri: None,
+            sub_part_uri: None,
+        }
+    }
+
+    pub fn with_relationship_type(mut self, relationship_type: impl Into<String>) -> Self {
+        self.relationship_type = Some(relationship_type.into());
+        self
+    }
+
+    pub fn with_part_uri(mut self, uri: impl Into<String>) -> Self {
+        self.part_uri = Some(uri.into());
+        self
+    }
+
+    pub fn with_sub_part_uri(mut self, uri: impl Into<String>) -> Self {
+        self.sub_part_uri = Some(uri.into());
+        self
+    }
+
+    pub fn into_validation_error(self) -> ValidationError {
+        ValidationError {
+            path: self.part_uri.clone().unwrap_or_default(),
+            message: self.message,
+            ..Default::default()
+        }
+    }
+}
+
 /// Message ids mirroring C# `OpenXmlPackageValidationResult.MessageId`.
 pub mod message_id {
     pub const PART_IS_NOT_ALLOWED: &str = "PartIsNotAllowed";
@@ -302,6 +349,24 @@ fn resolve_pkg_target(target: &str) -> std::result::Result<PackUri, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn open_xml_package_validation_result_shell() {
+        let r = super::OpenXmlPackageValidationResult::new(
+            super::message_id::PART_IS_NOT_ALLOWED,
+            "chart not allowed under styles",
+        )
+        .with_relationship_type("http://rel/chart")
+        .with_part_uri("/word/styles.xml")
+        .with_sub_part_uri("/word/charts/chart1.xml");
+        assert_eq!(
+            r.message_id.as_deref(),
+            Some(super::message_id::PART_IS_NOT_ALLOWED)
+        );
+        assert!(r.message.contains("PartIsNotAllowed"));
+        let e = r.into_validation_error();
+        assert_eq!(e.path, "/word/styles.xml");
+    }
+
     use super::*;
     use crate::namespace::content_type;
     use crate::opc::RelationshipTargetMode;

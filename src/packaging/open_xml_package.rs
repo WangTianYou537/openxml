@@ -3092,4 +3092,14 @@ mod part_events_tests {
         assert!(pkg.package_relationships().is_empty() || true);
         assert!(pkg.part_relationships(&crate::opc::PackUri::new("/none")).is_none());
     }
+
+    #[test]
+    fn open_xml_package_exception_into_error() {
+        let e: crate::error::Error =
+            crate::error::OpenXmlPackageException::data_part_is_in_use().into();
+        match e {
+            crate::error::Error::Package(m) => assert_eq!(m, "DataPartIsInUse"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
 }

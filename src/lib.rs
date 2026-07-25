@@ -64,7 +64,7 @@ pub mod validation;
 pub mod wordprocessing;
 
 pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, OpenXmlPartWriterSettings, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
-pub use error::{Error, Result};
+pub use error::{Error, OpenXmlPackageException, Result};
 pub use features::{
     AnnotationsFeature, ApplicationType, ContainerDisposableFeature, ContentTypeFeature,
     DataPartsFeature, DisposableFeature, DocumentTypeFeature, ElementEventsFeature,

@@ -71,3 +71,63 @@ impl From<quick_xml::events::attributes::AttrError> for Error {
         Error::Xml(value.to_string())
     }
 }
+
+
+/// C# `OpenXmlPackageException` — packaging errors that map to [`Error::Package`].
+///
+/// Prefer constructing [`Error::Package`] directly; this helper centralizes the
+/// well-known C# `ExceptionMessages` strings used by the managed SDK.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenXmlPackageException {
+    pub message: String,
+}
+
+impl OpenXmlPackageException {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    pub fn same_part_different_relationship_type() -> Self {
+        Self::new("SamePartWithDifferentRelationshipType")
+    }
+
+    pub fn foreign_data_part() -> Self {
+        Self::new("ForeignDataPart")
+    }
+
+    pub fn data_part_is_in_use() -> Self {
+        Self::new("DataPartIsInUse")
+    }
+
+    pub fn cannot_change_document_type() -> Self {
+        Self::new("CannotChangeDocumentType")
+    }
+
+    pub fn part_is_not_allowed() -> Self {
+        Self::new("PartIsNotAllowed")
+    }
+
+    pub fn only_one_part_allowed() -> Self {
+        Self::new("OnlyOnePartAllowed")
+    }
+
+    pub fn into_error(self) -> Error {
+        Error::Package(self.message)
+    }
+}
+
+impl From<OpenXmlPackageException> for Error {
+    fn from(value: OpenXmlPackageException) -> Self {
+        value.into_error()
+    }
+}
+
+impl std::fmt::Display for OpenXmlPackageException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for OpenXmlPackageException {}
