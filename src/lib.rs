@@ -63,7 +63,7 @@ pub mod spreadsheet;
 pub mod validation;
 pub mod wordprocessing;
 
-pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
+pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind, OpenXmlPartWriter};
 pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, FeatureCollection, PackageEvent, PackageEventType, PackageEvents,
