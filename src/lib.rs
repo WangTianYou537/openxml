@@ -97,7 +97,7 @@ pub use packaging::{
     footer, footer_reference, header, header_reference, hyperlink, AlternativeFormatImportType,
     DocumentSettingsPart, ExtendedPart, ImageFormat, ImagePart, MainDocumentPart,
     CompatibilityLevel, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
-    OpenXmlPackage, PackageMiddleware, PresentationDocument, PresentationDocumentBuilder,
+    OpenXmlPackage, PartTypeInfo, PackageMiddleware, PresentationDocument, PresentationDocumentBuilder,
     PresentationDocumentType, SlideInfo, SlideLayoutInfo, SlideMasterInfo, SpreadsheetDocument,
     SpreadsheetDocumentBuilder, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart,
     PartConstraintFeature, PartConstraintRule, WordprocessingDocumentBuilder, constraints_for,

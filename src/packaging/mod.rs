@@ -21,7 +21,7 @@ pub use open_xml_package::{
     CompatibilityLevel, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
     OpenSettings, OpenXmlPackage,
 };
-pub use open_xml_part::{ExtendedPart, MainDocumentPart, OpenXmlPart};
+pub use open_xml_part::{ExtendedPart, MainDocumentPart, OpenXmlPart, PartTypeInfo};
 pub use parts::{
     default_settings, default_styles, footer, footer_reference, header, header_reference,
     hyperlink, hyperlink_anchor, AlternativeFormatImportType, DocumentSettingsPart, ImageFormat,

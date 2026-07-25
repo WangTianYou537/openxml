@@ -873,6 +873,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackageException` shell + known ExceptionMessages helpers
 - [x] `OpenXmlPackageValidationResult` shell (C# packaging validation event)
 
+- [x] `PartTypeInfo` + `OpenXmlPackage::create_part_from_type_info`
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

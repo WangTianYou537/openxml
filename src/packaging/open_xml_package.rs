@@ -2140,6 +2140,32 @@ impl OpenXmlPackage {
         )
     }
 
+    /// Create an empty part using [`PartTypeInfo`] (C# part create with content type + extension).
+    pub fn create_part_from_type_info(
+        &mut self,
+        parent: &crate::opc::PackUri,
+        target_path: &str,
+        target_name: &str,
+        info: &crate::packaging::PartTypeInfo,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::error::Result<crate::opc::PackUri> {
+        let uri = self.create_part_uri(
+            &info.content_type,
+            parent,
+            target_path,
+            target_name,
+            info.extension_no_dot(),
+            true,
+        )?;
+        let ext = info.extension_no_dot();
+        if !ext.is_empty() {
+            self.set_content_type_default(ext, &info.content_type);
+        }
+        self.set_part(uri.clone(), info.content_type.clone(), data.into());
+        Ok(uri)
+    }
+
+
     /// Max characters per part from open settings (C# `MaxCharactersInPart`).
     pub fn max_characters_in_part(&self) -> u64 {
         self.settings.max_characters_in_part
@@ -3101,5 +3127,30 @@ mod part_events_tests {
             crate::error::Error::Package(m) => assert_eq!(m, "DataPartIsInUse"),
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    #[test]
+    fn create_part_from_type_info_allocates_and_sets() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let parent = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            parent.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        let info = crate::packaging::PartTypeInfo::new("image/png", "png");
+        assert_eq!(info.extension, ".png");
+        let uri = pkg
+            .create_part_from_type_info(&parent, "media", "image", &info, b"\x89PNG")
+            .expect("part");
+        assert!(uri.as_str().contains("/word/media/image"));
+        assert!(uri.as_str().ends_with(".png"));
+        assert!(pkg.opc().has_part(&uri));
+        assert_eq!(
+            pkg.opc().content_types().defaults.get("png").map(|s| s.as_str()),
+            Some("image/png")
+        );
+        assert!(pkg.part_uri_feature().is_reserved(&uri));
     }
 }

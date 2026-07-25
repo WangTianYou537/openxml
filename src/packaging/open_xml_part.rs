@@ -6,6 +6,31 @@ use crate::opc::{PackUri, RelationshipTargetMode};
 use crate::packaging::OpenXmlPackage;
 use std::io::Write;
 
+/// Content type + extension used when creating a new part (C# `PartTypeInfo`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PartTypeInfo {
+    pub content_type: String,
+    pub extension: String,
+}
+
+impl PartTypeInfo {
+    pub fn new(content_type: impl Into<String>, extension: impl Into<String>) -> Self {
+        let mut extension = extension.into();
+        if !extension.is_empty() && !extension.starts_with('.') {
+            extension = format!(".{extension}");
+        }
+        Self {
+            content_type: content_type.into(),
+            extension,
+        }
+    }
+
+    /// Extension without leading dot.
+    pub fn extension_no_dot(&self) -> &str {
+        self.extension.strip_prefix('.').unwrap_or(self.extension.as_str())
+    }
+}
+
 /// A part in an Open XML package (e.g. `/word/document.xml`).
 #[derive(Debug)]
 pub struct OpenXmlPart {
