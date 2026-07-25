@@ -16,6 +16,7 @@ mod typed;
 mod part_reader;
 mod part_writer;
 mod writer;
+mod xml_path;
 
 pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
 pub use dom_reader::OpenXmlDomReader;
@@ -36,3 +37,4 @@ pub use typed::{
 pub use part_reader::{ElementState, OpenXmlPartReader};
 pub use part_writer::OpenXmlPartWriter;
 pub use writer::write_element;
+pub use xml_path::{xpath_index_among_siblings, OpenXmlUnknownMarker, XmlPath};

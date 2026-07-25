@@ -36,7 +36,7 @@
 | Strict→Transitional | Features / rewrite | `namespace_rewrite` | ✅ |
 | Schema particle 校验 | 完整 particle validators | Sequence/Choice/Group/All/Element/Any | 🟡 引擎有，覆盖面/XSD 限制不全 |
 | Semantic 校验 | 21 约束类 + **948** Schematron 规则 | ✅ 可抽取子集 ~942 条：63 rel + 115 unique + 236 range + 184 length + 15 pattern + 37 enum + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count + 17 fixed-val + 7 fixed-ne + 12 multi-ne + 9 both-present + 7 finite + 5 required-attr（`validate_schematron` / `validate_schematron_constraints`）；其余 XPath/跨部件规则未执行 | 🟡 |
-| Package 级校验 | `PackageValidator` / `OpenXmlValidator` | ✅ `validate_package` + **`validate_package_constraints`**（PartConstraintFeature 图遍历）+ 文档级 `validate` / `validate_full` | 🟡 |
+| Package 级校验 | `PackageValidator` / `OpenXmlValidator` | ✅ `validate_package` + `validate_package_constraints` + **`OpenXmlValidator`** 门面 | 🟡 |
 | Features DI / 事件 | 大量 `I*Feature` | ✅ FeatureCollection + PackageEvents + ElementContext + PartConstraintFeature | 🟡 |
 | 流式 Reader/Writer | `OpenXmlReader`/`Writer`/`PartReader` | ✅ StreamReader + PartReader + DomReader + PartWriter | 🟡 |
 | 加密 Office 文件 | `IsEncryptedOfficeFile` 检测 | ✅ 检测 + `Error::EncryptedPackage`（不加解密） | 🟡 |
@@ -65,15 +65,15 @@
 | 缺口 | C# 位置 | 说明 | 优先级 |
 |------|---------|------|--------|
 | **强类型元素类** | 生成 `Paragraph : OpenXmlCompositeElement` 等 | Rust 仅有 `paragraph()` 工厂返回通用 DOM，无 `struct Paragraph` 属性访问器 | 高（API 体验） |
-| **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | ✅ `OpenXmlMiscKind`（Comment/PI/CData）挂在统一 DOM | 🟡 Leaf/Unknown 仍合并 |
-| **OpenXmlReader / OpenXmlWriter 流式** | `OpenXmlReader.cs`, `OpenXmlPartReader` | 大部件必须整树进内存 | 高（大文件） |
-| **OpenXmlLoadMode** | Full / Lazy（默认缓存 OuterXml） | 无惰性加载 | 高 |
+| **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | ✅ `OpenXmlMiscKind` + **`OpenXmlUnknownMarker` / `is_unknown`** | 🟡 Leaf 仍合并 |
+| **OpenXmlReader / OpenXmlWriter 流式** | `OpenXmlReader.cs`, `OpenXmlPartReader` | ✅ Stream/Part/Dom Reader + PartWriter | 🟡 |
+| **OpenXmlLoadMode** | Full / Lazy（默认缓存 OuterXml） | ✅ `OpenXmlLoadMode` + ElementContext | 🟡 |
 | **MaxCharactersInPart** | OpenSettings DoS 防护 | ✅ 有 DoS 防护 | ✅ |
 | **CompressionOption** | 包压缩选项 | ✅ `CompressionOption` + `OpenSettings.compression` | ✅ |
-| **元素事件** | `ElementEventArgs`, Features `ElementEvents` | 无变更通知 | 低 |
+| **元素事件** | `ElementEventArgs`, Features `ElementEvents` | ✅ ElementEvent shell | 🟡 |
 | **Equality** | `Equality/OpenXmlElementEqualityComparer` | ✅ `elements_equal` / `EqualityOptions` | ✅ |
-| **Annotations** | `AnnotationsFeature` | 无元素注解字典 | 低 |
-| **XmlPath / XmlLineInfo** | 校验错误定位 | 校验错误路径信息较弱 | 中 |
+| **Annotations** | `AnnotationsFeature` | ✅ 元素 + package AnnotationsFeature | ✅ |
+| **XmlPath / XmlLineInfo** | 校验错误定位 | ✅ `XmlPath`（索引路径；无父指针） | 🟡 无行号 |
 | **Builder 模式** | `Builder/`, package builders | 无对等 fluent builder 框架 | 低 |
 
 ### 2.3 简单类型缺口

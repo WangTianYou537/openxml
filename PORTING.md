@@ -761,6 +761,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] OpenXmlDomReader DOM cursor (Read/Skip over element trees)
 - [x] PartConstraintFeature / PartConstraintRule (IPartConstraintFeature shell)
 - [x] PackageValidator-style `validate_package_constraints` (PartIsNotAllowed / RequiredPart / OnlyOne / InvalidContentType / DataPartRef) wired into `validate_package` + Word/Excel/PPT
+- [x] `XmlPath` + path-from-indices (owned-DOM); `OpenXmlUnknownElement` marker; `OpenXmlValidator` facade (max errors / file format / package+element)
 
 **Still intentionally deferred / partial:**
 

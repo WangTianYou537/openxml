@@ -45,6 +45,9 @@ pub enum Error {
     #[error("part exceeds MaxCharactersInPart limit ({limit}): {uri}")]
     PartTooLarge { uri: String, limit: u64 },
 
+    #[error("validation error: {0}")]
+    Validation(String),
+
     #[error("{0}")]
     Other(String),
 }
