@@ -227,6 +227,7 @@ impl OpenXmlPackage {
         self.raise_part_event(crate::features::PackageEventType::Deleting, &uri_str);
         let data = self.opc.remove_part(uri);
         if data.is_some() {
+            self.parts_feature_mut().remove(&uri_str);
             self.raise_part_event(crate::features::PackageEventType::Removed, &uri_str);
             self.raise_part_event(crate::features::PackageEventType::Deleted, &uri_str);
         }
@@ -250,6 +251,7 @@ impl OpenXmlPackage {
             self.raise_part_event(crate::features::PackageEventType::Adding, &uri_str);
         }
         self.opc.set_part(uri, content_type, data);
+        self.parts_feature_mut().add(&uri_str);
         if existed {
             self.raise_part_event(crate::features::PackageEventType::Added, &uri_str);
         } else {
@@ -620,6 +622,42 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Content-type constancy flag (C# `IContentTypeFeature`).
+    pub fn content_type_feature(&self) -> crate::features::ContentTypeFeature {
+        self.features
+            .get::<crate::features::ContentTypeFeature>()
+            .copied()
+            .unwrap_or_default()
+    }
+
+    pub fn set_content_type_feature(&mut self, feature: crate::features::ContentTypeFeature) {
+        self.features.set(feature);
+    }
+
+    /// Package sync lock (C# `ILockFeature`).
+    pub fn lock_feature(&mut self) -> &crate::features::LockFeature {
+        if !self.features.contains::<crate::features::LockFeature>() {
+            self.features.set(crate::features::LockFeature::new());
+        }
+        self.features
+            .get::<crate::features::LockFeature>()
+            .expect("just inserted")
+    }
+
+    /// Loaded-parts registry (C# `IPartsFeature` shell).
+    pub fn parts_feature(&mut self) -> &crate::features::PartsFeature {
+        self.parts_feature_mut()
+    }
+
+    fn parts_feature_mut(&mut self) -> &mut crate::features::PartsFeature {
+        if !self.features.contains::<crate::features::PartsFeature>() {
+            self.features.set(crate::features::PartsFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::PartsFeature>()
+            .expect("just inserted")
+    }
+
     /// Add a package-level relationship after running any registered relationship filters
     /// (C# relationship create + `IRelationshipFilterFeature`).
     pub fn add_package_relationship(
@@ -945,5 +983,24 @@ mod part_events_tests {
         assert!(rels
             .iter()
             .any(|r| r.relationship_type == "http://filtered/officeDocument"));
+    }
+
+    #[test]
+    fn parts_feature_tracks_set_and_delete() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let uri = PackUri::new("/word/styles.xml");
+        pkg.set_part(uri.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        assert!(pkg.parts_feature().contains(uri.as_str()));
+        assert!(pkg.delete_part(&uri).is_some());
+        assert!(!pkg.parts_feature().contains(uri.as_str()));
+        pkg.set_content_type_feature(crate::features::ContentTypeFeature::constant());
+        assert!(pkg.content_type_feature().is_constant);
+        let ran = Arc::new(AtomicUsize::new(0));
+        let r = ran.clone();
+        pkg.lock_feature().with_lock(|| {
+            r.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(ran.load(Ordering::SeqCst), 1);
     }
 }

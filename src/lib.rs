@@ -66,11 +66,11 @@ pub mod wordprocessing;
 pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, OpenXmlPartWriterSettings, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
 pub use error::{Error, Result};
 pub use features::{
-    AnnotationsFeature, ApplicationType, DisposableFeature, DocumentTypeFeature, FeatureCollection,
-    MainPartFeature, PackageCapabilities, PackageEvent, PackageEventType, PackageEvents,
-    PackageFactoryFeature, PackageRelationshipBuilder, ParagraphIdGenerator, PartEvents,
-    PartRootEvents, ProgrammaticIdentifierFeature, RelationshipFilterFeature,
-    SchemaTrackingFeature, StrictNamespaceFeature,
+    AnnotationsFeature, ApplicationType, ContentTypeFeature, DisposableFeature, DocumentTypeFeature,
+    FeatureCollection, LockFeature, MainPartFeature, PackageCapabilities, PackageEvent,
+    PackageEventType, PackageEvents, PackageFactoryFeature, PackageRelationshipBuilder,
+    ParagraphIdGenerator, PartEvents, PartRootEvents, PartsFeature, ProgrammaticIdentifierFeature,
+    RelationshipFilterFeature, SchemaTrackingFeature, StrictNamespaceFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

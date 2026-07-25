@@ -818,6 +818,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Capture XML `standalone` on part load (`parse_xml_standalone`)
 - [x] `RelationshipFilterFeature` / `PackageRelationshipBuilder` / `PackageFactoryFeature` / `ProgrammaticIdentifierFeature`
 - [x] `OpenXmlPackage::{add_package_relationship,add_part_relationship}` apply relationship filters
+- [x] `ContentTypeFeature` / `LockFeature` / `PartsFeature` (IContentTypeFeature / ILockFeature / IPartsFeature shells)
 
 **Still intentionally deferred / partial:**
 

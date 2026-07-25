@@ -547,6 +547,102 @@ impl ProgrammaticIdentifierFeature {
     }
 }
 
+/// Whether content types are fixed for the package (C# `IContentTypeFeature`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ContentTypeFeature {
+    /// When true, content types cannot be changed after open (C# `IsConstant`).
+    pub is_constant: bool,
+}
+
+impl Default for ContentTypeFeature {
+    fn default() -> Self {
+        Self { is_constant: false }
+    }
+}
+
+impl ContentTypeFeature {
+    pub fn new(is_constant: bool) -> Self {
+        Self { is_constant }
+    }
+
+    pub fn constant() -> Self {
+        Self { is_constant: true }
+    }
+}
+
+/// Package-level synchronization lock (C# `ILockFeature.SyncLock` shell).
+///
+/// Holds a mutex used by callers that need to coordinate concurrent package access.
+#[derive(Default)]
+pub struct LockFeature {
+    lock: Mutex<()>,
+}
+
+impl std::fmt::Debug for LockFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LockFeature").finish_non_exhaustive()
+    }
+}
+
+impl LockFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Run `f` while holding the package sync lock.
+    pub fn with_lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _g = self.lock.lock().unwrap_or_else(|e| e.into_inner());
+        f()
+    }
+}
+
+/// Registry of loaded parts by URI (C# `IPartsFeature` shell).
+///
+/// Tracks which part URIs have been registered without owning the full part DOM.
+#[derive(Debug, Default, Clone)]
+pub struct PartsFeature {
+    uris: Vec<String>,
+}
+
+impl PartsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, uri: impl Into<String>) {
+        let uri = uri.into();
+        if !self.uris.iter().any(|u| u == &uri) {
+            self.uris.push(uri);
+        }
+    }
+
+    pub fn contains(&self, uri: &str) -> bool {
+        self.uris.iter().any(|u| u == uri)
+    }
+
+    pub fn try_get(&self, uri: &str) -> bool {
+        self.contains(uri)
+    }
+
+    pub fn uris(&self) -> &[String] {
+        &self.uris
+    }
+
+    pub fn len(&self) -> usize {
+        self.uris.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.uris.is_empty()
+    }
+
+    pub fn remove(&mut self, uri: &str) -> bool {
+        let before = self.uris.len();
+        self.uris.retain(|u| u != uri);
+        self.uris.len() != before
+    }
+}
+
 /// Application host type flags (C# `ApplicationType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ApplicationType {
@@ -882,5 +978,28 @@ mod tests {
         assert_eq!(ids.next_id(), "R00000002");
         let factory = PackageFactoryFeature::new("WordprocessingDocument");
         assert_eq!(factory.package_kind, "WordprocessingDocument");
+    }
+
+    #[test]
+    fn content_type_lock_and_parts_features() {
+        let ct = ContentTypeFeature::constant();
+        assert!(ct.is_constant);
+        assert!(!ContentTypeFeature::default().is_constant);
+
+        let lock = LockFeature::new();
+        let n = Arc::new(AtomicUsize::new(0));
+        let c = n.clone();
+        lock.with_lock(|| {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(n.load(Ordering::SeqCst), 1);
+
+        let mut parts = PartsFeature::new();
+        parts.add("/word/document.xml");
+        parts.add("/word/document.xml");
+        assert_eq!(parts.len(), 1);
+        assert!(parts.contains("/word/document.xml"));
+        assert!(parts.remove("/word/document.xml"));
+        assert!(parts.is_empty());
     }
 }
