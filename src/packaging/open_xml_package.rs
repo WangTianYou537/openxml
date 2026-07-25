@@ -282,6 +282,11 @@ impl OpenXmlPackage {
         &self.features
     }
 
+    /// Debug summary of registered features (C# `FeatureCollectionDebugView` shell).
+    pub fn feature_debug_view(&self) -> crate::features::FeatureCollectionDebugView {
+        crate::features::FeatureCollectionDebugView::from_collection(&self.features)
+    }
+
     pub fn features_mut(&mut self) -> &mut FeatureCollection {
         &mut self.features
     }
@@ -2389,6 +2394,55 @@ impl OpenXmlPackage {
             );
             self.features.set(pf);
         }
+        // Register a relationship filter that rewrites clearly non-URI external targets
+        // (C# MalformedUriHandlingPackage.Filter shell).
+        if !self
+            .features
+            .contains::<crate::features::RelationshipFilterFeature>()
+        {
+            self.features
+                .set(crate::features::RelationshipFilterFeature::new());
+        }
+        // Only add the filter once: track via a note on the malformed feature source count.
+        // Filters cannot be inspected for identity; callers re-enabling is idempotent enough
+        // for shell parity when filter_count is already > 0 from a prior enable.
+        let already = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+            .map(|f| f.filter_count() > 0)
+            .unwrap_or(false);
+        if !already {
+            let rf = self
+                .features
+                .get::<crate::features::RelationshipFilterFeature>()
+                .expect("RelationshipFilterFeature");
+            rf.add_filter(|builder: &mut crate::features::PackageRelationshipBuilder| {
+                if !builder.is_external() {
+                    return;
+                }
+                let target = builder.target.as_str();
+                // Valid absolute URI-ish targets are left alone.
+                if target.starts_with("http://")
+                    || target.starts_with("https://")
+                    || target.starts_with("mailto:")
+                    || target.starts_with("file:")
+                    || target.starts_with("rewritten://")
+                {
+                    return;
+                }
+                // Spaces or empty/control-heavy strings are treated as malformed.
+                if target.is_empty() || target.contains(' ') || target.contains('\n') {
+                    let rewritten = format!(
+                        "rewritten://{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| format!("{:x}", d.as_nanos()))
+                            .unwrap_or_else(|_| "0".into())
+                    );
+                    builder.set_target(rewritten);
+                }
+            });
+        }
     }
 
     /// Whether malformed-URI handling is enabled.
@@ -3669,6 +3723,27 @@ mod part_events_tests {
             crate::error::OpenXmlPackageException::error_content_type().message,
             "ErrorContentType"
         );
+        assert!(pkg.feature_debug_view().feature_count() > 0);
+        // Malformed external target should be rewritten by the filter.
+        let parent = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(parent.clone(), "application/xml", b"<w:document/>");
+        let eid = pkg.add_external_relationship(
+            Some(&parent),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "not a valid uri",
+        );
+        let rels = pkg.external_relationships(Some(&parent));
+        let r = rels.iter().find(|r| r.id == eid).expect("rel");
+        assert!(
+            r.target.starts_with("rewritten://"),
+            "expected rewritten target, got {}",
+            r.target
+        );
+        let mut b = crate::features::PackageRelationshipBuilder::new("rIdX", "http://t", "x")
+            .with_target_mode("External")
+            .with_id("rIdY");
+        assert!(b.is_external());
+        assert_eq!(b.id, "rIdY");
     }
 
     #[test]

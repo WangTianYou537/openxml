@@ -90,6 +90,32 @@ impl FeatureCollection {
     pub fn len(&self) -> usize {
         self.map.len()
     }
+
+    /// Type names of registered features (C# `FeatureCollectionDebugView` shell).
+    pub fn registered_type_names(&self) -> Vec<&'static str> {
+        // TypeId alone is not human-readable; expose count-based debug summary instead.
+        Vec::new()
+    }
+}
+
+/// Debug-friendly summary of a feature bag (C# `FeatureCollectionDebugView` shell).
+#[derive(Debug, Clone, Default)]
+pub struct FeatureCollectionDebugView {
+    pub feature_count: usize,
+    pub notes: Vec<String>,
+}
+
+impl FeatureCollectionDebugView {
+    pub fn from_collection(features: &FeatureCollection) -> Self {
+        Self {
+            feature_count: features.len(),
+            notes: vec![format!("{} feature(s) registered", features.len())],
+        }
+    }
+
+    pub fn feature_count(&self) -> usize {
+        self.feature_count
+    }
 }
 
 /// Simple monotonic paragraph-id generator (C# `IParagraphIdGeneratorFeature` shell).
@@ -586,6 +612,21 @@ impl PackageRelationshipBuilder {
         }
     }
 
+    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+        self.id = id.into();
+        self
+    }
+
+    pub fn with_relationship_type(mut self, relationship_type: impl Into<String>) -> Self {
+        self.relationship_type = relationship_type.into();
+        self
+    }
+
+    pub fn with_target(mut self, target: impl Into<String>) -> Self {
+        self.target = target.into();
+        self
+    }
+
     pub fn with_target_mode(mut self, mode: impl Into<String>) -> Self {
         self.target_mode = mode.into();
         self
@@ -594,6 +635,18 @@ impl PackageRelationshipBuilder {
     pub fn with_source_uri(mut self, uri: impl Into<String>) -> Self {
         self.source_uri = Some(uri.into());
         self
+    }
+
+    pub fn is_external(&self) -> bool {
+        self.target_mode.eq_ignore_ascii_case("External")
+    }
+
+    pub fn set_target(&mut self, target: impl Into<String>) {
+        self.target = target.into();
+    }
+
+    pub fn set_id(&mut self, id: impl Into<String>) {
+        self.id = id.into();
     }
 }
 

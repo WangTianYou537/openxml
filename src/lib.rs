@@ -68,7 +68,7 @@ pub use error::{Error, OpenXmlPackageException, Result};
 pub use features::{
     AnnotationsFeature, ApplicationType, ContainerDisposableFeature, ContentTypeFeature,
     DataPartsFeature, DisposableFeature, DocumentTypeFeature, ElementEventsFeature,
-    DefaultFeatures, ElementMetadata, ElementMetadataFactoryFeature, FeatureCollection,
+    DefaultFeatures, ElementMetadata, ElementMetadataFactoryFeature, FeatureCollection, FeatureCollectionDebugView,
     FeatureEventArgs, FeatureEventHub, FilePackageFeature, KnownDataPartFeature, LockFeature,
     MainPartFeature, OpenXmlNamespaceResolverFeature, OpenXmlSchemaType, PackageCapabilities,
     PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageFeature,
