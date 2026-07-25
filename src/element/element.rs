@@ -968,6 +968,33 @@ impl OpenXmlElement {
         self.attributes.clear();
     }
 
+    /// Copy attributes and namespace declarations from `other` onto this element
+    /// (C# `CopyAttributes` used by `CloneNode`).
+    pub fn copy_attributes_from(&mut self, other: &OpenXmlElement) {
+        self.attributes = other.attributes.clone();
+        self.namespace_declarations = other.namespace_declarations.clone();
+    }
+
+    /// Copy only attributes (not namespace declarations).
+    pub fn copy_attributes_only_from(&mut self, other: &OpenXmlElement) {
+        self.attributes = other.attributes.clone();
+    }
+
+    /// Deep- or shallow-copy children from `other` (C# `CopyChildren`).
+    ///
+    /// When `deep` is true, each child is `clone_node()`; otherwise
+    /// `clone_node_shallow()`.
+    pub fn copy_children_from(&mut self, other: &OpenXmlElement, deep: bool) {
+        self.children = other
+            .children
+            .iter()
+            .map(|c| if deep { c.clone_node() } else { c.clone_node_shallow() })
+            .collect();
+        if deep {
+            self.text = other.text.clone();
+        }
+    }
+
     /// Insert a child at `index` (C# `InsertAt`). Clamps to end if out of range.
     pub fn insert_at(&mut self, index: usize, child: OpenXmlElement) {
         let i = index.min(self.children.len());
@@ -1294,6 +1321,20 @@ mod element_api_parity_tests {
         assert!(el.has_attributes());
         el.clear_all_attributes();
         assert!(!el.has_attributes());
+    }
+
+    #[test]
+    fn copy_attributes_from_other() {
+        let src = OpenXmlElement::w("p")
+            .with_attribute("rsidR", "AA")
+            .with_ns_decl("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main");
+        let mut dst = OpenXmlElement::w("p");
+        dst.copy_attributes_from(&src);
+        assert_eq!(dst.get_attribute("rsidR"), Some("AA"));
+        assert_eq!(
+            dst.lookup_namespace("w"),
+            Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+        );
     }
 
     #[test]
