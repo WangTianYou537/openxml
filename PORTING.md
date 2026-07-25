@@ -824,6 +824,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Stream/Part reader capture XML declaration encoding + standalone; DomReader declaration shells
 - [x] `PackageStreamFeature` / `PackagePartFeature` / `PackageInitializerFeature` shells
 - [x] `PartUriFeature` shell; seed Parts/PartUri on `from_opc`; `open_bytes` records package stream
+- [x] `DataPartsFeature` / `PartRelationshipsFeature` / `ReferenceRelationshipsFeature` / `TypedPartFactoryFeature` shells
+- [x] Package accessors; track part/ref relationships on add_*; seed DataParts on `from_opc`; media create/delete updates bag
+- [x] Word/Excel/PPT `add_external_relationship` routes through filtered package API
 
 **Still intentionally deferred / partial:**
 

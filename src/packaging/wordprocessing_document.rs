@@ -13115,7 +13115,6 @@ impl WordprocessingDocument {
         let uri = main.uri().clone();
         Ok(self
             .package
-            .opc_mut()
             .add_external_relationship(Some(&uri), relationship_type, external_uri))
     }
 

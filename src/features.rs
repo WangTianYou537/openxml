@@ -809,6 +809,210 @@ impl PartUriFeature {
     }
 }
 
+/// Registry of package-level data parts (C# `IDataPartsFeature` shell).
+#[derive(Debug, Default, Clone)]
+pub struct DataPartsFeature {
+    /// Part URIs registered as data/media parts.
+    uris: Vec<String>,
+}
+
+impl DataPartsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, uri: impl Into<String>) {
+        let uri = uri.into();
+        if !self.uris.iter().any(|u| u == &uri) {
+            self.uris.push(uri);
+        }
+    }
+
+    pub fn contains(&self, uri: &str) -> bool {
+        self.uris.iter().any(|u| u == uri)
+    }
+
+    pub fn try_get(&self, uri: &str) -> bool {
+        self.contains(uri)
+    }
+
+    pub fn remove(&mut self, uri: &str) -> bool {
+        let before = self.uris.len();
+        self.uris.retain(|u| u != uri);
+        self.uris.len() != before
+    }
+
+    pub fn uris(&self) -> &[String] {
+        &self.uris
+    }
+
+    pub fn len(&self) -> usize {
+        self.uris.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.uris.is_empty()
+    }
+}
+
+/// Part relationship id → target URI map for a container (C# `IPartRelationshipsFeature` shell).
+#[derive(Debug, Default, Clone)]
+pub struct PartRelationshipsFeature {
+    /// (relationship id, target part URI)
+    entries: Vec<(String, String)>,
+}
+
+impl PartRelationshipsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, id: impl Into<String>, part_uri: impl Into<String>) {
+        let id = id.into();
+        let part_uri = part_uri.into();
+        if let Some(e) = self.entries.iter_mut().find(|(i, _)| i == &id) {
+            e.1 = part_uri;
+        } else {
+            self.entries.push((id, part_uri));
+        }
+    }
+
+    pub fn contains_id(&self, id: &str) -> bool {
+        self.entries.iter().any(|(i, _)| i == id)
+    }
+
+    pub fn contains_uri(&self, uri: &str) -> bool {
+        self.entries.iter().any(|(_, u)| u == uri)
+    }
+
+    pub fn try_get(&self, id: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|(i, _)| i == id)
+            .map(|(_, u)| u.as_str())
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|(i, _)| i != id);
+        self.entries.len() != before
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.entries.iter().map(|(i, u)| (i.as_str(), u.as_str()))
+    }
+}
+
+/// Reference relationship registry (C# `IReferenceRelationshipsFeature` shell).
+#[derive(Debug, Default, Clone)]
+pub struct ReferenceRelationshipsFeature {
+    /// (id, relationship_type, target, is_external)
+    items: Vec<(String, String, String, bool)>,
+}
+
+impl ReferenceRelationshipsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(
+        &mut self,
+        id: impl Into<String>,
+        relationship_type: impl Into<String>,
+        target: impl Into<String>,
+        is_external: bool,
+    ) {
+        let id = id.into();
+        if let Some(item) = self.items.iter_mut().find(|(i, _, _, _)| i == &id) {
+            *item = (id, relationship_type.into(), target.into(), is_external);
+        } else {
+            self.items
+                .push((id, relationship_type.into(), target.into(), is_external));
+        }
+    }
+
+    pub fn try_get(&self, id: &str) -> Option<(&str, &str, bool)> {
+        self.items
+            .iter()
+            .find(|(i, _, _, _)| i == id)
+            .map(|(_, t, target, ext)| (t.as_str(), target.as_str(), *ext))
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.items.iter().any(|(i, _, _, _)| i == id)
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let before = self.items.len();
+        self.items.retain(|(i, _, _, _)| i != id);
+        self.items.len() != before
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str, &str, bool)> {
+        self.items
+            .iter()
+            .map(|(i, t, target, e)| (i.as_str(), t.as_str(), target.as_str(), *e))
+    }
+}
+
+/// Typed part factory by Rust type name (C# `ITypedPartFactoryFeature` shell).
+#[derive(Debug, Default, Clone)]
+pub struct TypedPartFactoryFeature {
+    /// type name → relationship type
+    by_type_name: std::collections::HashMap<String, String>,
+}
+
+impl TypedPartFactoryFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, type_name: impl Into<String>, relationship_type: impl Into<String>) {
+        self.by_type_name
+            .insert(type_name.into(), relationship_type.into());
+    }
+
+    pub fn create(&self, type_name: &str) -> Option<&str> {
+        self.by_type_name.get(type_name).map(|s| s.as_str())
+    }
+
+    pub fn contains(&self, type_name: &str) -> bool {
+        self.by_type_name.contains_key(type_name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_type_name.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_type_name.is_empty()
+    }
+}
+
 /// Package initializer callbacks (C# `IPackageInitializer` shell).
 ///
 /// Runs registered hooks after a package is constructed (builder path).
@@ -1272,5 +1476,45 @@ mod tests {
         assert!(!f.is_reserved(&uri));
         f.reserve(&uri);
         assert!(f.is_reserved(&uri));
+    }
+
+    #[test]
+    fn data_parts_part_rel_ref_rel_typed_factory() {
+        let mut dp = DataPartsFeature::new();
+        dp.add("/media/image1.png");
+        dp.add("/media/image1.png");
+        assert_eq!(dp.len(), 1);
+        assert!(dp.contains("/media/image1.png"));
+        assert!(dp.try_get("/media/image1.png"));
+        assert!(dp.remove("/media/image1.png"));
+        assert!(dp.is_empty());
+
+        let mut pr = PartRelationshipsFeature::new();
+        pr.add("rId1", "/word/styles.xml");
+        pr.add("rId1", "/word/styles2.xml");
+        assert_eq!(pr.try_get("rId1"), Some("/word/styles2.xml"));
+        assert!(pr.contains_id("rId1"));
+        assert!(pr.contains_uri("/word/styles2.xml"));
+        assert!(pr.remove("rId1"));
+        assert!(pr.is_empty());
+
+        let mut rr = ReferenceRelationshipsFeature::new();
+        rr.add("rId9", "http://rel/hyperlink", "https://example.com", true);
+        assert_eq!(
+            rr.try_get("rId9"),
+            Some(("http://rel/hyperlink", "https://example.com", true))
+        );
+        assert!(rr.contains("rId9"));
+        assert!(rr.remove("rId9"));
+        assert!(rr.is_empty());
+
+        let mut tf = TypedPartFactoryFeature::new();
+        tf.register("ImagePart", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
+        assert_eq!(
+            tf.create("ImagePart"),
+            Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/image")
+        );
+        assert!(tf.contains("ImagePart"));
+        assert!(!tf.is_empty());
     }
 }

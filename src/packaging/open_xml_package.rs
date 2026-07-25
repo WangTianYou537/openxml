@@ -117,7 +117,7 @@ impl OpenXmlPackage {
             closed: false,
             features: FeatureCollection::new(),
         };
-        // Seed PartsFeature + PartUriFeature from existing package parts.
+        // Seed PartsFeature + PartUriFeature + DataPartsFeature from existing package parts.
         let uris: Vec<_> = pkg.opc.part_uris();
         {
             let parts = pkg.parts_feature_mut();
@@ -128,6 +128,18 @@ impl OpenXmlPackage {
         pkg.features.set(crate::features::PartUriFeature::from_helper(
             crate::opc::PartUriHelper::from_package(pkg.opc()),
         ));
+        {
+            let data_uris: Vec<String> = pkg
+                .opc
+                .data_parts()
+                .iter()
+                .map(|p| p.uri.as_str().to_string())
+                .collect();
+            let dp = pkg.data_parts_feature_mut();
+            for u in data_uris {
+                dp.add(u);
+            }
+        }
         pkg
     }
 
@@ -451,7 +463,9 @@ impl OpenXmlPackage {
         content_type: &str,
         extension: Option<&str>,
     ) -> crate::error::Result<crate::opc::DataPart> {
-        self.opc_mut().create_media_data_part(content_type, extension)
+        let part = self.opc_mut().create_media_data_part(content_type, extension)?;
+        self.data_parts_feature_mut().add(part.uri.as_str());
+        Ok(part)
     }
 
     /// Create a media data part pre-filled with bytes.
@@ -461,8 +475,11 @@ impl OpenXmlPackage {
         extension: Option<&str>,
         data: impl Into<Vec<u8>>,
     ) -> crate::error::Result<crate::opc::DataPart> {
-        self.opc_mut()
-            .create_media_data_part_with_data(content_type, extension, data)
+        let part = self
+            .opc_mut()
+            .create_media_data_part_with_data(content_type, extension, data)?;
+        self.data_parts_feature_mut().add(part.uri.as_str());
+        Ok(part)
     }
 
     /// Registered data parts (C# `DataParts`).
@@ -472,13 +489,38 @@ impl OpenXmlPackage {
 
     /// Delete unused (unreferenced) data parts.
     pub fn delete_unused_data_parts(&mut self) -> usize {
-        self.opc_mut().delete_unused_data_parts()
+        let before: Vec<String> = self
+            .opc
+            .data_parts()
+            .iter()
+            .map(|p| p.uri.as_str().to_string())
+            .collect();
+        let n = self.opc_mut().delete_unused_data_parts();
+        if n > 0 {
+            let after: std::collections::HashSet<String> = self
+                .opc
+                .data_parts()
+                .iter()
+                .map(|p| p.uri.as_str().to_string())
+                .collect();
+            let feat = self.data_parts_feature_mut();
+            for u in before {
+                if !after.contains(&u) {
+                    feat.remove(&u);
+                }
+            }
+        }
+        n
     }
 
     /// Delete a data part if unreferenced (C# `DeletePart(DataPart)`).
     pub fn delete_data_part(&mut self, uri: &crate::opc::PackUri) -> Result<bool> {
         self.ensure_open()?;
-        self.opc.delete_data_part(uri)
+        let ok = self.opc.delete_data_part(uri)?;
+        if ok {
+            self.data_parts_feature_mut().remove(uri.as_str());
+        }
+        Ok(ok)
     }
 
     pub fn path(&self) -> Option<&Path> {
@@ -768,6 +810,72 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Data-parts URI registry (C# `IDataPartsFeature`).
+    pub fn data_parts_feature(&mut self) -> &crate::features::DataPartsFeature {
+        self.data_parts_feature_mut()
+    }
+
+    fn data_parts_feature_mut(&mut self) -> &mut crate::features::DataPartsFeature {
+        if !self
+            .features
+            .contains::<crate::features::DataPartsFeature>()
+        {
+            self.features
+                .set(crate::features::DataPartsFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::DataPartsFeature>()
+            .expect("just inserted")
+    }
+
+    /// Part relationship id map shell (C# `IPartRelationshipsFeature`).
+    pub fn part_relationships_feature(
+        &mut self,
+    ) -> &mut crate::features::PartRelationshipsFeature {
+        if !self
+            .features
+            .contains::<crate::features::PartRelationshipsFeature>()
+        {
+            self.features
+                .set(crate::features::PartRelationshipsFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::PartRelationshipsFeature>()
+            .expect("just inserted")
+    }
+
+    /// Reference relationship registry shell (C# `IReferenceRelationshipsFeature`).
+    pub fn reference_relationships_feature(
+        &mut self,
+    ) -> &mut crate::features::ReferenceRelationshipsFeature {
+        if !self
+            .features
+            .contains::<crate::features::ReferenceRelationshipsFeature>()
+        {
+            self.features
+                .set(crate::features::ReferenceRelationshipsFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::ReferenceRelationshipsFeature>()
+            .expect("just inserted")
+    }
+
+    /// Typed part factory by type name (C# `ITypedPartFactoryFeature`).
+    pub fn typed_part_factory_feature(
+        &mut self,
+    ) -> &mut crate::features::TypedPartFactoryFeature {
+        if !self
+            .features
+            .contains::<crate::features::TypedPartFactoryFeature>()
+        {
+            self.features
+                .set(crate::features::TypedPartFactoryFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::TypedPartFactoryFeature>()
+            .expect("just inserted")
+    }
+
     /// Record package source bytes on the stream feature (C# open-from-stream path).
     pub fn set_package_stream_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
         self.package_stream_feature().set_bytes(bytes);
@@ -802,8 +910,20 @@ impl OpenXmlPackage {
             crate::opc::RelationshipTargetMode::Internal
         };
         let target_uri = crate::opc::PackUri::new(&builder.target);
-        self.opc
-            .add_package_relationship(&builder.relationship_type, &target_uri, mode)
+        let id = self.opc
+            .add_package_relationship(&builder.relationship_type, &target_uri, mode);
+        if mode == crate::opc::RelationshipTargetMode::Internal {
+            self.part_relationships_feature()
+                .add(&id, target_uri.as_str());
+        } else {
+            self.reference_relationships_feature().add(
+                &id,
+                &builder.relationship_type,
+                target_uri.as_str(),
+                true,
+            );
+        }
+        id
     }
 
     /// Add a part→part relationship after relationship filters.
@@ -836,12 +956,63 @@ impl OpenXmlPackage {
             crate::opc::RelationshipTargetMode::Internal
         };
         let target_uri = crate::opc::PackUri::new(&builder.target);
-        self.opc.add_part_relationship(
+        let id = self.opc.add_part_relationship(
             source,
             &builder.relationship_type,
             &target_uri,
             mode,
+        );
+        if mode == crate::opc::RelationshipTargetMode::Internal {
+            self.part_relationships_feature()
+                .add(&id, target_uri.as_str());
+        } else {
+            self.reference_relationships_feature().add(
+                &id,
+                &builder.relationship_type,
+                target_uri.as_str(),
+                true,
+            );
+        }
+        id
+    }
+
+    /// Add an external relationship after relationship filters
+    /// (C# external/hyperlink create + `IReferenceRelationshipsFeature` shell).
+    ///
+    /// `source` is the part that owns the relationship, or `None` for package-level.
+    pub fn add_external_relationship(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        relationship_type: &str,
+        target: &str,
+    ) -> String {
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            "",
+            relationship_type,
+            target,
         )
+        .with_target_mode("External");
+        if let Some(s) = source {
+            builder = builder.with_source_uri(s.as_str());
+        }
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let id = self.opc.add_external_relationship(
+            source,
+            &builder.relationship_type,
+            &builder.target,
+        );
+        self.reference_relationships_feature().add(
+            &id,
+            &builder.relationship_type,
+            &builder.target,
+            true,
+        );
+        id
     }
 
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
@@ -1155,5 +1326,52 @@ mod part_events_tests {
         let mut pkg = OpenXmlPackage::from_opc(opc, OpenSettings::default());
         assert!(pkg.parts_feature().contains(uri.as_str()));
         assert!(pkg.part_uri_feature().is_reserved(&uri));
+    }
+
+    #[test]
+    fn relationship_and_data_part_features_track_adds() {
+        use crate::namespace::rel;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        pkg.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        let id = pkg.add_part_relationship(
+            &doc,
+            rel::STYLES,
+            &styles,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        assert!(pkg.part_relationships_feature().contains_id(&id));
+        assert_eq!(
+            pkg.part_relationships_feature().try_get(&id),
+            Some(styles.as_str())
+        );
+
+        let ext_id = pkg.add_external_relationship(
+            Some(&doc),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://example.com",
+        );
+        assert!(pkg.reference_relationships_feature().contains(&ext_id));
+        assert_eq!(
+            pkg.reference_relationships_feature().try_get(&ext_id).map(|t| t.2),
+            Some(true)
+        );
+
+        pkg.typed_part_factory_feature()
+            .register("StylesPart", rel::STYLES);
+        assert_eq!(
+            pkg.typed_part_factory_feature().create("StylesPart"),
+            Some(rel::STYLES)
+        );
+
+        let media = pkg
+            .create_media_data_part("image/png", Some("png"))
+            .expect("media");
+        assert!(pkg.data_parts_feature().contains(media.uri.as_str()));
+        assert!(pkg.delete_data_part(&media.uri).unwrap());
+        assert!(!pkg.data_parts_feature().contains(media.uri.as_str()));
     }
 }

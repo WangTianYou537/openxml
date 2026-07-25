@@ -66,13 +66,14 @@ pub mod wordprocessing;
 pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, OpenXmlPartWriterSettings, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
 pub use error::{Error, Result};
 pub use features::{
-    AnnotationsFeature, ApplicationType, ContentTypeFeature, DisposableFeature, DocumentTypeFeature,
-    FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature, PackageCapabilities,
-    PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageInitializerFeature,
-    PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature, ParagraphIdGenerator,
-    PartEvents, PartFactoryFeature, PartRootEvents, PartsFeature, PartUriFeature,
-    ProgrammaticIdentifierFeature, RelationshipFilterFeature, SchemaTrackingFeature,
-    StrictNamespaceFeature,
+    AnnotationsFeature, ApplicationType, ContentTypeFeature, DataPartsFeature, DisposableFeature,
+    DocumentTypeFeature, FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature,
+    PackageCapabilities, PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature,
+    PackageInitializerFeature, PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature,
+    ParagraphIdGenerator, PartEvents, PartFactoryFeature, PartRelationshipsFeature, PartRootEvents,
+    PartsFeature, PartUriFeature, ProgrammaticIdentifierFeature, ReferenceRelationshipsFeature,
+    RelationshipFilterFeature, SchemaTrackingFeature, StrictNamespaceFeature,
+    TypedPartFactoryFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

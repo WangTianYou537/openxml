@@ -3013,7 +3013,7 @@ impl PresentationDocument {
             .opc()
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .map_err(|_| Error::Package("no presentation part".into()))?;
-        Ok(self.package.opc_mut().add_external_relationship(
+        Ok(self.package.add_external_relationship(
             Some(&pres),
             relationship_type,
             external_uri,
