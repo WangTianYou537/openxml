@@ -113,6 +113,54 @@ impl OpenXmlPackageException {
         Self::new("OnlyOnePartAllowed")
     }
 
+    pub fn error_content_type() -> Self {
+        Self::new("ErrorContentType")
+    }
+
+    pub fn invalid_main_part_content_type() -> Self {
+        Self::new("InvalidMainPartContentType")
+    }
+
+    pub fn invalid_package_type() -> Self {
+        Self::new("InvalidPackageType")
+    }
+
+    pub fn extended_part_is_open_xml_part() -> Self {
+        Self::new("ExtendedPartIsOpenXmlPart")
+    }
+
+    pub fn extended_part_not_allowed() -> Self {
+        Self::new("ExtendedPartNotAllowed")
+    }
+
+    pub fn foreign_open_xml_part() -> Self {
+        Self::new("ForeignOpenXmlPart")
+    }
+
+    pub fn foreign_media_data_part() -> Self {
+        Self::new("ForeignMediaDataPart")
+    }
+
+    pub fn multiple_relationships_to_same_part() -> Self {
+        Self::new("MultipleRelationshipsToSamePart")
+    }
+
+    pub fn part_exists_with_different_relationship_id() -> Self {
+        Self::new("PartExistsWithDifferentRelationshipId")
+    }
+
+    pub fn malformed_uri() -> Self {
+        Self::new("MalformedUri")
+    }
+
+    pub fn failed_to_open_package() -> Self {
+        Self::new("FailedToOpenPackage")
+    }
+
+    pub fn package_access_mode_is_readonly() -> Self {
+        Self::new("PackageAccessModeIsReadonly")
+    }
+
     pub fn into_error(self) -> Error {
         Error::Package(self.message)
     }

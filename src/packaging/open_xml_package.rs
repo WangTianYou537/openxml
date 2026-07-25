@@ -2165,6 +2165,179 @@ impl OpenXmlPackage {
         Ok(uri)
     }
 
+    /// Part URI for relationship id, bool form (C# `TryGetPartById`).
+    pub fn try_get_part_by_id(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::PackUri> {
+        self.get_part_by_id(source, id)
+    }
+
+    /// Whether `parent` has an internal child relationship to `child`
+    /// (C# `OpenXmlPartContainer` child-part check shell).
+    pub fn is_child_part(
+        &self,
+        parent: &crate::opc::PackUri,
+        child: &crate::opc::PackUri,
+    ) -> bool {
+        self.opc.is_child_part(parent, child)
+    }
+
+    /// Parts with the given content type (package-wide).
+    pub fn get_parts_of_content_type(
+        &self,
+        content_type: &str,
+    ) -> Vec<crate::opc::PackUri> {
+        self.opc
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
+                self.opc
+                    .content_types()
+                    .content_type_for(u.as_str())
+                    == Some(content_type)
+            })
+            .collect()
+    }
+
+    /// Add an application-specific extended part under `parent`
+    /// (C# `OpenXmlPartContainer.AddExtendedPart`).
+    ///
+    /// Creates the part bytes, content-type entry, and filtered relationship.
+    /// Returns `(relationship_id, part_uri)`.
+    pub fn add_extended_part(
+        &mut self,
+        parent: &crate::opc::PackUri,
+        relationship_type: &str,
+        content_type: &str,
+        target_ext: &str,
+        data: impl Into<Vec<u8>>,
+        relationship_id: Option<&str>,
+    ) -> crate::error::Result<(String, crate::opc::PackUri)> {
+        let ext = target_ext.trim_start_matches('.');
+        let uri = self.create_part_uri(
+            content_type,
+            parent,
+            "udata",
+            "data",
+            ext,
+            true,
+        )?;
+        if !ext.is_empty() {
+            self.set_content_type_default(ext, content_type);
+        }
+        self.set_part(uri.clone(), content_type.to_string(), data.into());
+        let rid = if let Some(id) = relationship_id {
+            self.create_relationship_to_part(parent, &uri, relationship_type, Some(id))?
+        } else {
+            self.add_part_relationship(
+                parent,
+                relationship_type,
+                &uri,
+                crate::opc::RelationshipTargetMode::Internal,
+            )
+        };
+        Ok((rid, uri))
+    }
+
+    /// Enable malformed external-URI rewrite handling
+    /// (C# `PackageUriHandlingExtensions.EnableUriHandling`).
+    ///
+    /// Sets [`MalformedUriHandlingFeature`] and marks
+    /// [`PackageCapabilities::MALFORMED_URI`] on the package feature.
+    pub fn enable_uri_handling(&mut self) {
+        let mut f = self
+            .features
+            .get::<crate::features::MalformedUriHandlingFeature>()
+            .cloned()
+            .unwrap_or_default();
+        f.enable();
+        self.features.set(f);
+        if let Some(pf) = self.features.get_mut::<crate::features::PackageFeature>() {
+            pf.insert_capability(crate::features::PackageCapabilities::MALFORMED_URI);
+        } else {
+            let pf = crate::features::PackageFeature::with_capabilities(
+                self.package_capabilities() | crate::features::PackageCapabilities::MALFORMED_URI,
+            );
+            self.features.set(pf);
+        }
+    }
+
+    /// Whether malformed-URI handling is enabled.
+    pub fn uri_handling_enabled(&self) -> bool {
+        self.features
+            .get::<crate::features::MalformedUriHandlingFeature>()
+            .map(|f| f.is_enabled())
+            .unwrap_or(false)
+            || self
+                .features
+                .get::<crate::features::PackageFeature>()
+                .map(|f| f.has_capability(crate::features::PackageCapabilities::MALFORMED_URI))
+                .unwrap_or(false)
+    }
+
+    /// Register a rewritten external target for a relationship id
+    /// (C# `RewrittenUriCollection.Register` shell).
+    pub fn register_malformed_uri(
+        &mut self,
+        source: &crate::opc::PackUri,
+        id: &str,
+        target: &str,
+    ) -> crate::features::RewrittenUri {
+        if !self.features.contains::<crate::features::MalformedUriHandlingFeature>() {
+            self.enable_uri_handling();
+        }
+        let f = self
+            .features
+            .get_mut::<crate::features::MalformedUriHandlingFeature>()
+            .expect("MalformedUriHandlingFeature");
+        f.enable();
+        f.register(source.as_str(), id, target)
+    }
+
+    /// Look up a rewritten external target (if any).
+    pub fn try_get_malformed_uri(
+        &self,
+        source: &crate::opc::PackUri,
+        id: &str,
+    ) -> Option<crate::features::RewrittenUri> {
+        self.features
+            .get::<crate::features::MalformedUriHandlingFeature>()?
+            .try_get_rewritten(source.as_str(), id)
+            .cloned()
+    }
+
+    /// Ensure the package stream feature has a writeable buffer
+    /// (C# `WriteableStreamExtensions.EnableWriteableStream` shell).
+    ///
+    /// Returns `true` when a buffer is available after the call.
+    pub fn enable_writeable_stream(&mut self) -> bool {
+        if !self.features.contains::<crate::features::PackageStreamFeature>() {
+            self.features
+                .set(crate::features::PackageStreamFeature::new());
+        }
+        let f = self
+            .features
+            .get_mut::<crate::features::PackageStreamFeature>()
+            .expect("PackageStreamFeature");
+        f.enable_writeable_stream()
+    }
+
+    /// Malformed URI handling feature (C# `PackageUriHandling` shell).
+    pub fn malformed_uri_feature(&mut self) -> &mut crate::features::MalformedUriHandlingFeature {
+        if !self
+            .features
+            .contains::<crate::features::MalformedUriHandlingFeature>()
+        {
+            self.features
+                .set(crate::features::MalformedUriHandlingFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::MalformedUriHandlingFeature>()
+            .expect("MalformedUriHandlingFeature")
+    }
+
 
     /// Max characters per part from open settings (C# `MaxCharactersInPart`).
     pub fn max_characters_in_part(&self) -> u64 {
@@ -3152,5 +3325,79 @@ mod part_events_tests {
             Some("image/png")
         );
         assert!(pkg.part_uri_feature().is_reserved(&uri));
+    }
+
+    #[test]
+    fn try_get_part_is_child_and_extended_part() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let parent = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            parent.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        let (rid, uri) = pkg
+            .add_extended_part(
+                &parent,
+                "http://example.com/rel/custom",
+                "application/octet-stream",
+                "bin",
+                b"XYZ",
+                None,
+            )
+            .expect("extended");
+        assert!(uri.as_str().contains("/word/udata/"));
+        assert!(uri.as_str().ends_with(".bin"));
+        assert_eq!(pkg.try_get_part_by_id(Some(&parent), &rid), Some(uri.clone()));
+        assert!(pkg.is_child_part(&parent, &uri));
+        assert!(pkg
+            .get_parts_of_content_type("application/octet-stream")
+            .contains(&uri));
+        let (rid2, uri2) = pkg
+            .add_extended_part(
+                &parent,
+                "http://example.com/rel/custom2",
+                "text/plain",
+                ".txt",
+                b"hi",
+                Some("rIdExt"),
+            )
+            .expect("extended fixed id");
+        assert_eq!(rid2, "rIdExt");
+        assert_eq!(pkg.get_part_by_id(Some(&parent), "rIdExt"), Some(uri2));
+    }
+
+    #[test]
+    fn uri_handling_and_writeable_stream() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        assert!(!pkg.uri_handling_enabled());
+        pkg.enable_uri_handling();
+        assert!(pkg.uri_handling_enabled());
+        assert!(pkg
+            .features()
+            .get::<crate::features::PackageFeature>()
+            .unwrap()
+            .has_capability(crate::features::PackageCapabilities::MALFORMED_URI));
+        let src = crate::opc::PackUri::new("/word/document.xml");
+        let rw = pkg.register_malformed_uri(&src, "rId9", "not a uri");
+        assert!(rw.rewritten.starts_with("rewritten://"));
+        assert_eq!(
+            pkg.try_get_malformed_uri(&src, "rId9")
+                .map(|r| r.target),
+            Some("not a uri".into())
+        );
+        assert!(pkg.enable_writeable_stream());
+        assert!(pkg.package_stream_feature().has_bytes());
+        let _ = pkg.malformed_uri_feature();
+        assert_eq!(
+            crate::error::OpenXmlPackageException::malformed_uri().message,
+            "MalformedUri"
+        );
+        assert_eq!(
+            crate::error::OpenXmlPackageException::error_content_type().message,
+            "ErrorContentType"
+        );
     }
 }

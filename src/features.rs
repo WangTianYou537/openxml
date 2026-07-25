@@ -893,7 +893,172 @@ impl PackageStreamFeature {
     pub fn clear(&mut self) {
         self.bytes = None;
     }
+
+    /// Whether the stream buffer is present (C# `IPackageStreamFeature.Stream` non-null shell).
+    pub fn has_bytes(&self) -> bool {
+        self.bytes.is_some()
+    }
+
+    /// Length of buffered package bytes, if any.
+    pub fn len(&self) -> usize {
+        self.bytes.as_ref().map(|b| b.len()).unwrap_or(0)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bytes.as_ref().map(|b| b.is_empty()).unwrap_or(true)
+    }
+
+    /// Ensure a mutable in-memory buffer exists (C# `EnableWriteableStream` shell).
+    ///
+    /// Returns `true` when a buffer was newly allocated or already present.
+    pub fn enable_writeable_stream(&mut self) -> bool {
+        if self.bytes.is_none() {
+            self.bytes = Some(Vec::new());
+        }
+        true
+    }
 }
+
+/// One rewritten external relationship target (C# `RewrittenUri` shell).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RewrittenUri {
+    /// Synthetic URI used while the package is open.
+    pub rewritten: String,
+    /// Original malformed / non-URI target string.
+    pub target: String,
+}
+
+impl RewrittenUri {
+    pub fn new(rewritten: impl Into<String>, target: impl Into<String>) -> Self {
+        Self {
+            rewritten: rewritten.into(),
+            target: target.into(),
+        }
+    }
+}
+
+/// Relationship-id → rewritten URI map for one relationship part
+/// (C# `RewrittenUriCollection` shell).
+#[derive(Debug, Clone, Default)]
+pub struct RewrittenUriCollection {
+    by_id: std::collections::HashMap<String, RewrittenUri>,
+}
+
+impl RewrittenUriCollection {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a malformed external target and return the rewritten placeholder.
+    pub fn register(&mut self, id: impl Into<String>, target: impl Into<String>) -> &RewrittenUri {
+        let id = id.into();
+        let target = target.into();
+        let rewritten = format!("rewritten://{}", uuid_like());
+        self.by_id
+            .entry(id)
+            .or_insert_with(|| RewrittenUri::new(rewritten, target))
+    }
+
+    pub fn try_get(&self, id: &str) -> Option<&RewrittenUri> {
+        self.by_id.get(id)
+    }
+
+    pub fn contains_id(&self, id: &str) -> bool {
+        self.by_id.contains_key(id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_id.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_id.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &RewrittenUri)> {
+        self.by_id.iter().map(|(k, v)| (k.as_str(), v))
+    }
+
+    pub fn clear(&mut self) {
+        self.by_id.clear();
+    }
+}
+
+fn uuid_like() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{nanos:x}")
+}
+
+/// Malformed external-URI rewrite state for a package
+/// (C# `PackageUriHandlingExtensions` / `MalformedUriHandlingPackage` shell).
+#[derive(Debug, Clone, Default)]
+pub struct MalformedUriHandlingFeature {
+    /// Source part URI (string) → rewritten external targets for its .rels.
+    rewritten: std::collections::HashMap<String, RewrittenUriCollection>,
+    enabled: bool,
+}
+
+impl MalformedUriHandlingFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn collection_mut(&mut self, source_uri: impl Into<String>) -> &mut RewrittenUriCollection {
+        self.rewritten
+            .entry(source_uri.into())
+            .or_default()
+    }
+
+    pub fn collection(&self, source_uri: &str) -> Option<&RewrittenUriCollection> {
+        self.rewritten.get(source_uri)
+    }
+
+    pub fn register(
+        &mut self,
+        source_uri: impl Into<String>,
+        id: impl Into<String>,
+        target: impl Into<String>,
+    ) -> RewrittenUri {
+        let col = self.collection_mut(source_uri);
+        col.register(id, target).clone()
+    }
+
+    pub fn try_get_rewritten(
+        &self,
+        source_uri: &str,
+        id: &str,
+    ) -> Option<&RewrittenUri> {
+        self.collection(source_uri)?.try_get(id)
+    }
+
+    pub fn source_count(&self) -> usize {
+        self.rewritten.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.rewritten.clear();
+    }
+}
+
+/// Marker that a container supports adding parts of type `T`
+/// (C# `ISupportedRelationship<T>` empty interface shell).
+///
+/// Rust has no empty marker interfaces with the same type-system role; this
+/// trait documents intent for typed relationship constraints.
+pub trait SupportedRelationship<T> {}
+
 
 /// Current package-part URI context (C# `IPackagePartFeature` shell).
 #[derive(Debug, Clone, Default)]
@@ -1335,6 +1500,14 @@ impl PackageFeature {
 
     pub fn reload(&mut self) {
         self.reload_count = self.reload_count.saturating_add(1);
+    }
+
+    pub fn insert_capability(&mut self, cap: PackageCapabilities) {
+        self.capabilities.insert(cap);
+    }
+
+    pub fn has_capability(&self, cap: PackageCapabilities) -> bool {
+        self.capabilities.contains(cap)
     }
 }
 
@@ -2507,6 +2680,25 @@ mod tests {
         pkg.reload();
         pkg.reload();
         assert_eq!(pkg.reload_count, 2);
+
+        let mut stream = PackageStreamFeature::from_bytes(b"abc");
+        assert!(stream.has_bytes());
+        assert_eq!(stream.len(), 3);
+        assert!(stream.enable_writeable_stream());
+        stream.clear();
+        assert!(stream.is_empty());
+        assert!(stream.enable_writeable_stream());
+        assert!(stream.has_bytes());
+
+        let mut mal = MalformedUriHandlingFeature::new();
+        assert!(!mal.is_enabled());
+        mal.enable();
+        assert!(mal.is_enabled());
+        let rw = mal.register("/word/document.xml", "rId1", "http://bad host");
+        assert!(rw.rewritten.starts_with("rewritten://"));
+        assert_eq!(rw.target, "http://bad host");
+        assert!(mal.try_get_rewritten("/word/document.xml", "rId1").is_some());
+        assert_eq!(mal.source_count(), 1);
     }
 
     #[test]

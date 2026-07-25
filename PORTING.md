@@ -875,6 +875,13 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 
 - [x] `PartTypeInfo` + `OpenXmlPackage::create_part_from_type_info`
 
+- [x] `try_get_part_by_id` / `is_child_part` / `get_parts_of_content_type`
+- [x] `OpenXmlPackage::add_extended_part` (C# `AddExtendedPart`, feature-aware)
+- [x] `MalformedUriHandlingFeature` / `RewrittenUri` / `enable_uri_handling` shells
+- [x] `PackageStreamFeature::enable_writeable_stream` + package wrapper
+- [x] Expanded `OpenXmlPackageException` ExceptionMessages helpers
+- [x] `SupportedRelationship<T>` marker trait; `PackageFeature` capability helpers
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
