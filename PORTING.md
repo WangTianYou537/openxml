@@ -842,6 +842,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackage::{id_part_pairs,get_reference_relationship,get_part_by_id,get_id_of_part,data_part_reference_relationships,hyperlink_relationships}`
 - [x] `OpenXmlPackage::{create_relationship_to_part,change_id_of_part}` apply filters + keep part/ref feature bags in sync
 - [x] Word/Excel/PPT route IdPartPair / Get* / CreateRelationshipToPart / ChangeIdOfPart / media / data-part-ref / hyperlink queries through package APIs
+- [x] `OpenXmlPackage::{delete_part_and_orphans,delete_part_by_id,delete_parts_of_content_type,delete_parts_by_ids}` event/feature-aware cascades
+- [x] Word/Excel/PPT route orphan/content-type delete paths through package APIs
 
 **Still intentionally deferred / partial:**
 

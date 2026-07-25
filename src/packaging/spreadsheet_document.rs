@@ -25469,7 +25469,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
     /// Delete a part and cascade to parts that become unreachable.
     pub fn delete_part_and_orphans(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
-        self.package.opc_mut().delete_part_and_orphans(uri)
+        self.package.delete_part_and_orphans(uri)
     }
 
     /// Delete the part identified by relationship id on the workbook part.
@@ -25480,14 +25480,12 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .ok();
         self.package
-            .opc_mut()
             .delete_part_by_id(source.as_ref(), id)
     }
 
     /// Delete every part with the given content type, cascading orphans.
     pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
         self.package
-            .opc_mut()
             .delete_parts_of_content_type(content_type)
     }
 

@@ -13070,7 +13070,7 @@ impl WordprocessingDocument {
 
     /// Delete a part and cascade to parts that become unreachable (C# DeletePart orphan cascade).
     pub fn delete_part_and_orphans(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
-        self.package.opc_mut().delete_part_and_orphans(uri)
+        self.package.delete_part_and_orphans(uri)
     }
 
     /// Delete the part identified by relationship id on the main document (or package if no main).
@@ -13080,7 +13080,6 @@ impl WordprocessingDocument {
             .as_ref()
             .map(|m| m.uri().clone());
         self.package
-            .opc_mut()
             .delete_part_by_id(source.as_ref(), id)
     }
 
@@ -13098,7 +13097,6 @@ impl WordprocessingDocument {
 
     pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
         self.package
-            .opc_mut()
             .delete_parts_of_content_type(content_type)
     }
 

@@ -301,8 +301,83 @@ impl OpenXmlPackage {
         &mut self,
         relationship_type: &str,
     ) -> usize {
-        self.opc
-            .delete_parts_recursively_of_relationship_type_all(relationship_type)
+        // Prefer package-level event/feature-aware cascade by collecting targets first.
+        let mut uris: Vec<crate::opc::PackUri> = Vec::new();
+        for rel in self.opc.package_relationships().iter() {
+            if rel.relationship_type == relationship_type
+                && rel.target_mode == crate::opc::RelationshipTargetMode::Internal
+            {
+                if let Ok(u) = self.opc.resolve_relationship(None, rel) {
+                    if self.opc.has_part(&u) {
+                        uris.push(u);
+                    }
+                }
+            }
+        }
+        let sources: Vec<_> = self.opc.part_relationship_sources();
+        for src in sources {
+            if let Some(rels) = self.opc.part_relationships(&src) {
+                for rel in rels.iter() {
+                    if rel.relationship_type == relationship_type
+                        && rel.target_mode == crate::opc::RelationshipTargetMode::Internal
+                    {
+                        if let Ok(u) = self.opc.resolve_relationship(Some(&src), rel) {
+                            if self.opc.has_part(&u) && !uris.iter().any(|x| x == &u) {
+                                uris.push(u);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        uris.sort_by(|a, b| b.as_str().len().cmp(&a.as_str().len()));
+        let mut n = 0;
+        for u in uris {
+            if self.opc.has_part(&u) && self.delete_part_and_orphans(&u).is_some() {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Delete every part with the given content type, cascading orphans
+    /// (approximate C# `DeletePartsRecursivelyOfType<T>` by content type).
+    pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
+        let mut uris: Vec<crate::opc::PackUri> = self
+            .opc
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
+                self.opc
+                    .content_types()
+                    .content_type_for(u.as_str())
+                    .map(|ct| ct == content_type)
+                    .unwrap_or(false)
+            })
+            .collect();
+        uris.sort_by(|a, b| b.as_str().len().cmp(&a.as_str().len()));
+        let mut n = 0;
+        for u in uris {
+            if self.opc.has_part(&u) && self.delete_part_and_orphans(&u).is_some() {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Delete parts by relationship ids under `source` (C# `DeleteParts` via ids).
+    pub fn delete_parts_by_ids(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        ids: &[&str],
+    ) -> usize {
+        let mut n = 0;
+        for id in ids {
+            if self.delete_part_by_id(source, id) {
+                n += 1;
+            }
+        }
+        n
     }
 
     /// Remove a part and raise part Removing/Removed events (C# `DeletePart` + `IPartEventsFeature`).
@@ -317,6 +392,68 @@ impl OpenXmlPackage {
             self.raise_part_event(crate::features::PackageEventType::Deleted, &uri_str);
         }
         data
+    }
+
+    /// Delete `uri` and cascade to parts that become unreachable (C# `DeletePart`
+    /// orphan cascade), raising part events and updating [`PartsFeature`].
+    pub fn delete_part_and_orphans(&mut self, uri: &crate::opc::PackUri) -> Option<Vec<u8>> {
+        if !self.opc.has_part(uri) {
+            return None;
+        }
+        let from_target = self.opc.reachable_parts(Some(std::slice::from_ref(uri)));
+        let live = self.opc.reachable_parts_excluding(uri);
+        let mut to_delete: Vec<crate::opc::PackUri> = from_target
+            .into_iter()
+            .filter(|p| !live.contains(p))
+            .collect();
+        if !to_delete.iter().any(|p| p == uri) {
+            to_delete.push(uri.clone());
+        }
+        to_delete.sort_by(|a, b| b.as_str().len().cmp(&a.as_str().len()));
+        let mut primary = None;
+        for p in &to_delete {
+            let data = self.delete_part(p);
+            if p == uri {
+                primary = data;
+            }
+        }
+        primary
+    }
+
+    /// Delete the part identified by relationship id on `source` (package-level when
+    /// `None`), cascading orphans and updating feature shells (C# `DeletePart(id)`).
+    pub fn delete_part_by_id(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> bool {
+        let rel = match source {
+            Some(s) => self
+                .opc
+                .part_relationships(s)
+                .and_then(|r| r.get(id))
+                .cloned(),
+            None => self.opc.package_relationships().get(id).cloned(),
+        };
+        let Some(rel) = rel else {
+            return false;
+        };
+        if rel.target_mode == crate::opc::RelationshipTargetMode::External {
+            let _ = self.delete_reference_relationship(source, id);
+            return true;
+        }
+        let Ok(target) = self.opc.resolve_relationship(source, &rel) else {
+            return false;
+        };
+        // Drop the relationship first so orphan detection sees it gone.
+        let _ = self.delete_reference_relationship(source, id);
+        if self.opc.has_part(&target) {
+            let live = self.opc.reachable_parts(None);
+            if !live.contains(&target) {
+                let _ = self.delete_part_and_orphans(&target);
+            }
+        }
+        true
     }
 
     /// Insert or replace part bytes and raise Adding/Added (or Creating/Created) part events.
@@ -2066,5 +2203,45 @@ mod part_events_tests {
             .get_reference_relationship(Some(&doc), "rIdStyles")
             .expect("ref");
         assert_eq!(got.id, "rIdStyles");
+    }
+
+    #[test]
+    fn delete_part_and_orphans_updates_parts_feature() {
+        use crate::namespace::rel;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        let theme = PackUri::new("/word/theme/theme1.xml");
+        pkg.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            b"<w:document/>".to_vec(),
+        );
+        pkg.set_part(
+            styles.clone(),
+            content_type::WORD_STYLES,
+            b"<w:styles/>".to_vec(),
+        );
+        pkg.set_part(theme.clone(), "application/vnd.openxmlformats-officedocument.theme+xml", b"<a:theme/>".to_vec());
+        let _ = pkg.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &doc,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        let rid = pkg
+            .create_relationship_to_part(&doc, &styles, rel::STYLES, None)
+            .unwrap();
+        let _ = pkg
+            .create_relationship_to_part(&styles, &theme, rel::THEME, None)
+            .unwrap();
+        assert!(pkg.parts_feature().contains(styles.as_str()));
+        assert!(pkg.parts_feature().contains(theme.as_str()));
+
+        assert!(pkg.delete_part_by_id(Some(&doc), &rid));
+        assert!(!pkg.parts_feature().contains(styles.as_str()));
+        assert!(!pkg.parts_feature().contains(theme.as_str()));
+        assert!(pkg.parts_feature().contains(doc.as_str()));
+        assert!(pkg.get_reference_relationship(Some(&doc), &rid).is_none());
     }
 }
