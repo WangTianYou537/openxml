@@ -78,6 +78,10 @@ impl OpenXmlPart {
     }
 
     fn load(&mut self, package: &OpenXmlPackage) -> Result<()> {
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Creating,
+            self.uri.as_str(),
+        );
         let data = package
             .opc()
             .get_part(&self.uri)
@@ -108,6 +112,10 @@ impl OpenXmlPart {
         }
         self.root = Some(element);
         self.dirty = false;
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Created,
+            self.uri.as_str(),
+        );
         Ok(())
     }
 
@@ -173,6 +181,23 @@ impl OpenXmlPart {
         self.root.take()
     }
 
+    /// Unload the DOM root and raise part-root Removing/Removed events when a hub is registered.
+    pub fn unload_root_element_with_events(
+        &mut self,
+        package: &OpenXmlPackage,
+    ) -> Option<OpenXmlElement> {
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Removing,
+            self.uri.as_str(),
+        );
+        let taken = self.unload_root_element();
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Removed,
+            self.uri.as_str(),
+        );
+        taken
+    }
+
     /// Parent part URIs that reference this part (C# `GetParentParts`).
     pub fn get_parent_parts(&self, package: &OpenXmlPackage) -> Vec<PackUri> {
         package.opc().parent_parts(&self.uri)
@@ -187,16 +212,33 @@ impl OpenXmlPart {
     ///
     /// Discards any unsaved in-memory edits.
     pub fn reload(&mut self, package: &OpenXmlPackage) -> Result<()> {
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Reloading,
+            self.uri.as_str(),
+        );
         self.root = None;
         self.dirty = false;
         self.load(package)?;
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Reloaded,
+            self.uri.as_str(),
+        );
         Ok(())
     }
 
     /// Save the current root element XML into the package (C# `OpenXmlPartRootElement.Save`).
     pub fn save_root(&mut self, package: &mut OpenXmlPackage) -> Result<()> {
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Saving,
+            self.uri.as_str(),
+        );
         self.dirty = true;
-        self.save_to_package(package)
+        self.save_to_package(package)?;
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Saved,
+            self.uri.as_str(),
+        );
+        Ok(())
     }
 }
 
@@ -390,5 +432,37 @@ mod tests {
         assert!(root.child("body").is_some());
         assert!(pkg.can_save());
         assert!(!pkg.is_closed());
+    }
+
+    #[test]
+    fn part_root_events_on_reload() {
+        use crate::features::PackageEventType;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let mut opc = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        opc.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#.to_vec(),
+        );
+        let mut pkg = OpenXmlPackage::from_opc(opc, Default::default());
+        let reloaded = Arc::new(AtomicUsize::new(0));
+        let c = reloaded.clone();
+        pkg.part_root_events().subscribe(move |e| {
+            if e.event_type == PackageEventType::Reloaded {
+                c.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        let mut part = OpenXmlPart::new(
+            doc,
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        part.reload(&pkg).unwrap();
+        assert_eq!(reloaded.load(Ordering::SeqCst), 1);
+        let _ = part.unload_root_element_with_events(&pkg);
+        assert!(!part.is_root_element_loaded());
     }
 }

@@ -269,6 +269,32 @@ impl OpenXmlPackage {
         }
     }
 
+    /// Ensure a [`PartRootEvents`](crate::features::PartRootEvents) feature exists
+    /// (C# `AddPartRootEventsFeature`).
+    pub fn part_root_events(&mut self) -> &crate::features::PartRootEvents {
+        if !self
+            .features
+            .contains::<crate::features::PartRootEvents>()
+        {
+            self.features
+                .set(crate::features::PartRootEvents::new());
+        }
+        self.features
+            .get::<crate::features::PartRootEvents>()
+            .expect("PartRootEvents just set")
+    }
+
+    /// Raise a part-root lifecycle event if the hub is registered (no-op otherwise).
+    pub fn raise_part_root_event(
+        &self,
+        event_type: crate::features::PackageEventType,
+        part_uri: impl Into<String>,
+    ) {
+        if let Some(ev) = self.features.get::<crate::features::PartRootEvents>() {
+            ev.raise(event_type, part_uri);
+        }
+    }
+
     /// Ensure [`AnnotationsFeature`](crate::features::AnnotationsFeature) exists.
     fn annotations_feature_mut(&mut self) -> &mut crate::features::AnnotationsFeature {
         if !self.features.contains::<crate::features::AnnotationsFeature>() {

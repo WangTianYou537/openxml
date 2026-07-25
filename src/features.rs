@@ -192,6 +192,47 @@ impl PackageEvents {
     }
 }
 
+/// Part-root lifecycle events (C# `IPartRootEventsFeature` shell).
+///
+/// Same event types as [`PackageEvents`], but always associated with a part URI
+/// (load / unload / save / reload of the part's DOM root).
+#[derive(Clone, Default)]
+pub struct PartRootEvents {
+    inner: PackageEvents,
+}
+
+impl std::fmt::Debug for PartRootEvents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PartRootEvents")
+            .field("listeners", &self.inner.listener_count())
+            .finish()
+    }
+}
+
+impl PartRootEvents {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn subscribe<F>(&self, f: F) -> usize
+    where
+        F: Fn(&PackageEvent) + Send + Sync + 'static,
+    {
+        self.inner.subscribe(f)
+    }
+
+    pub fn unsubscribe(&self, id: usize) {
+        self.inner.unsubscribe(id);
+    }
+
+    pub fn raise(&self, event_type: PackageEventType, part_uri: impl Into<String>) {
+        self.inner.raise_part(event_type, part_uri);
+    }
+
+    pub fn listener_count(&self) -> usize {
+        self.inner.listener_count()
+    }
+}
 
 /// Package / part container annotations (C# `AnnotationsFeature` on `OpenXmlPartContainer`).
 ///
@@ -291,5 +332,20 @@ mod tests {
         events.raise_type(PackageEventType::Closing);
         assert_eq!(count.load(Ordering::SeqCst), 1);
         events.raise_part(PackageEventType::Deleted, "/word/styles.xml");
+    }
+
+    #[test]
+    fn part_root_events_fire() {
+        let events = PartRootEvents::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c2 = count.clone();
+        events.subscribe(move |e| {
+            if e.event_type == PackageEventType::Reloaded {
+                c2.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        events.raise(PackageEventType::Reloading, "/word/document.xml");
+        events.raise(PackageEventType::Reloaded, "/word/document.xml");
+        assert_eq!(count.load(Ordering::SeqCst), 1);
     }
 }
