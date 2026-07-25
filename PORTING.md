@@ -932,6 +932,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `MarkupCompatibilityProcessSettings` builders / process_mode accessors
 - [x] `OpenXmlPart::{relationship,relationships}_by_type`
 
+- [x] `ElementMetadata` attribute/child/count/availability/schema_type helpers
+- [x] `ElementMetadataFactoryFeature` remove/clear/type_names/is_empty
+- [x] `OpenXmlNamespaceResolverFeature` extended namespace enumerate/remove/clear helpers
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

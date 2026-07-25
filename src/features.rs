@@ -1806,6 +1806,30 @@ impl OpenXmlNamespaceResolverFeature {
         }
         FileFormatVersions::NONE
     }
+
+    pub fn contains_extended_namespace(&self, uri: &str) -> bool {
+        self.try_get_extended_namespace(uri).is_some()
+    }
+
+    pub fn remove_extended_namespace(&mut self, uri: &str) -> bool {
+        let before = self.extended.len();
+        self.extended.retain(|(obsolete, _)| obsolete != uri);
+        self.extended.len() != before
+    }
+
+    pub fn extended_count(&self) -> usize {
+        self.extended.len()
+    }
+
+    pub fn extended_namespaces(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.extended
+            .iter()
+            .map(|(obsolete, expected)| (obsolete.as_str(), expected.as_str()))
+    }
+
+    pub fn clear_extended_namespaces(&mut self) {
+        self.extended.clear();
+    }
 }
 
 /// Cryptographic-style random fill (C# `IRandomNumberGeneratorFeature` shell).
@@ -2171,6 +2195,30 @@ impl ElementMetadata {
             self.children.push(name);
         }
     }
+
+    pub fn has_attribute(&self, name: &str) -> bool {
+        self.attributes.iter().any(|a| a == name)
+    }
+
+    pub fn has_child(&self, name: &str) -> bool {
+        self.children.iter().any(|c| c == name)
+    }
+
+    pub fn attribute_count(&self) -> usize {
+        self.attributes.len()
+    }
+
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    pub fn is_available_in(&self, version: crate::file_format::FileFormatVersions) -> bool {
+        version.at_least(self.availability) || version.intersects(self.availability)
+    }
+
+    pub fn schema_type(&self) -> &OpenXmlSchemaType {
+        &self.schema_type
+    }
 }
 
 /// Element metadata factory with type-name cache (C# `ElementMetadataFactoryFeature`).
@@ -2234,6 +2282,33 @@ impl ElementMetadataFactoryFeature {
             .lock()
             .map(|g| g.contains_key(type_name))
             .unwrap_or(false)
+    }
+
+    pub fn remove(&self, type_name: &str) -> Option<ElementMetadata> {
+        self.lookup
+            .lock()
+            .ok()
+            .and_then(|mut g| g.remove(type_name))
+    }
+
+    pub fn clear(&self) {
+        if let Ok(mut g) = self.lookup.lock() {
+            g.clear();
+        }
+    }
+
+    pub fn type_names(&self) -> Vec<String> {
+        let mut names = self
+            .lookup
+            .lock()
+            .map(|g| g.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -2945,6 +3020,18 @@ mod tests {
                 "http://purl.oclc.org/ooxml/wordprocessingml/main"
             )
             .is_some());
+        assert!(r.extended_count() > 0);
+        assert!(r
+            .extended_namespaces()
+            .any(|(obsolete, _)| obsolete.contains("wordprocessingml/2006/3")));
+        let mut custom = OpenXmlNamespaceResolverFeature::new();
+        custom.register_extended("urn:old", "urn:new");
+        assert!(custom.contains_extended_namespace("urn:old"));
+        assert!(custom.remove_extended_namespace("urn:old"));
+        assert_eq!(custom.extended_count(), 0);
+        custom.register_extended("urn:a", "urn:b");
+        custom.clear_extended_namespaces();
+        assert_eq!(custom.extended_count(), 0);
 
         let rng = RandomNumberGeneratorFeature::new();
         let mut a = [0u8; 16];
@@ -3048,11 +3135,20 @@ mod tests {
             m
         });
         assert_eq!(meta.schema_type.name, "p");
-        assert!(meta.attributes.iter().any(|a| a == "rsidR"));
+        assert!(meta.has_attribute("rsidR"));
+        assert!(meta.has_child("r"));
+        assert_eq!(meta.attribute_count(), 1);
+        assert_eq!(meta.child_count(), 1);
+        assert!(meta.is_available_in(crate::file_format::FileFormatVersions::OFFICE2013));
+        assert_eq!(meta.schema_type().name, "p");
         assert_eq!(factory.get("Paragraph").map(|m| m.schema_type.name), Some("p".into()));
         // second call hits cache
         let again = factory.get_or_create("Paragraph", || ElementMetadata::none());
         assert_eq!(again.schema_type.name, "p");
+        assert!(factory.type_names().iter().any(|n| n == "Paragraph"));
+        assert!(factory.remove("Paragraph").is_some());
+        assert!(!factory.contains("Paragraph"));
+        factory.insert("Paragraph", again);
 
         let mut bag = FeatureCollection::new();
         shared.ensure_on(&mut bag);
