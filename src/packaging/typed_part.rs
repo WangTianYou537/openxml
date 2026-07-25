@@ -201,7 +201,7 @@ pub fn add_typed_part(
         true,
     )?;
     package.set_part(uri.clone(), ct, data.into());
-    let rid = package.opc_mut().add_part_relationship(
+    let rid = package.add_part_relationship(
         parent,
         info.relationship_type,
         &uri,

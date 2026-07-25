@@ -441,7 +441,7 @@ impl MainDocumentPart {
         relationship_type: &str,
         target: &PackUri,
     ) -> String {
-        package.opc_mut().add_part_relationship(
+        package.add_part_relationship(
             &self.inner.uri,
             relationship_type,
             target,

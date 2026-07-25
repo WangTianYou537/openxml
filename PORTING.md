@@ -817,6 +817,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Route document/part `set_part` writes through `OpenXmlPackage::set_part` so `PartEvents` fire
 - [x] Capture XML `standalone` on part load (`parse_xml_standalone`)
 - [x] `RelationshipFilterFeature` / `PackageRelationshipBuilder` / `PackageFactoryFeature` / `ProgrammaticIdentifierFeature`
+- [x] `OpenXmlPackage::{add_package_relationship,add_part_relationship}` apply relationship filters
 
 **Still intentionally deferred / partial:**
 

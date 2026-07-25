@@ -620,6 +620,77 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Add a package-level relationship after running any registered relationship filters
+    /// (C# relationship create + `IRelationshipFilterFeature`).
+    pub fn add_package_relationship(
+        &mut self,
+        relationship_type: &str,
+        target: &crate::opc::PackUri,
+        target_mode: crate::opc::RelationshipTargetMode,
+    ) -> String {
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            "",
+            relationship_type,
+            target.as_str(),
+        )
+        .with_target_mode(match target_mode {
+            crate::opc::RelationshipTargetMode::Internal => "Internal",
+            crate::opc::RelationshipTargetMode::External => "External",
+        });
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let mode = if builder.target_mode.eq_ignore_ascii_case("External") {
+            crate::opc::RelationshipTargetMode::External
+        } else {
+            crate::opc::RelationshipTargetMode::Internal
+        };
+        let target_uri = crate::opc::PackUri::new(&builder.target);
+        self.opc
+            .add_package_relationship(&builder.relationship_type, &target_uri, mode)
+    }
+
+    /// Add a part→part relationship after relationship filters.
+    pub fn add_part_relationship(
+        &mut self,
+        source: &crate::opc::PackUri,
+        relationship_type: &str,
+        target: &crate::opc::PackUri,
+        target_mode: crate::opc::RelationshipTargetMode,
+    ) -> String {
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            "",
+            relationship_type,
+            target.as_str(),
+        )
+        .with_target_mode(match target_mode {
+            crate::opc::RelationshipTargetMode::Internal => "Internal",
+            crate::opc::RelationshipTargetMode::External => "External",
+        })
+        .with_source_uri(source.as_str());
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let mode = if builder.target_mode.eq_ignore_ascii_case("External") {
+            crate::opc::RelationshipTargetMode::External
+        } else {
+            crate::opc::RelationshipTargetMode::Internal
+        };
+        let target_uri = crate::opc::PackUri::new(&builder.target);
+        self.opc.add_part_relationship(
+            source,
+            &builder.relationship_type,
+            &target_uri,
+            mode,
+        )
+    }
+
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
     pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()
@@ -850,5 +921,29 @@ mod part_events_tests {
         let id2 = pkg.programmatic_identifier().next_id();
         assert_ne!(id1, id2);
         assert!(id1.starts_with('R'));
+    }
+
+    #[test]
+    fn add_package_relationship_runs_filters() {
+        use crate::namespace::rel;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        pkg.relationship_filter().add_filter(|b| {
+            if b.relationship_type.contains("officeDocument") {
+                b.relationship_type = "http://filtered/officeDocument".into();
+            }
+        });
+        let uri = PackUri::new("/word/document.xml");
+        pkg.set_part(uri.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        let id = pkg.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &uri,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        assert!(!id.is_empty());
+        let rels: Vec<_> = pkg.opc().package_relationships().iter().collect();
+        assert!(rels
+            .iter()
+            .any(|r| r.relationship_type == "http://filtered/officeDocument"));
     }
 }
