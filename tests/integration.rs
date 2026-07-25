@@ -3281,6 +3281,31 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn part_extension_provider_roundtrip() {
+    use officexml::PartExtensionProvider;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    assert_eq!(
+        doc.package_mut().extension_for_content_type("image/png"),
+        ".png"
+    );
+    doc.package_mut()
+        .part_extension_provider()
+        .register("application/x-test", "tst");
+    assert_eq!(
+        doc.package_mut()
+            .part_extension_provider()
+            .try_get_extension("application/x-test"),
+        Some(".tst")
+    );
+    let _ = PartExtensionProvider::default();
+}
+
 #[test]
 fn data_part_and_id_part_pair() {
     use officexml::{DataPart, IdPartPair, MediaKind};

@@ -158,6 +158,30 @@ impl OpenXmlPart {
         self.root = None;
         self.dirty = false;
     }
+
+    /// Whether the DOM root is currently loaded (C# `IsRootElementLoaded`).
+    pub fn is_root_element_loaded(&self) -> bool {
+        self.root.is_some()
+    }
+
+    /// Unload the DOM root, returning it if present (C# `UnloadRootElement`).
+    ///
+    /// Does **not** write dirty changes; call [`save_to_package`](Self::save_to_package) first
+    /// if the in-memory tree must be persisted.
+    pub fn unload_root_element(&mut self) -> Option<OpenXmlElement> {
+        self.dirty = false;
+        self.root.take()
+    }
+
+    /// Parent part URIs that reference this part (C# `GetParentParts`).
+    pub fn get_parent_parts(&self, package: &OpenXmlPackage) -> Vec<PackUri> {
+        package.opc().parent_parts(&self.uri)
+    }
+
+    /// Optional view of the loaded root without loading from the package.
+    pub fn root_element(&self) -> Option<&OpenXmlElement> {
+        self.root.as_ref()
+    }
 }
 
 /// The main document part of a WordprocessingDocument (`/word/document.xml`).
@@ -227,5 +251,43 @@ impl MainDocumentPart {
             target,
             RelationshipTargetMode::Internal,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::namespace::{content_type, rel};
+    use crate::opc::{OpcPackage, RelationshipTargetMode};
+    use crate::packaging::OpenXmlPackage;
+
+    #[test]
+    fn unload_root_and_parent_parts() {
+        let mut opc = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        opc.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#.to_vec(),
+        );
+        opc.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        opc.add_part_relationship(&doc, rel::STYLES, &styles, RelationshipTargetMode::Internal);
+        let pkg = OpenXmlPackage::from_opc(opc, Default::default());
+
+        let mut part = OpenXmlPart::new(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        assert!(!part.is_root_element_loaded());
+        let _ = part.root(&pkg).unwrap();
+        assert!(part.is_root_element_loaded());
+        assert!(part.unload_root_element().is_some());
+        assert!(!part.is_root_element_loaded());
+
+        assert_eq!(pkg.opc().parent_parts(&styles), vec![doc.clone()]);
+        assert!(pkg.opc().is_child_part(&doc, &styles));
+        assert_eq!(part.get_parent_parts(&pkg), Vec::<PackUri>::new());
     }
 }

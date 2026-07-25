@@ -115,6 +115,27 @@ impl OpenXmlPackage {
         &mut self.features
     }
 
+    /// Content-type → extension map (C# `PartExtensionProvider`).
+    ///
+    /// Stored in the feature bag; created on first access with known Office defaults.
+    pub fn part_extension_provider(&mut self) -> &mut crate::opc::PartExtensionProvider {
+        if !self.features.contains::<crate::opc::PartExtensionProvider>() {
+            self.features
+                .set(crate::opc::PartExtensionProvider::with_known_extensions());
+        }
+        self.features
+            .get_mut::<crate::opc::PartExtensionProvider>()
+            .expect("PartExtensionProvider just set")
+    }
+
+    /// Extension for `content_type` from the provider, or from the built-in table.
+    pub fn extension_for_content_type(&mut self, content_type: &str) -> String {
+        self.part_extension_provider()
+            .extension_or_bin(content_type)
+            .to_string()
+    }
+
+
     /// Ensure a [`crate::features::PackageEvents`] feature exists.
     pub fn package_events(&mut self) -> &crate::features::PackageEvents {
         if !self.features.contains::<crate::features::PackageEvents>() {

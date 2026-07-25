@@ -371,3 +371,57 @@ mod tests {
         );
     }
 }
+
+
+impl OpcPackage {
+    /// Parts that have an internal relationship targeting `child`
+    /// (C# `OpenXmlPart.GetParentParts` shell — returns source URIs).
+    pub fn parent_parts(&self, child: &PackUri) -> Vec<PackUri> {
+        let mut out = Vec::new();
+        // Package-level relationships
+        for rel in self.package_relationships().iter() {
+            if rel.target_mode != super::RelationshipTargetMode::Internal {
+                continue;
+            }
+            if let Ok(u) = self.resolve_relationship(None, rel) {
+                if &u == child {
+                    // Package itself is not a part URI; skip — C# yields OpenXmlPart only.
+                }
+            }
+        }
+        for src in self.part_relationship_sources() {
+            if let Some(rels) = self.part_relationships(&src) {
+                for rel in rels.iter() {
+                    if rel.target_mode != super::RelationshipTargetMode::Internal {
+                        continue;
+                    }
+                    if let Ok(u) = self.resolve_relationship(Some(&src), rel) {
+                        if &u == child {
+                            out.push(src.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Whether `parent` has an internal child relationship to `child`.
+    pub fn is_child_part(&self, parent: &PackUri, child: &PackUri) -> bool {
+        let Some(rels) = self.part_relationships(parent) else {
+            return false;
+        };
+        for rel in rels.iter() {
+            if rel.target_mode != super::RelationshipTargetMode::Internal {
+                continue;
+            }
+            if let Ok(u) = self.resolve_relationship(Some(parent), rel) {
+                if &u == child {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}

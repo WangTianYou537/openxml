@@ -120,21 +120,12 @@ impl From<&super::part_uri::RelatedPart> for IdPartPair {
     }
 }
 
-fn extension_for_content_type(content_type: &str) -> &'static str {
-    match content_type {
-        "audio/mpeg" | "audio/mp3" => "mp3",
-        "audio/wav" | "audio/x-wav" => "wav",
-        "audio/ogg" => "ogg",
-        "video/mp4" => "mp4",
-        "video/avi" | "video/x-msvideo" => "avi",
-        "video/mpeg" => "mpeg",
-        "image/png" => "png",
-        "image/jpeg" => "jpg",
-        "image/gif" => "gif",
-        "image/bmp" => "bmp",
-        "image/tiff" => "tiff",
-        _ => "bin",
-    }
+fn extension_for_content_type(content_type: &str) -> String {
+    let p = super::part_extension::PartExtensionProvider::with_known_extensions();
+    // strip leading dot for URI construction
+    p.extension_or_bin(content_type)
+        .trim_start_matches('.')
+        .to_string()
 }
 
 fn kind_for_content_type(content_type: &str) -> MediaKind {
@@ -161,6 +152,7 @@ impl OpcPackage {
     ) -> Result<DataPart> {
         let ext = extension
             .map(|e| e.trim_start_matches('.'))
+            .map(|e| e.to_string())
             .unwrap_or_else(|| extension_for_content_type(content_type));
         let kind = kind_for_content_type(content_type);
         let mut index = 1u32;

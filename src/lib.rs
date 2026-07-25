@@ -74,7 +74,7 @@ pub use opc::{
     add_media_part, AudioReferenceRelationship, CompressionOption, CustomProperties,
     DataPart, DataPartReferenceRelationship, IdPartPair,
     CustomProperty, CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind, media_rel,
-    MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartUriHelper,
+    MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartExtensionProvider, PartUriHelper,
     ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
 };
 pub use packaging::{
