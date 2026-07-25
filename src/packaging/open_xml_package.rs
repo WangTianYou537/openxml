@@ -14,6 +14,9 @@ pub enum MarkupCompatibilityProcessMode {
     NoProcess,
     /// Process AlternateContent / Ignorable on loaded part roots.
     ProcessLoadedPartsOnly,
+    /// Process Markup Compatibility on every XML part in the package
+    /// (C# `ProcessAllParts`).
+    ProcessAllParts,
 }
 
 /// Markup Compatibility processing settings (mirrors C# `MarkupCompatibilityProcessSettings`).
@@ -140,6 +143,70 @@ impl OpenXmlPackage {
     pub fn get_all_parts(&self) -> Vec<(crate::opc::PackUri, String)> {
         self.opc.get_all_parts()
     }
+
+    /// C# `StrictRelationshipFound`.
+    pub fn strict_relationship_found(&self) -> bool {
+        self.opc.strict_relationship_found()
+    }
+
+    /// Whether any part still embeds a Strict OOXML namespace URI.
+    pub fn strict_namespace_found(&self) -> bool {
+        self.opc.strict_namespace_found()
+    }
+
+    /// Normalize Strict → Transitional namespaces and relationship types.
+    pub fn rewrite_strict_to_transitional(&mut self) -> crate::error::Result<(usize, usize)> {
+        crate::namespace_rewrite::rewrite_package_to_transitional(&mut self.opc)
+    }
+
+    /// Delete multiple parts by URI (C# `DeleteParts`).
+    pub fn delete_parts(&mut self, uris: &[crate::opc::PackUri]) -> usize {
+        self.opc.delete_parts(uris)
+    }
+
+    /// Apply Markup Compatibility processing to all XML parts when mode is
+    /// [`ProcessAllParts`](MarkupCompatibilityProcessMode::ProcessAllParts).
+    pub fn process_markup_compatibility_all_parts(&mut self) -> crate::error::Result<usize> {
+        if self.settings.markup_compatibility.mode != MarkupCompatibilityProcessMode::ProcessAllParts
+        {
+            return Ok(0);
+        }
+        let version = self.settings.markup_compatibility.target_file_format_versions;
+        let uris = self.opc.part_uris();
+        let mut n = 0usize;
+        for uri in uris {
+            let Some(data) = self.opc.get_part(&uri).map(|b| b.to_vec()) else {
+                continue;
+            };
+            let trimmed: Vec<u8> = data
+                .iter()
+                .skip_while(|b| b.is_ascii_whitespace())
+                .copied()
+                .take(5)
+                .collect();
+            if !(trimmed.starts_with(b"<?xml") || trimmed.starts_with(b"<")) {
+                continue;
+            }
+            let mut root = match crate::element::parse_element(&data) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            crate::markup_compatibility::process_markup_compatibility_for_version(
+                &mut root, version,
+            );
+            let ct = self
+                .opc
+                .content_types()
+                .content_type_for(uri.as_str())
+                .unwrap_or("application/xml")
+                .to_string();
+            let xml = crate::element::write_element(&root)?;
+            self.opc.set_part(uri, ct, xml);
+            n += 1;
+        }
+        Ok(n)
+    }
+
 
 
 

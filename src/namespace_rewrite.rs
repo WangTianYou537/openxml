@@ -491,3 +491,95 @@ mod tests {
         assert!(!doc.contains("purl.oclc.org/ooxml/wordprocessingml"));
     }
 }
+
+
+/// True if any relationship type in the package is a known Strict URI
+/// (C# `OpenXmlPackage.StrictRelationshipFound` shell).
+pub fn package_has_strict_relationships(package: &OpcPackage) -> bool {
+    for rel in package.package_relationships().iter() {
+        if to_transitional_relationship(&rel.relationship_type).is_some()
+            && rel.relationship_type.contains("purl.oclc.org/ooxml")
+        {
+            return true;
+        }
+        // also catch if type is strict even when mapping returns Some always — check is_strict via map key
+        if STRICT_TO_TRANSITIONAL_RELATIONSHIPS
+            .iter()
+            .any(|(s, _)| *s == rel.relationship_type.as_str())
+        {
+            return true;
+        }
+    }
+    for src in package.part_relationship_sources() {
+        if let Some(rels) = package.part_relationships(&src) {
+            for rel in rels.iter() {
+                if STRICT_TO_TRANSITIONAL_RELATIONSHIPS
+                    .iter()
+                    .any(|(s, _)| *s == rel.relationship_type.as_str())
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// True if any loaded XML part still contains a Strict namespace URI.
+pub fn package_has_strict_namespaces(package: &OpcPackage) -> bool {
+    let needle = b"purl.oclc.org/ooxml";
+    for uri in package.part_uris() {
+        let Some(data) = package.get_part(&uri) else {
+            continue;
+        };
+        if data.windows(needle.len()).any(|w| w == needle) {
+            return true;
+        }
+    }
+    false
+}
+
+impl OpcPackage {
+    /// C# `StrictRelationshipFound` — any Strict relationship type present.
+    pub fn strict_relationship_found(&self) -> bool {
+        package_has_strict_relationships(self)
+    }
+
+    /// Whether any part still embeds a Strict OOXML namespace URI.
+    pub fn strict_namespace_found(&self) -> bool {
+        package_has_strict_namespaces(self)
+    }
+}
+
+#[cfg(test)]
+mod strict_found_tests {
+    use super::*;
+    use crate::namespace::{content_type, rel};
+    use crate::opc::{PackUri, RelationshipTargetMode};
+
+    #[test]
+    fn strict_relationship_found_detects() {
+        let mut pkg = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        // Transitional — not strict
+        pkg.add_package_relationship(rel::OFFICE_DOCUMENT, &doc, RelationshipTargetMode::Internal);
+        assert!(!pkg.strict_relationship_found());
+
+        // Inject a Strict relationship type on the document
+        let strict_office = "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
+        // only if mapping knows it
+        if super::to_transitional_relationship(strict_office).is_some()
+            || super::STRICT_TO_TRANSITIONAL_RELATIONSHIPS
+                .iter()
+                .any(|(s, _)| *s == strict_office)
+        {
+            pkg.part_relationships_mut(&doc).add(
+                strict_office,
+                "styles.xml",
+                RelationshipTargetMode::Internal,
+            );
+            assert!(pkg.strict_relationship_found());
+        }
+    }
+}

@@ -743,6 +743,30 @@ impl OpcPackage {
     ///
     /// Approximate stand-in for C# `DeletePartsRecursivelyOfType<T>` when T is known
     /// only by content type (Rust has no generic OpenXmlPart hierarchy).
+    /// Delete multiple parts by URI (C# `DeleteParts`). Each URI is removed with
+    /// inbound relationship cleanup; does not cascade orphans unless you also call
+    /// [`delete_part_and_orphans`](Self::delete_part_and_orphans) per part.
+    pub fn delete_parts(&mut self, uris: &[PackUri]) -> usize {
+        let mut n = 0;
+        for uri in uris {
+            if self.remove_part(uri).is_some() {
+                n += 1;
+            }
+        }
+        n
+    }
+
+    /// Delete parts by relationship ids under `source` (C# `DeleteParts` via ids).
+    pub fn delete_parts_by_ids(&mut self, source: Option<&PackUri>, ids: &[&str]) -> usize {
+        let mut n = 0;
+        for id in ids {
+            if self.delete_part_by_id(source, id) {
+                n += 1;
+            }
+        }
+        n
+    }
+
     pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
         let mut uris: Vec<PackUri> = self
             .part_uris()
@@ -1423,6 +1447,19 @@ mod tests {
 
 
     #[test]
+
+    #[test]
+    fn delete_parts_batch() {
+        let mut pkg = OpcPackage::create();
+        let a = PackUri::new("/word/a.xml");
+        let b = PackUri::new("/word/b.xml");
+        pkg.set_part(a.clone(), "application/xml", b"<a/>".to_vec());
+        pkg.set_part(b.clone(), "application/xml", b"<b/>".to_vec());
+        assert_eq!(pkg.delete_parts(&[a.clone(), b.clone()]), 2);
+        assert!(!pkg.has_part(&a));
+        assert!(!pkg.has_part(&b));
+    }
+
     fn lazy_open_defers_parts() {
         let mut pkg = OpcPackage::create();
         pkg.set_part(

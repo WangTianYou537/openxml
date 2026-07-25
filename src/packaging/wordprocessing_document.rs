@@ -13015,6 +13015,16 @@ impl WordprocessingDocument {
 
     /// Delete every part with the given content type, cascading orphans
     /// (approximate C# `DeletePartsRecursivelyOfType<T>`).
+    /// Delete multiple parts by URI (C# `DeleteParts`).
+    pub fn delete_parts(&mut self, uris: &[PackUri]) -> usize {
+        self.package.opc_mut().delete_parts(uris)
+    }
+
+    /// C# `StrictRelationshipFound`.
+    pub fn strict_relationship_found(&self) -> bool {
+        self.package.strict_relationship_found()
+    }
+
     pub fn delete_parts_of_content_type(&mut self, content_type: &str) -> usize {
         self.package
             .opc_mut()

@@ -745,6 +745,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `DataPart` / `DataPartReferenceRelationship` / `IdPartPair`; `CreateMediaDataPart`, `DeleteUnusedDataParts`, `DeleteReferenceRelationship`
 - [x] `PartExtensionProvider`; `OpenXmlPart` UnloadRootElement / IsRootElementLoaded / GetParentParts
 - [x] `GetAllParts` BFS; DOM `OuterXml`/`InnerXml`, InsertBefore/After, RemoveChild, First/LastChild
+- [x] `StrictRelationshipFound` / strict namespace detect; `DeleteParts` batch; MC `ProcessAllParts`
 
 **Still intentionally deferred / partial:**
 

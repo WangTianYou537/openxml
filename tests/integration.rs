@@ -3283,6 +3283,29 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn delete_parts_and_strict_flag() {
+    use officexml::opc::PackUri;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    doc.add_default_styles().unwrap();
+    assert!(!doc.strict_relationship_found());
+
+    let styles = doc
+        .related_parts(None)
+        .into_iter()
+        .find(|p| p.uri.as_str().contains("styles"))
+        .expect("styles")
+        .uri;
+    let n = doc.delete_parts(&[styles.clone()]);
+    assert_eq!(n, 1);
+    assert!(!doc.package().opc().has_part(&styles));
+}
+
 #[test]
 fn get_all_parts_bfs_word() {
     let mut doc =
