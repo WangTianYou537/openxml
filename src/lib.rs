@@ -71,11 +71,12 @@ pub use features::{
     FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature,
     OpenXmlNamespaceResolverFeature, PackageCapabilities, PackageEvent, PackageEventType,
     PackageEvents, PackageFactoryFeature, PackageFeature, PackageInitializerFeature,
-    PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature, ParagraphIdGenerator,
-    PartElementEvent, PartEvents, PartFactoryFeature, PartRelationshipsFeature, PartRootEvents,
-    PartsFeature, PartUriFeature, ProgrammaticIdentifierFeature, RandomNumberGeneratorFeature,
-    ReferenceRelationshipsFeature, RelationshipFilterFeature, RootElementFeature, SaveFeature,
-    SchemaTrackingFeature, StrictNamespaceFeature, TargetFeature, TypedPartFactoryFeature,
+    PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature, ParagraphIdCollectionFeature,
+    ParagraphIdGenerator, PartElementEvent, PartEvents, PartFactoryFeature, PartRelationshipsFeature,
+    PartRootEvents, PartsFeature, PartUriFeature, ProgrammaticIdentifierFeature,
+    RandomNumberGeneratorFeature, ReferenceRelationshipsFeature, RelationshipFilterFeature,
+    RootElementFeature, SaveFeature, SchemaTrackingFeature, SharedFeatureRegistry,
+    StrictNamespaceFeature, TargetFeature, TypedPartFactoryFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

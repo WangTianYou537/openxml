@@ -92,15 +92,20 @@ impl FeatureCollection {
     }
 }
 
-/// Simple monotonic paragraph-id generator (C# `ParagraphIdFeature` shell).
+/// Simple monotonic paragraph-id generator (C# `IParagraphIdGeneratorFeature` shell).
 #[derive(Debug, Clone)]
 pub struct ParagraphIdGenerator {
     next: u32,
+    /// Optional uniqueness set (C# `IParagraphIdCollectionFeature` integration).
+    seen: std::collections::HashSet<String>,
 }
 
 impl Default for ParagraphIdGenerator {
     fn default() -> Self {
-        Self { next: 1 }
+        Self {
+            next: 1,
+            seen: std::collections::HashSet::new(),
+        }
     }
 }
 
@@ -110,14 +115,141 @@ impl ParagraphIdGenerator {
     }
 
     pub fn with_start(start: u32) -> Self {
-        Self { next: start.max(1) }
+        Self {
+            next: start.max(1) & 0x7FFF_FFFF,
+            seen: std::collections::HashSet::new(),
+        }
     }
 
-    /// Allocate the next 8-hex-digit paragraph id.
+    /// Register an existing paragraph id so future allocations avoid collisions.
+    pub fn register_existing(&mut self, id: impl Into<String>) {
+        self.seen.insert(id.into());
+    }
+
+    /// Allocate the next 8-hex-digit paragraph id (not necessarily unique vs collection).
     pub fn next_id(&mut self) -> String {
-        let id = self.next;
-        self.next = self.next.wrapping_add(1).max(1);
-        format!("{id:08X}")
+        let id = self.create_unique_paragraph_id();
+        id
+    }
+
+    /// Create a w14:paraId value in (0, 0x80000000) unique within registered ids
+    /// (C# `CreateUniqueParagraphId`).
+    pub fn create_unique_paragraph_id(&mut self) -> String {
+        loop {
+            let n = self.next & 0x7FFF_FFFF;
+            self.next = if n == 0 || n >= 0x7FFF_FFFF {
+                1
+            } else {
+                n + 1
+            };
+            if n == 0 {
+                continue;
+            }
+            let id = format!("{n:08X}");
+            if self.seen.insert(id.clone()) {
+                return id;
+            }
+        }
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.seen.contains(id)
+    }
+
+    pub fn count(&self) -> usize {
+        self.seen.len()
+    }
+}
+
+/// Registered paragraph ids in a document (C# `IParagraphIdCollectionFeature` shell).
+#[derive(Debug, Default, Clone)]
+pub struct ParagraphIdCollectionFeature {
+    ids: std::collections::HashSet<String>,
+}
+
+impl ParagraphIdCollectionFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, id: impl Into<String>) {
+        self.ids.insert(id.into());
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.ids.contains(id)
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        self.ids.remove(id)
+    }
+
+    pub fn count(&self) -> usize {
+        self.ids.len()
+    }
+
+    pub fn len(&self) -> usize {
+        self.ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ids.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.ids.iter().map(|s| s.as_str())
+    }
+
+    /// Merge into a generator so allocations avoid these ids.
+    pub fn apply_to_generator(&self, gen: &mut ParagraphIdGenerator) {
+        for id in &self.ids {
+            gen.register_existing(id.clone());
+        }
+    }
+}
+
+/// Multi-instance shared feature bag (C# `ISharedFeature<T>` shell).
+///
+/// Stores type-erased clones as `String` tokens for simple composite counting;
+/// for typed sharing, callers hold their own `Vec` and use this as a registry count.
+#[derive(Debug, Default, Clone)]
+pub struct SharedFeatureRegistry {
+    /// Logical feature keys currently shared.
+    keys: Vec<String>,
+}
+
+impl SharedFeatureRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, key: impl Into<String>) {
+        let key = key.into();
+        if !self.keys.iter().any(|k| k == &key) {
+            self.keys.push(key);
+        }
+    }
+
+    pub fn remove(&mut self, key: &str) -> bool {
+        let before = self.keys.len();
+        self.keys.retain(|k| k != key);
+        self.keys.len() != before
+    }
+
+    pub fn count(&self) -> usize {
+        self.keys.len()
+    }
+
+    pub fn contains(&self, key: &str) -> bool {
+        self.keys.iter().any(|k| k == key)
+    }
+
+    pub fn keys(&self) -> &[String] {
+        &self.keys
+    }
+
+    pub fn clear(&mut self) {
+        self.keys.clear();
     }
 }
 
@@ -2074,5 +2206,30 @@ mod tests {
         );
         assert_eq!(hits.load(Ordering::SeqCst), 1);
         assert_eq!(ee.listener_count(), 1);
+    }
+
+    #[test]
+    fn paragraph_id_collection_and_shared_registry() {
+        let mut coll = ParagraphIdCollectionFeature::new();
+        coll.add("0000000A");
+        coll.add("0000000B");
+        assert_eq!(coll.count(), 2);
+        assert!(coll.contains("0000000A"));
+
+        let mut gen = ParagraphIdGenerator::with_start(0xA);
+        coll.apply_to_generator(&mut gen);
+        // 0000000A and 0000000B are taken; next free from start A is C after skip.
+        let id = gen.create_unique_paragraph_id();
+        assert_eq!(id, "0000000C");
+        assert!(gen.contains("0000000C"));
+        assert_eq!(gen.count(), 3);
+
+        let mut shared = SharedFeatureRegistry::new();
+        shared.add("ParagraphId");
+        shared.add("ParagraphId");
+        assert_eq!(shared.count(), 1);
+        assert!(shared.contains("ParagraphId"));
+        assert!(shared.remove("ParagraphId"));
+        assert_eq!(shared.count(), 0);
     }
 }

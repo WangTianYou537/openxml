@@ -997,6 +997,63 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Paragraph id generator (C# `IParagraphIdGeneratorFeature`).
+    pub fn paragraph_id_generator(&mut self) -> &mut crate::features::ParagraphIdGenerator {
+        if !self
+            .features
+            .contains::<crate::features::ParagraphIdGenerator>()
+        {
+            self.features
+                .set(crate::features::ParagraphIdGenerator::new());
+        }
+        self.features
+            .get_mut::<crate::features::ParagraphIdGenerator>()
+            .expect("just inserted")
+    }
+
+    /// Paragraph id collection (C# `IParagraphIdCollectionFeature`).
+    pub fn paragraph_id_collection(
+        &mut self,
+    ) -> &mut crate::features::ParagraphIdCollectionFeature {
+        if !self
+            .features
+            .contains::<crate::features::ParagraphIdCollectionFeature>()
+        {
+            self.features
+                .set(crate::features::ParagraphIdCollectionFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::ParagraphIdCollectionFeature>()
+            .expect("just inserted")
+    }
+
+    /// Shared feature registry (C# `ISharedFeature` shell).
+    pub fn shared_feature_registry(&mut self) -> &mut crate::features::SharedFeatureRegistry {
+        if !self
+            .features
+            .contains::<crate::features::SharedFeatureRegistry>()
+        {
+            self.features
+                .set(crate::features::SharedFeatureRegistry::new());
+        }
+        self.features
+            .get_mut::<crate::features::SharedFeatureRegistry>()
+            .expect("just inserted")
+    }
+
+    /// Seed generator uniqueness from the paragraph-id collection.
+    pub fn sync_paragraph_id_generator_from_collection(&mut self) {
+        let ids: Vec<String> = self
+            .paragraph_id_collection()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let gen = self.paragraph_id_generator();
+        for id in ids {
+            gen.register_existing(id);
+        }
+    }
+
     /// Record package source bytes on the stream feature (C# open-from-stream path).
     pub fn set_package_stream_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
         self.package_stream_feature().set_bytes(bytes);
@@ -1571,5 +1628,18 @@ mod part_events_tests {
         });
         pkg.container_disposable_feature().dispose();
         assert_eq!(d.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn paragraph_id_and_shared_feature_accessors() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        pkg.paragraph_id_collection().add("00000001");
+        pkg.sync_paragraph_id_generator_from_collection();
+        let id = pkg.paragraph_id_generator().create_unique_paragraph_id();
+        assert_ne!(id, "00000001");
+        assert!(pkg.paragraph_id_generator().contains(&id));
+        pkg.shared_feature_registry().add("ParagraphId");
+        assert_eq!(pkg.shared_feature_registry().count(), 1);
     }
 }

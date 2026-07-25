@@ -831,6 +831,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackage::{save,save_as}` run `ISaveFeature` hooks before package events
 - [x] `OpenXmlNamespaceResolverFeature` / `RandomNumberGeneratorFeature` / `ContainerDisposableFeature` / `ElementEventsFeature` shells + package accessors
 - [x] Close path runs container disposable hooks
+- [x] `ParagraphIdCollectionFeature` / unique `ParagraphIdGenerator::create_unique_paragraph_id` / `SharedFeatureRegistry`
+- [x] Package accessors + `sync_paragraph_id_generator_from_collection`
 
 **Still intentionally deferred / partial:**
 
