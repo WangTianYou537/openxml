@@ -14,11 +14,30 @@ use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 /// How the package was opened.
+///
+/// Maps to C# `System.IO.FileAccess` / `OpenXmlPackage.FileOpenAccess`:
+/// - [`Read`](Self::Read) → `FileAccess.Read`
+/// - [`Create`](Self::Create) / [`ReadWrite`](Self::ReadWrite) → `FileAccess.ReadWrite`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PackageMode {
     Read,
     Create,
     ReadWrite,
+}
+
+/// C# `OpenXmlPackage.FileOpenAccess` / `FileAccess` alias.
+pub type FileOpenAccess = PackageMode;
+
+impl PackageMode {
+    /// Whether write/save is allowed.
+    pub fn can_write(self) -> bool {
+        matches!(self, Self::Create | Self::ReadWrite)
+    }
+
+    /// Whether the package was opened for reading existing content.
+    pub fn can_read(self) -> bool {
+        matches!(self, Self::Read | Self::ReadWrite)
+    }
 }
 
 /// ZIP compression level for ordinary (non-media, non-font) parts.
@@ -1565,6 +1584,16 @@ mod tests {
         assert!(!pkg.has_part(&header_styles));
         assert!(pkg.has_part(&doc));
         assert!(pkg.has_part(&header));
+    }
+
+    #[test]
+    fn package_mode_file_open_access_helpers() {
+        assert!(PackageMode::Create.can_write());
+        assert!(!PackageMode::Read.can_write());
+        assert!(PackageMode::Read.can_read());
+        assert!(PackageMode::ReadWrite.can_write() && PackageMode::ReadWrite.can_read());
+        let access: FileOpenAccess = PackageMode::ReadWrite;
+        assert_eq!(access, PackageMode::ReadWrite);
     }
 
 }

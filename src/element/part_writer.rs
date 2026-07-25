@@ -211,6 +211,52 @@ impl<W: Write> OpenXmlPartWriter<W> {
         Ok(())
     }
 
+    /// Write a self-closing empty element (`<name …/>`) (XmlWriter `WriteEmptyElement` shell).
+    pub fn write_empty_element(
+        &mut self,
+        prefix: Option<&str>,
+        local_name: &str,
+        attributes: &[OpenXmlAttribute],
+    ) -> Result<()> {
+        self.finish_open_start()?;
+        self.ensure_decl()?;
+        let qname = match prefix {
+            Some(p) if !p.is_empty() => format!("{p}:{local_name}"),
+            _ => local_name.to_string(),
+        };
+        self.writer.write_all(b"<").map_err(Error::Io)?;
+        self.writer.write_all(qname.as_bytes()).map_err(Error::Io)?;
+        for attr in attributes {
+            write_attr(&mut self.writer, attr)?;
+        }
+        self.writer.write_all(b"/>").map_err(Error::Io)?;
+        Ok(())
+    }
+
+    /// Write a self-closing empty element from an [`OpenXmlElement`] (attrs + ns decls only).
+    pub fn write_empty_from_element(&mut self, element: &OpenXmlElement) -> Result<()> {
+        self.finish_open_start()?;
+        self.ensure_decl()?;
+        let qname = element.qualified_name();
+        self.writer.write_all(b"<").map_err(Error::Io)?;
+        self.writer.write_all(qname.as_bytes()).map_err(Error::Io)?;
+        for (prefix, uri) in &element.namespace_declarations {
+            self.writer.write_all(b" xmlns").map_err(Error::Io)?;
+            if !prefix.is_empty() {
+                self.writer.write_all(b":").map_err(Error::Io)?;
+                self.writer.write_all(prefix.as_bytes()).map_err(Error::Io)?;
+            }
+            self.writer.write_all(b"=\"").map_err(Error::Io)?;
+            write_escaped_attr(&mut self.writer, uri)?;
+            self.writer.write_all(b"\"").map_err(Error::Io)?;
+        }
+        for attr in &element.attributes {
+            write_attr(&mut self.writer, attr)?;
+        }
+        self.writer.write_all(b"/>").map_err(Error::Io)?;
+        Ok(())
+    }
+
     pub fn write_end_element(&mut self) -> Result<()> {
         self.finish_open_start()?;
         let qname = self
@@ -221,6 +267,14 @@ impl<W: Write> OpenXmlPartWriter<W> {
         self.writer.write_all(qname.as_bytes()).map_err(Error::Io)?;
         self.writer.write_all(b">").map_err(Error::Io)?;
         Ok(())
+    }
+
+    /// Always write a full end tag `</name>` (C# `WriteFullEndElement`).
+    ///
+    /// Identical to [`write_end_element`] in this port (start tags are never left
+    /// in a self-closing state once content is written).
+    pub fn write_full_end_element(&mut self) -> Result<()> {
+        self.write_end_element()
     }
 
     /// Write an attribute on the currently open start tag (C# `WriteAttribute` / `WriteAttributeString`).
@@ -614,5 +668,48 @@ mod tests {
         assert!(s.contains("rsidR=\"00AB\""), "{s}");
         assert!(s.contains("xmlns:r="), "{s}");
         assert!(s.contains(">x</"), "{s}");
+    }
+
+    #[test]
+    fn write_empty_element_self_closing() {
+        let mut buf = Vec::new();
+        {
+            let mut w = OpenXmlPartWriter::create_without_declaration(&mut buf);
+            w.write_empty_element(
+                Some("w"),
+                "br",
+                &[OpenXmlAttribute {
+                    prefix: Some("w".into()),
+                    namespace_uri: None,
+                    local_name: "type".into(),
+                    value: "page".into(),
+                }],
+            )
+            .unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("<w:br"), "{s}");
+        assert!(s.contains("/>"), "{s}");
+        assert!(s.contains("type=\"page\""), "{s}");
+    }
+
+    #[test]
+    fn write_full_end_element_and_empty_from_element() {
+        let mut buf = Vec::new();
+        {
+            let mut w = OpenXmlPartWriter::create_without_declaration(&mut buf);
+            w.write_start(Some("w"), "p", &[]).unwrap();
+            w.write_empty_from_element(
+                &OpenXmlElement::w("br").with_attribute("type", "page"),
+            )
+            .unwrap();
+            w.write_full_end_element().unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("<w:p"), "{s}");
+        assert!(s.contains("</w:p>"), "{s}");
+        assert!(s.contains("/>"), "{s}");
     }
 }

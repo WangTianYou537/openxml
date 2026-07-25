@@ -102,10 +102,31 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         self.eof || self.state == ElementState::EOF
     }
 
-    /// Line/position info when tracked; currently empty shell (C# `GetLineInfo`).
+    /// Line/position of the current node (C# `GetLineInfo` / `IXmlLineInfo`).
     pub fn get_line_info(&self) -> super::xml_path::XmlLineInfo {
+        self.inner.line_info()
+    }
+
+    /// Whether miscellaneous nodes are reported (C# `ReadMiscNodes`).
+    pub fn read_misc_nodes(&self) -> bool {
+        self.read_misc_nodes
+    }
+
+    /// XML declaration encoding when known (C# `Encoding`; always `None` shell).
+    pub fn encoding(&self) -> Option<&str> {
         let _ = self;
-        super::xml_path::XmlLineInfo::EMPTY
+        None
+    }
+
+    /// XML declaration standalone flag (C# `StandaloneXml`; always `None` shell).
+    pub fn standalone_xml(&self) -> Option<bool> {
+        let _ = self;
+        None
+    }
+
+    /// Whether the current node carries a text value (C# `HasValue` shell).
+    pub fn has_value(&self) -> bool {
+        self.state == ElementState::LeafText && !self.text.is_empty()
     }
 
     pub fn depth(&self) -> usize {
@@ -554,5 +575,22 @@ mod tests {
         assert_eq!(r.attribute_count(), 1);
         r.close();
         assert!(r.is_eof());
+    }
+
+    #[test]
+    fn part_reader_line_info() {
+        let xml = b"<a>\n<b/>\n</a>";
+        let mut r = OpenXmlPartReader::from_bytes(xml);
+        assert!(r.read().unwrap());
+        assert_eq!(r.local_name(), "a");
+        assert!(r.get_line_info().has_line_info());
+        assert_eq!(r.get_line_info().line_number, 1);
+        assert!(r.read().unwrap());
+        assert_eq!(r.local_name(), "b");
+        assert_eq!(r.get_line_info().line_number, 2);
+        assert!(!r.has_value());
+        assert!(!r.read_misc_nodes());
+        assert!(r.encoding().is_none());
+        assert!(r.standalone_xml().is_none());
     }
 }

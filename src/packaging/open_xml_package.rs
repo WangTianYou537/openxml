@@ -451,8 +451,8 @@ impl OpenXmlPackage {
         )
     }
 
-    /// File access mode shell (C# `FileOpenAccess`).
-    pub fn file_open_access(&self) -> crate::opc::PackageMode {
+    /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
+    pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()
     }
 

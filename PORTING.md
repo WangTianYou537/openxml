@@ -792,6 +792,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlElementContext` XmlnsUri/XmlnsPrefix/LazySteps + `OpenXmlSimpleType::{has_value,is_in_version}`
 - [x] `OpenXmlElement::{is_leaf_element,is_leaf_text_element,is_composite_element,xml_space,set_xml_space,preserves_space}`
 - [x] `ValidationCache` + OpenXmlValidator cache; Reader/Writer `Create` factories
+- [x] `OpenXmlPartWriter::{write_empty_element,write_empty_from_element,write_full_end_element}`
+- [x] Stream/Part reader real `XmlLineInfo` line tracking (byte consume counter)
+- [x] Part reader `read_misc_nodes`/`encoding`/`standalone_xml`/`has_value` shells
+- [x] `FileOpenAccess` alias + `PackageMode::{can_read,can_write}`
 
 **Still intentionally deferred / partial:**
 

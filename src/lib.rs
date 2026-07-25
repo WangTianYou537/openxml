@@ -73,11 +73,12 @@ pub use features::{
 pub use file_format::FileFormatVersions;
 pub use namespace::{Namespace, OpenXmlNamespace};
 pub use opc::{
-    add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, PackageDiff, PackageEqualityOptions, compare_packages, packages_equal, CustomProperties,
-    DataPart, DataPartReferenceRelationship, IdPartPair,
-    CustomProperty, CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind, media_rel,
-    MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartExtensionProvider, PartUriHelper,
-    ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
+    add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, FileOpenAccess,
+    PackageDiff, PackageEqualityOptions, PackageMode, compare_packages, packages_equal,
+    CustomProperties, DataPart, DataPartReferenceRelationship, IdPartPair, CustomProperty,
+    CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind, media_rel,
+    MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartExtensionProvider,
+    PartUriHelper, ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
 };
 pub use packaging::{
     add_typed_part, add_typed_part_element, default_settings, default_styles, find_typed_parts,

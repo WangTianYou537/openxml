@@ -6,7 +6,83 @@
 use crate::error::{Error, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
-use std::io::BufRead;
+use std::io::{self, BufRead, Read};
+
+/// Counts newlines as the underlying reader is consumed (for `IXmlLineInfo`).
+struct LineCountingReader<R> {
+    inner: R,
+    line: u64,
+    column: u64,
+    /// Snapshot taken before each `read_event_into` call.
+    mark_line: u64,
+    mark_column: u64,
+}
+
+impl<R> LineCountingReader<R> {
+    fn new(inner: R) -> Self {
+        Self {
+            inner,
+            line: 1,
+            column: 1,
+            mark_line: 1,
+            mark_column: 1,
+        }
+    }
+
+    fn mark(&mut self) {
+        self.mark_line = self.line;
+        self.mark_column = self.column;
+    }
+
+    fn note_bytes(&mut self, data: &[u8]) {
+        for &b in data {
+            if b == b'\n' {
+                self.line = self.line.saturating_add(1);
+                self.column = 1;
+            } else {
+                self.column = self.column.saturating_add(1);
+            }
+        }
+    }
+}
+
+impl<R: Read> Read for LineCountingReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.note_bytes(&buf[..n]);
+        Ok(n)
+    }
+}
+
+impl<R: BufRead> BufRead for LineCountingReader<R> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        // Count bytes being consumed from the current buffer view.
+        // `fill_buf` may have been called; we must count only the slice consumed.
+        // Safe approach: peek then consume.
+        if amt == 0 {
+            return;
+        }
+        // Re-borrow: get the bytes about to be consumed.
+        // `fill_buf` is already valid for at least `amt` after a successful read path.
+        if let Ok(buf) = self.inner.fill_buf() {
+            let n = amt.min(buf.len());
+            // Copy bytes to count (cannot hold borrow across mutate of line counters via note
+            // while also calling consume on inner — copy first).
+            let chunk: Vec<u8> = buf[..n].to_vec();
+            self.inner.consume(n);
+            self.note_bytes(&chunk);
+            if amt > n {
+                // Should not happen with correct BufRead users; ignore remainder.
+            }
+        } else {
+            self.inner.consume(amt);
+        }
+    }
+}
 
 /// A streaming XML event.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,36 +110,65 @@ pub enum XmlEvent {
 
 /// Forward-only reader over an XML byte stream.
 pub struct OpenXmlStreamReader<R: BufRead> {
-    reader: Reader<R>,
+    reader: Reader<LineCountingReader<R>>,
     buf: Vec<u8>,
+    /// Line/column of the most recently *returned* event start.
+    event_line: u64,
+    event_column: u64,
 }
 
 impl<R: BufRead> OpenXmlStreamReader<R> {
     pub fn from_reader(reader: R) -> Self {
-        let mut reader = Reader::from_reader(reader);
+        let mut reader = Reader::from_reader(LineCountingReader::new(reader));
         reader.config_mut().trim_text(false);
         Self {
             reader,
             buf: Vec::new(),
+            event_line: 0,
+            event_column: 0,
         }
+    }
+
+    /// Line/position of the last returned event (C# `IXmlLineInfo` subset).
+    pub fn line_info(&self) -> super::xml_path::XmlLineInfo {
+        if self.event_line == 0 {
+            super::xml_path::XmlLineInfo::EMPTY
+        } else {
+            super::xml_path::XmlLineInfo::new(self.event_line, self.event_column)
+        }
+    }
+
+    /// Absolute byte offset in the input (quick-xml `buffer_position`).
+    pub fn buffer_position(&self) -> u64 {
+        self.reader.buffer_position()
     }
 
     /// Read the next event; `None` at EOF.
     pub fn read_event(&mut self) -> Result<Option<XmlEvent>> {
         loop {
             self.buf.clear();
+            // Mark line/col before consuming the next event's bytes.
+            self.reader.get_mut().mark();
+            let mark_line = self.reader.get_mut().mark_line;
+            let mark_col = self.reader.get_mut().mark_column;
             let event = self
                 .reader
                 .read_event_into(&mut self.buf)
                 .map_err(|e| Error::Xml(e.to_string()))?;
             match event {
                 Event::Start(e) => {
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
                     return Ok(Some(Self::start_event(&e, false)?));
                 }
                 Event::Empty(e) => {
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
                     return Ok(Some(Self::start_event(&e, true)?));
                 }
                 Event::End(e) => {
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
                     let name = e.name();
                     let (prefix, local) = split_name(name.as_ref());
                     return Ok(Some(XmlEvent::End {
@@ -79,6 +184,8 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
                     if text.is_empty() {
                         continue;
                     }
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
                     return Ok(Some(XmlEvent::Text(text)));
                 }
                 Event::CData(c) => {
@@ -86,10 +193,16 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
                     if text.is_empty() {
                         continue;
                     }
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
                     return Ok(Some(XmlEvent::Text(text)));
                 }
-                Event::Eof => return Ok(None),
-                // Skip declarations, comments, PIs, doc types
+                Event::Eof => {
+                    self.event_line = 0;
+                    self.event_column = 0;
+                    return Ok(None);
+                }
+                // Skip declarations, comments, PIs, doc types (bytes already counted).
                 _ => continue,
             }
         }
@@ -285,5 +398,27 @@ mod tests {
         let xml = write_xml_events(&events).unwrap();
         let s = String::from_utf8(xml).unwrap();
         assert!(s.contains("hi"));
+    }
+
+    #[test]
+    fn stream_line_info_tracks_newlines() {
+        let xml = b"<root>\n  <child/>\n</root>";
+        let mut r = OpenXmlStreamReader::from_bytes(xml);
+        let ev = r.read_event().unwrap().unwrap();
+        assert!(matches!(ev, XmlEvent::Start { local_name: ref n, .. } if n == "root"));
+        let li = r.line_info();
+        assert!(li.has_line_info(), "{li:?}");
+        assert_eq!(li.line_number, 1, "{li:?}");
+
+        // Skip insignificant whitespace Text events between elements.
+        let mut child_li = None;
+        while let Some(ev) = r.read_event().unwrap() {
+            if matches!(ev, XmlEvent::Empty { local_name: ref n, .. } if n == "child") {
+                child_li = Some(r.line_info());
+                break;
+            }
+        }
+        let li = child_li.expect("child empty element");
+        assert_eq!(li.line_number, 2, "{li:?}");
     }
 }
