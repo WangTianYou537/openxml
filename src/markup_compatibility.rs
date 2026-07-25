@@ -398,3 +398,262 @@ mod tests {
         assert_eq!(root.children[0].prefix, "w14");
     }
 }
+
+// ---------------------------------------------------------------------------
+// AlternateContent structural validation (C# AlternateContentValidator subset)
+// ---------------------------------------------------------------------------
+
+use crate::validation::ValidationError;
+
+/// Validate `mc:AlternateContent` structure under `root` (recursive).
+///
+/// Checks ECMA-376 Part 5 rules mirrored by C# `AlternateContentValidator`:
+/// - AlternateContent must contain ≥1 Choice
+/// - Children order: Choice+ then optional single Fallback
+/// - Nested AlternateContent is not allowed as a direct child
+/// - Choice must have a `Requires` attribute
+/// - Requires prefixes should resolve via xmlns on the Choice or ancestors
+/// - xml:lang / xml:space are not allowed on AC/Choice/Fallback
+pub fn validate_alternate_content(root: &OpenXmlElement) -> Vec<ValidationError> {
+    let mut errors = Vec::new();
+    validate_ac_tree(root, "mc:AlternateContent", &mut errors);
+    errors
+}
+
+fn validate_ac_tree(elem: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
+    if elem.local_name == "AlternateContent"
+        && (elem.prefix == "mc"
+            || elem.namespace_uri == MC
+            || elem.namespace_uri.is_empty())
+    {
+        validate_one_ac(elem, path, errors);
+    }
+    for (i, child) in elem.children.iter().enumerate() {
+        let child_path = format!("{path}/{}[{i}]", child.local_name);
+        validate_ac_tree(child, &child_path, errors);
+    }
+}
+
+fn is_xml_lang_or_space(attr: &crate::element::OpenXmlAttribute) -> bool {
+    let is_xml_ns = attr.namespace_uri.as_deref() == Some("http://www.w3.org/XML/1998/namespace")
+        || attr.prefix.as_deref() == Some("xml");
+    is_xml_ns && (attr.local_name == "lang" || attr.local_name == "space")
+}
+
+fn validate_mc_xml_attrs(elem: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
+    for a in &elem.attributes {
+        if is_xml_lang_or_space(a) {
+            errors.push(ValidationError {
+                path: path.to_string(),
+                message: format!(
+                    "MC_InvalidXmlAttribute: xml:{} is not allowed on <{}>",
+                    a.local_name, elem.local_name
+                ),
+            });
+        }
+    }
+}
+
+fn resolve_prefix_ns(elem: &OpenXmlElement, prefix: &str) -> Option<String> {
+    if let Some(uri) = elem.lookup_namespace(prefix) {
+        return Some(uri.to_string());
+    }
+    // Also check xmlns:prefix attributes that might not be in ns_decls yet.
+    for a in &elem.attributes {
+        if a.prefix.as_deref() == Some("xmlns") && a.local_name == prefix {
+            return Some(a.value.clone());
+        }
+        if a.local_name == "xmlns" && prefix.is_empty() {
+            return Some(a.value.clone());
+        }
+    }
+    None
+}
+
+fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
+    validate_mc_xml_attrs(ac, path, errors);
+
+    let non_misc: Vec<&OpenXmlElement> = ac
+        .children
+        .iter()
+        .filter(|c| !c.is_misc_node())
+        .collect();
+
+    if non_misc.is_empty() {
+        errors.push(ValidationError {
+            path: path.to_string(),
+            message: "MC_ShallContainChoice: AlternateContent must contain one or more Choice elements".into(),
+        });
+        return;
+    }
+
+    // status: 0 = expect Choice, 1 = Choice seen (Choice|Fallback ok), 2 = Fallback seen
+    let mut status = 0u8;
+    for (i, child) in non_misc.iter().enumerate() {
+        let cpath = format!("{path}/{}[{i}]", child.local_name);
+        if child.local_name == "AlternateContent" {
+            errors.push(ValidationError {
+                path: cpath.clone(),
+                message: "MC_ShallNotContainAlternateContent: AlternateContent cannot nest directly".into(),
+            });
+            continue;
+        }
+        match status {
+            0 => {
+                if child.local_name == "Choice" {
+                    validate_choice(child, ac, &cpath, errors);
+                    status = 1;
+                } else {
+                    errors.push(ValidationError {
+                        path: path.to_string(),
+                        message: format!(
+                            "MC_ShallContainChoice: expected Choice, found <{}>",
+                            child.local_name
+                        ),
+                    });
+                    if child.local_name == "Fallback" {
+                        validate_mc_xml_attrs(child, &cpath, errors);
+                        status = 2;
+                    }
+                }
+            }
+            1 => {
+                if child.local_name == "Choice" {
+                    validate_choice(child, ac, &cpath, errors);
+                } else if child.local_name == "Fallback" {
+                    validate_mc_xml_attrs(child, &cpath, errors);
+                    status = 2;
+                } else {
+                    errors.push(ValidationError {
+                        path: cpath,
+                        message: format!(
+                            "Sch_InvalidElementContentExpectingComplex: unexpected <{}> in AlternateContent",
+                            child.local_name
+                        ),
+                    });
+                }
+            }
+            2 => {
+                errors.push(ValidationError {
+                    path: cpath,
+                    message: format!(
+                        "Sch_InvalidElementContentExpectingComplex: content after Fallback (<{}>)",
+                        child.local_name
+                    ),
+                });
+            }
+            _ => {}
+        }
+    }
+    if status == 0 {
+        errors.push(ValidationError {
+            path: path.to_string(),
+            message: "MC_ShallContainChoice: AlternateContent must contain one or more Choice elements".into(),
+        });
+    }
+}
+
+fn validate_choice(
+    choice: &OpenXmlElement,
+    ac: &OpenXmlElement,
+    path: &str,
+    errors: &mut Vec<ValidationError>,
+) {
+    validate_mc_xml_attrs(choice, path, errors);
+    let requires = choice
+        .get_attribute("Requires")
+        .or_else(|| choice.get_attribute_qname("mc:Requires"));
+    let Some(requires) = requires else {
+        errors.push(ValidationError {
+            path: path.to_string(),
+            message: "MC_MissedRequiresAttribute: Choice must have a Requires attribute".into(),
+        });
+        return;
+    };
+    for prefix in requires.split_whitespace() {
+        if prefix.is_empty() {
+            continue;
+        }
+        let resolved = resolve_prefix_ns(choice, prefix).or_else(|| resolve_prefix_ns(ac, prefix));
+        if resolved.is_none() {
+            errors.push(ValidationError {
+                path: path.to_string(),
+                message: format!(
+                    "MC_InvalidRequiresAttribute: prefix `{prefix}` in Requires=\"{requires}\" is not defined"
+                ),
+            });
+        }
+    }
+}
+
+#[cfg(test)]
+mod ac_validate_tests {
+    use super::*;
+
+    #[test]
+    fn empty_ac_errors() {
+        let ac = alternate_content(Vec::<OpenXmlElement>::new());
+        let errs = validate_alternate_content(&ac);
+        assert!(errs.iter().any(|e| e.message.contains("ShallContainChoice")));
+    }
+
+    #[test]
+    fn choice_without_requires() {
+        let ac = alternate_content(vec![
+            OpenXmlElement::new("mc", MC, "Choice").with_child(OpenXmlElement::w("t")),
+        ]);
+        let errs = validate_alternate_content(&ac);
+        assert!(errs.iter().any(|e| e.message.contains("MissedRequires")));
+    }
+
+    #[test]
+    fn valid_ac_ok() {
+        let ac = alternate_content_with(
+            "w14",
+            vec![OpenXmlElement::w("r")],
+            vec![OpenXmlElement::w("r")],
+        );
+        // Declare w14 on the AC so Requires resolves
+        let mut ac = ac;
+        ac = ac.with_ns_decl(
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml",
+        );
+        let errs = validate_alternate_content(&ac);
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn nested_ac_rejected() {
+        let inner = alternate_content_with("w14", vec![OpenXmlElement::w("r")], vec![]);
+        let ac = alternate_content(vec![
+            choice("w14", vec![OpenXmlElement::w("r")]),
+            inner,
+        ]);
+        let mut ac = ac;
+        ac = ac.with_ns_decl(
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml",
+        );
+        let errs = validate_alternate_content(&ac);
+        assert!(errs.iter().any(|e| e.message.contains("ShallNotContainAlternateContent")
+            || e.message.contains("after Fallback")
+            || e.message.contains("unexpected")));
+    }
+
+    #[test]
+    fn two_fallbacks_rejected() {
+        let ac = alternate_content(vec![
+            choice("w", vec![OpenXmlElement::w("r")]),
+            fallback(vec![OpenXmlElement::w("r")]),
+            fallback(vec![OpenXmlElement::w("r")]),
+        ]);
+        let mut ac = ac;
+        ac = ac.with_ns_decl(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        );
+        let errs = validate_alternate_content(&ac);
+        assert!(errs.iter().any(|e| e.message.contains("after Fallback")));
+    }
+}

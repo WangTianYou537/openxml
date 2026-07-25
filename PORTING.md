@@ -767,6 +767,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartEvents` (IPartEventsFeature) distinct from PackageEvents/PartRootEvents; raise on OpenXmlPackage set_part/delete_part
 - [x] `delete_parts_recursively_of_relationship_type` (C# DeletePartsRecursivelyOfType stand-in by rel URI) on OpcPackage + OpenXmlPackage + Word/Excel/PPT
 - [x] CloneableExtensions subset: `clone_to_path` / `clone_to_bytes` / `clone_to_writer` on Word/Excel/PPT (plus existing `clone_document`)
+- [x] `validate_alternate_content` (C# AlternateContentValidator structure rules) + wired into OpenXmlValidator::validate_element
 
 **Still intentionally deferred / partial:**
 

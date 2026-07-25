@@ -91,6 +91,9 @@ pub use semantic::{
     word_unique_attribute_rules, RelationshipExistRule, UniqueAttributeRule,
 };
 
+/// Re-export Markup Compatibility AlternateContent structural validation.
+pub use crate::markup_compatibility::validate_alternate_content;
+
 use crate::element::OpenXmlElement;
 use std::collections::HashMap;
 use std::fmt;
