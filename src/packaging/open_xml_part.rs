@@ -182,7 +182,80 @@ impl OpenXmlPart {
     pub fn root_element(&self) -> Option<&OpenXmlElement> {
         self.root.as_ref()
     }
+
+    /// Reload the DOM root from package bytes (C# `OpenXmlPartRootElement.Reload`).
+    ///
+    /// Discards any unsaved in-memory edits.
+    pub fn reload(&mut self, package: &OpenXmlPackage) -> Result<()> {
+        self.root = None;
+        self.dirty = false;
+        self.load(package)?;
+        Ok(())
+    }
+
+    /// Save the current root element XML into the package (C# `OpenXmlPartRootElement.Save`).
+    pub fn save_root(&mut self, package: &mut OpenXmlPackage) -> Result<()> {
+        self.dirty = true;
+        self.save_to_package(package)
+    }
 }
+
+/// Application-specific extended part (C# `ExtendedPart`).
+///
+/// Default target path is `udata/data*.dat` under the source part's directory.
+#[derive(Debug)]
+pub struct ExtendedPart {
+    inner: OpenXmlPart,
+}
+
+impl ExtendedPart {
+    pub const DEFAULT_EXTENSION: &'static str = ".dat";
+    pub const DEFAULT_PATH: &'static str = "udata";
+    pub const DEFAULT_NAME: &'static str = "data";
+
+    pub fn new(
+        uri: impl Into<PackUri>,
+        content_type: impl Into<String>,
+        relationship_type: impl Into<String>,
+    ) -> Self {
+        Self {
+            inner: OpenXmlPart::new(uri, content_type, relationship_type),
+        }
+    }
+
+    pub fn from_part(part: OpenXmlPart) -> Self {
+        Self { inner: part }
+    }
+
+    pub fn part(&self) -> &OpenXmlPart {
+        &self.inner
+    }
+
+    pub fn part_mut(&mut self) -> &mut OpenXmlPart {
+        &mut self.inner
+    }
+
+    pub fn uri(&self) -> &PackUri {
+        self.inner.uri()
+    }
+
+    pub fn content_type(&self) -> &str {
+        self.inner.content_type()
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+    }
+
+    pub fn feed_data(&mut self, package: &mut OpenXmlPackage, data: impl Into<Vec<u8>>) {
+        self.inner.feed_data(package, data)
+    }
+
+    pub fn get_stream(&self, package: &OpenXmlPackage) -> Result<Vec<u8>> {
+        self.inner.get_stream(package)
+    }
+}
+
 
 /// The main document part of a WordprocessingDocument (`/word/document.xml`).
 #[derive(Debug)]
@@ -289,5 +362,33 @@ mod tests {
         assert_eq!(pkg.opc().parent_parts(&styles), vec![doc.clone()]);
         assert!(pkg.opc().is_child_part(&doc, &styles));
         assert_eq!(part.get_parent_parts(&pkg), Vec::<PackUri>::new());
+    }
+
+
+    #[test]
+    fn reload_discards_edits() {
+        let mut opc = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        opc.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#.to_vec(),
+        );
+        let mut pkg = OpenXmlPackage::from_opc(opc, Default::default());
+        let mut part = OpenXmlPart::new(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        {
+            let root = part.root_mut(&pkg).unwrap();
+            root.children.clear();
+            assert!(root.children.is_empty());
+        }
+        part.reload(&pkg).unwrap();
+        let root = part.root(&pkg).unwrap();
+        assert!(root.child("body").is_some());
+        assert!(pkg.can_save());
+        assert!(!pkg.is_closed());
     }
 }

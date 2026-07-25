@@ -13245,6 +13245,46 @@ impl WordprocessingDocument {
         Ok((rid, part_uri))
     }
 
+    /// Create an [`ExtendedPart`] under `udata/` with auto URI (C# `ExtendedPart` defaults).
+    ///
+    /// Returns `(relationship_id, ExtendedPart handle)`.
+    pub fn create_extended_part(
+        &mut self,
+        content_type_str: &str,
+        relationship_type: &str,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<(String, crate::packaging::ExtendedPart)> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?
+            .uri()
+            .clone();
+        let mut index = 1u32;
+        let part_uri = loop {
+            let candidate = PackUri::new(format!("/word/udata/data{index}.dat"));
+            if !self.package.opc().has_part(&candidate) {
+                break candidate;
+            }
+            index += 1;
+        };
+        self.package
+            .opc_mut()
+            .set_part(part_uri.clone(), content_type_str, data.into());
+        let rid = self.package.opc_mut().add_part_relationship(
+            &main,
+            relationship_type,
+            &part_uri,
+            RelationshipTargetMode::Internal,
+        );
+        let part = crate::packaging::ExtendedPart::new(
+            part_uri,
+            content_type_str,
+            relationship_type,
+        );
+        Ok((rid, part))
+    }
+
     fn ensure_sect_pr_reference(&mut self, reference: OpenXmlElement) -> Result<()> {
         // Load body, find or create trailing sectPr, append the reference.
         {

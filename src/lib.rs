@@ -80,7 +80,7 @@ pub use opc::{
 pub use packaging::{
     add_typed_part, add_typed_part_element, default_settings, default_styles, find_typed_parts,
     footer, footer_reference, header, header_reference, hyperlink, AlternativeFormatImportType,
-    DocumentSettingsPart, ImageFormat, ImagePart, MainDocumentPart,
+    DocumentSettingsPart, ExtendedPart, ImageFormat, ImagePart, MainDocumentPart,
     MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
     OpenXmlPackage, PresentationDocument, PresentationDocumentType, SlideInfo, SlideLayoutInfo,
     SlideMasterInfo, SpreadsheetDocument, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart,

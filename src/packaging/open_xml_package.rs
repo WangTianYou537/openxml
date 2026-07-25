@@ -305,6 +305,43 @@ impl OpenXmlPackage {
         self.closed
     }
 
+    /// Whether the package can be saved (C# `CanSave`).
+    ///
+    /// False when closed or opened read-only.
+    pub fn can_save(&self) -> bool {
+        if self.closed {
+            return false;
+        }
+        matches!(
+            self.opc.mode(),
+            crate::opc::PackageMode::Create | crate::opc::PackageMode::ReadWrite
+        )
+    }
+
+    /// File access mode shell (C# `FileOpenAccess`).
+    pub fn file_open_access(&self) -> crate::opc::PackageMode {
+        self.opc.mode()
+    }
+
+    /// Max characters per part from open settings (C# `MaxCharactersInPart`).
+    pub fn max_characters_in_part(&self) -> u64 {
+        self.settings.max_characters_in_part
+    }
+
+    /// Close the package: optionally save, delete unused data parts, raise events
+    /// (C# `Dispose` / close path simplified).
+    pub fn close(&mut self, save: bool) -> Result<()> {
+        self.ensure_open()?;
+        if save && self.can_save() {
+            self.save()?;
+        }
+        // C# DeleteUnusedDataPartOnClose
+        self.opc.delete_unused_data_parts();
+        self.mark_closed();
+        Ok(())
+    }
+
+
     pub(crate) fn ensure_open(&self) -> Result<()> {
         if self.closed {
             Err(Error::Closed)

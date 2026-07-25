@@ -3284,6 +3284,26 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn extended_part_and_package_close() {
+    use officexml::ExtendedPart;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    let (rid, part): (String, ExtendedPart) = doc
+        .create_extended_part("application/octet-stream", "http://example/rel", b"bin")
+        .unwrap();
+    assert!(rid.starts_with('r'));
+    assert!(part.uri().as_str().contains("udata"));
+    assert_eq!(part.get_stream(doc.package()).unwrap(), b"bin");
+    assert!(doc.package().can_save());
+    doc.package_mut().close(false).unwrap();
+    assert!(doc.package().is_closed());
+}
+
 #[test]
 fn delete_parts_and_strict_flag() {
     use officexml::opc::PackUri;
