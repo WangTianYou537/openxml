@@ -313,7 +313,7 @@ impl WordprocessingDocument {
   <w:body/>
 </w:document>"#.to_vec(),
         );
-        self.package.opc_mut().add_package_relationship(
+        self.package.add_package_relationship(
             rel::OFFICE_DOCUMENT,
             &PackUri::new(MainDocumentPart::URI),
             RelationshipTargetMode::Internal,
@@ -1390,7 +1390,7 @@ impl WordprocessingDocument {
             content_type::CUSTOM_XML,
             xml.as_ref().to_vec(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::CUSTOM_XML,
             &item_uri,
@@ -1443,7 +1443,7 @@ impl WordprocessingDocument {
         {
             return Ok(existing);
         }
-        Ok(self.package.opc_mut().add_package_relationship(
+        Ok(self.package.add_package_relationship(
             rel::THUMBNAIL,
             &uri,
             RelationshipTargetMode::Internal,
@@ -9144,7 +9144,7 @@ impl WordprocessingDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::PACKAGE,
             &uri,
@@ -9183,7 +9183,7 @@ impl WordprocessingDocument {
         {
             return Ok(existing);
         }
-        Ok(self.package.opc_mut().add_part_relationship(
+        Ok(self.package.add_part_relationship(
             &main_uri,
             rel::GLOSSARY_DOCUMENT,
             &uri,
@@ -9433,7 +9433,7 @@ impl WordprocessingDocument {
         );
         const RECIPIENT_DATA: &str =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/recipientData";
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &settings_uri,
             RECIPIENT_DATA,
             &uri,
@@ -10541,7 +10541,7 @@ impl WordprocessingDocument {
             crate::element::write_element(&taskpanes)?,
         );
         // taskpanes → webextension
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &tp_uri,
             rel::WEB_EXTENSION,
             &we_uri,
@@ -10555,7 +10555,7 @@ impl WordprocessingDocument {
             .get_by_type(rel::WEB_EXTENSION_TASKPANES)
             .is_none()
         {
-            self.package.opc_mut().add_package_relationship(
+            self.package.add_package_relationship(
                 rel::WEB_EXTENSION_TASKPANES,
                 &tp_uri,
                 RelationshipTargetMode::Internal,
@@ -10590,7 +10590,7 @@ impl WordprocessingDocument {
             content_type::WORD_COMMENTS_IDS,
             crate::element::write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::COMMENTS_IDS,
             &uri,
@@ -10615,7 +10615,7 @@ impl WordprocessingDocument {
             content_type::WORD_COMMENTS_EXTENSIBLE,
             crate::element::write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::COMMENTS_EXTENSIBLE,
             &uri,
@@ -10640,7 +10640,7 @@ impl WordprocessingDocument {
             content_type::ATTACHED_TOOLBARS,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::ATTACHED_TOOLBARS,
             &uri,
@@ -10675,7 +10675,7 @@ impl WordprocessingDocument {
             content_type::CUSTOM_PROPERTY_XML,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::CUSTOM_PROPERTY,
             &uri,
@@ -10711,7 +10711,7 @@ impl WordprocessingDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::FONT,
             &uri,
@@ -10804,7 +10804,7 @@ impl WordprocessingDocument {
             content_type::DRAWINGML_CHART,
             crate::element::write_element(&chart)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::CHART,
             &uri,
@@ -11046,13 +11046,13 @@ impl WordprocessingDocument {
             content_type::LEGACY_DIAGRAM_TEXT_INFO,
             crate::element::write_element(&info)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &main_uri,
             rel::LEGACY_DIAGRAM_TEXT,
             &text_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &text_uri,
             rel::LEGACY_DIAGRAM_TEXT_INFO,
             &info_uri,
@@ -11087,7 +11087,7 @@ impl WordprocessingDocument {
             content_type::PACKAGE_EMBEDDED,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::PACKAGE,
             &uri,
@@ -11122,7 +11122,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::STYLES_WITH_EFFECTS,
             &uri,
@@ -11154,7 +11154,7 @@ impl WordprocessingDocument {
             content_type::VBA_DATA,
             crate::element::write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &parent,
             rel::VBA_DATA,
             &uri,
@@ -11180,7 +11180,7 @@ impl WordprocessingDocument {
             content_type::CUSTOMIZATION,
             crate::element::write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::CUSTOMIZATION,
             &uri,
@@ -11216,7 +11216,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::QAT,
             &uri,
             RelationshipTargetMode::Internal,
@@ -11250,7 +11250,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::LABEL_INFO,
             &uri,
             RelationshipTargetMode::Internal,
@@ -11283,7 +11283,7 @@ impl WordprocessingDocument {
             "application/vnd.openxmlformats-officedocument.oleObject",
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::OLE_OBJECT,
             &uri,
@@ -11387,7 +11387,7 @@ impl WordprocessingDocument {
             (&colors_uri, rel::DIAGRAM_COLORS),
             (&style_uri, rel::DIAGRAM_STYLE),
         ] {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &main_uri,
                 rel_ty,
                 uri,
@@ -11395,7 +11395,7 @@ impl WordprocessingDocument {
             );
         }
         // Persist layout is a child of the data part
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &data_uri,
             rel::DIAGRAM_PERSIST_LAYOUT,
             &drawing_uri,
@@ -11433,7 +11433,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::CUSTOM_UI_2007,
             &uri,
             RelationshipTargetMode::Internal,
@@ -11478,7 +11478,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::DOCUMENT_TASKS,
             &uri,
@@ -11511,7 +11511,7 @@ impl WordprocessingDocument {
             content_type::WORD_PRINTER_SETTINGS,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::PRINTER_SETTINGS,
             &uri,
@@ -11552,7 +11552,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::PEOPLE,
             &uri,
@@ -11589,7 +11589,7 @@ impl WordprocessingDocument {
             content_type::CUSTOM_XML_PROPERTIES,
             xml,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             custom_xml_uri,
             rel::CUSTOM_XML_PROPS,
             &props_uri,
@@ -11620,7 +11620,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::VBA_PROJECT,
             &uri,
@@ -11672,7 +11672,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::COMMENTS_EXTENDED,
             &uri,
@@ -11704,7 +11704,7 @@ impl WordprocessingDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::DIGITAL_SIGNATURE_ORIGIN,
             &uri,
             RelationshipTargetMode::Internal,
@@ -11734,7 +11734,7 @@ impl WordprocessingDocument {
             content_type::DIGITAL_SIGNATURE_XML,
             signature_xml.as_ref().to_vec(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &origin_uri,
             rel::DIGITAL_SIGNATURE,
             &sig_uri,
@@ -13308,7 +13308,7 @@ impl WordprocessingDocument {
         self.package
             .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             relationship_type,
             &part_uri,
@@ -13397,7 +13397,7 @@ impl WordprocessingDocument {
         self.package
             .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main,
             relationship_type,
             &part_uri,
@@ -19824,7 +19824,7 @@ impl WordprocessingDocument {
                 })
                 .unwrap_or(false);
             if !has_rel {
-                let _ = self.package.opc_mut().add_part_relationship(
+                let _ = self.package.add_part_relationship(
                     &main_uri,
                     "http://schemas.microsoft.com/office/2011/relationships/people",
                     &uri,

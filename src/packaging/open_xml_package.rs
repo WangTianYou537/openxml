@@ -658,6 +658,39 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Part factory by relationship type (C# `IPartFactoryFeature`).
+    pub fn part_factory(&mut self) -> &mut crate::features::PartFactoryFeature {
+        if !self
+            .features
+            .contains::<crate::features::PartFactoryFeature>()
+        {
+            self.features
+                .set(crate::features::PartFactoryFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::PartFactoryFeature>()
+            .expect("just inserted")
+    }
+
+    /// Known data-part relationship types (C# `IKnownDataPartFeature`).
+    pub fn known_data_part_feature(&mut self) -> &crate::features::KnownDataPartFeature {
+        if !self
+            .features
+            .contains::<crate::features::KnownDataPartFeature>()
+        {
+            self.features
+                .set(crate::features::KnownDataPartFeature::with_defaults());
+        }
+        self.features
+            .get::<crate::features::KnownDataPartFeature>()
+            .expect("just inserted")
+    }
+
+    /// Whether `relationship_type` is a known data-part relationship.
+    pub fn is_known_data_part_relationship(&mut self, relationship_type: &str) -> bool {
+        self.known_data_part_feature().is_known(relationship_type)
+    }
+
     /// Add a package-level relationship after running any registered relationship filters
     /// (C# relationship create + `IRelationshipFilterFeature`).
     pub fn add_package_relationship(

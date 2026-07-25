@@ -819,6 +819,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `RelationshipFilterFeature` / `PackageRelationshipBuilder` / `PackageFactoryFeature` / `ProgrammaticIdentifierFeature`
 - [x] `OpenXmlPackage::{add_package_relationship,add_part_relationship}` apply relationship filters
 - [x] `ContentTypeFeature` / `LockFeature` / `PartsFeature` (IContentTypeFeature / ILockFeature / IPartsFeature shells)
+- [x] `PartFactoryFeature` / `KnownDataPartFeature` shells + package accessors
+- [x] Route Word/Excel/PPT `add_*_relationship` through filtered `OpenXmlPackage` APIs
 
 **Still intentionally deferred / partial:**
 

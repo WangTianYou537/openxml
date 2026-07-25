@@ -362,7 +362,7 @@ impl SpreadsheetDocument {
             self.document_type.content_type(),
             b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><x:workbook xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><x:sheets/></x:workbook>".to_vec(),
         );
-        self.package.opc_mut().add_package_relationship(
+        self.package.add_package_relationship(
             rel::OFFICE_DOCUMENT,
             &wb_uri,
             RelationshipTargetMode::Internal,
@@ -1202,7 +1202,7 @@ impl SpreadsheetDocument {
             content_type::SPREADSHEET_TABLE,
             table_xml,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::TABLE,
             &table_uri,
@@ -5784,7 +5784,7 @@ impl SpreadsheetDocument {
             content_type::SPREADSHEET_DRAWING,
             b"<?xml version=\"1.0\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\"/>".to_vec(),
         );
-        let chart_rel = self.package.opc_mut().add_part_relationship(
+        let chart_rel = self.package.add_part_relationship(
             &drawing_uri,
             rel::CHART,
             chart_uri,
@@ -5803,7 +5803,7 @@ impl SpreadsheetDocument {
             content_type::SPREADSHEET_CHARTSHEET,
             b"placeholder".to_vec(),
         );
-        let drawing_rel = self.package.opc_mut().add_part_relationship(
+        let drawing_rel = self.package.add_part_relationship(
             &sheet_uri,
             rel::DRAWING,
             &drawing_uri,
@@ -5816,7 +5816,7 @@ impl SpreadsheetDocument {
             cs_xml,
         );
         // Workbook relationship + sheet entry
-        let sheet_rid = self.package.opc_mut().add_part_relationship(
+        let sheet_rid = self.package.add_part_relationship(
             &wb_uri,
             rel::CHARTSHEET,
             &sheet_uri,
@@ -10196,13 +10196,13 @@ impl SpreadsheetDocument {
             write_element(&timelines)?,
         );
         let wb_uri = self.ensure_workbook()?;
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::TIMELINE_CACHE,
             &cache_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &sheet_uri,
             rel::TIMELINE,
             &timelines_uri,
@@ -10330,13 +10330,13 @@ impl SpreadsheetDocument {
             content_type::CHART_COLOR_STYLE,
             write_element(&colors)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             chart_uri,
             rel::CHART_STYLE,
             &style_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             chart_uri,
             rel::CHART_COLOR_STYLE,
             &colors_uri,
@@ -10376,7 +10376,7 @@ impl SpreadsheetDocument {
             content_type::SPREADSHEET_DIALOGSHEET,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::DIALOGSHEET,
             &uri,
@@ -10429,7 +10429,7 @@ impl SpreadsheetDocument {
             content_type::NAMED_SHEET_VIEW,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::NAMED_SHEET_VIEW,
             &uri,
@@ -11031,7 +11031,7 @@ impl SpreadsheetDocument {
             content_type::THREADED_COMMENT,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::THREADED_COMMENT,
             &uri,
@@ -11060,7 +11060,7 @@ impl SpreadsheetDocument {
             content_type::PERSON,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::PERSON,
             &uri,
@@ -11134,19 +11134,19 @@ impl SpreadsheetDocument {
             content_type::USERS,
             write_element(&users)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &headers_uri,
             rel::REVISION_LOG,
             &log_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::REVISION_HEADERS,
             &headers_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::USERS,
             &users_uri,
@@ -11183,7 +11183,7 @@ impl SpreadsheetDocument {
             content_type::SORT_MAP,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::SORT_MAP,
             &uri,
@@ -11223,7 +11223,7 @@ impl SpreadsheetDocument {
             content_type::CELL_METADATA,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::CELL_METADATA,
             &uri,
@@ -11252,7 +11252,7 @@ impl SpreadsheetDocument {
             content_type::SPREADSHEET_PRINTER_SETTINGS,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::PRINTER_SETTINGS,
             &uri,
@@ -11270,7 +11270,7 @@ impl SpreadsheetDocument {
             content_type::EXCEL_ATTACHED_TOOLBARS,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::ATTACHED_TOOLBARS,
             &uri,
@@ -11291,7 +11291,7 @@ impl SpreadsheetDocument {
             content_type::RICH_STYLES,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::RICH_STYLES,
             &uri,
@@ -11322,13 +11322,13 @@ impl SpreadsheetDocument {
             content_type::SUPPORTING_PROPERTY_BAG,
             write_element(&data)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::SUPPORTING_PROPERTY_BAG_STRUCTURE,
             &struct_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::SUPPORTING_PROPERTY_BAG,
             &data_uri,
@@ -11350,7 +11350,7 @@ impl SpreadsheetDocument {
             content_type::RD_ARRAY,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::RD_ARRAY,
             &uri,
@@ -11384,7 +11384,7 @@ impl SpreadsheetDocument {
             content_type::CONTROL_PROPS,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::CONTROL_PROPS,
             &uri,
@@ -11416,7 +11416,7 @@ impl SpreadsheetDocument {
             content_type::CHART_DRAWING,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             chart_uri,
             rel::CHART_DRAWING,
             &uri,
@@ -11466,7 +11466,7 @@ impl SpreadsheetDocument {
             content_type::EXTENDED_CHART,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::EXTENDED_CHART,
             &uri,
@@ -11495,7 +11495,7 @@ impl SpreadsheetDocument {
             content_type::INT_MACRO_SHEET,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::INT_MACRO_SHEET,
             &uri,
@@ -11533,7 +11533,7 @@ impl SpreadsheetDocument {
             content_type::RD_RICH_VALUE_WEB_IMAGE,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::RD_RICH_VALUE_WEB_IMAGE,
             &uri,
@@ -11562,7 +11562,7 @@ impl SpreadsheetDocument {
             content_type::EMBEDDED_CONTROL_PERSISTENCE,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::EMBEDDED_CONTROL_PERSISTENCE,
             &uri,
@@ -11594,7 +11594,7 @@ impl SpreadsheetDocument {
             content_type::CUSTOM_PROPERTY_SPREADSHEET,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::CUSTOM_PROPERTY,
             &uri,
@@ -11626,7 +11626,7 @@ impl SpreadsheetDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::FONT,
             &uri,
@@ -11731,7 +11731,7 @@ impl SpreadsheetDocument {
             content_type::SINGLE_CELL_TABLE,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::SINGLE_CELL_TABLE,
             &uri,
@@ -11776,7 +11776,7 @@ impl SpreadsheetDocument {
             (&struct_uri, rel::RICH_VALUE_STRUCTURE),
             (&data_uri, rel::RICH_VALUE),
         ] {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &wb_uri,
                 rel_ty,
                 uri,
@@ -11799,7 +11799,7 @@ impl SpreadsheetDocument {
             content_type::FEATURE_PROPERTY_BAG,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::FEATURE_PROPERTY_BAG,
             &uri,
@@ -11834,7 +11834,7 @@ impl SpreadsheetDocument {
             content_type::MACRO_SHEET,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::MACRO_SHEET,
             &uri,
@@ -11898,7 +11898,7 @@ impl SpreadsheetDocument {
             content_type::THEME_OVERRIDE,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             parent_uri,
             rel::THEME_OVERRIDE,
             &uri,
@@ -11937,13 +11937,13 @@ impl SpreadsheetDocument {
             content_type::CUSTOM_DATA_PROPS,
             write_element(&props)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &props_uri,
             rel::CUSTOM_DATA,
             &data_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::CUSTOM_DATA_PROPS,
             &props_uri,
@@ -11980,7 +11980,7 @@ impl SpreadsheetDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::CUSTOM_XML_MAPPINGS,
             &uri,
@@ -12024,7 +12024,7 @@ impl SpreadsheetDocument {
             content_type::SPREADSHEET_QUERY_TABLE,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &sheet_uri,
             rel::QUERY_TABLE,
             &uri,
@@ -12055,7 +12055,7 @@ impl SpreadsheetDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::VOLATILE_DEPENDENCIES,
             &uri,
@@ -12104,7 +12104,7 @@ impl SpreadsheetDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::CONNECTIONS,
             &uri,
@@ -12170,13 +12170,13 @@ impl SpreadsheetDocument {
         );
         // workbook → cache, worksheet → slicers
         let wb_uri = self.ensure_workbook()?;
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &wb_uri,
             rel::SLICER_CACHE,
             &cache_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &sheet_uri,
             rel::SLICER,
             &slicers_uri,
@@ -12460,7 +12460,7 @@ impl SpreadsheetDocument {
         {
             return Ok((theme_uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::THEME,
             &theme_uri,
@@ -12513,7 +12513,7 @@ impl SpreadsheetDocument {
             target_workbook,
             RelationshipTargetMode::External,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::EXTERNAL_LINK,
             &link_uri,
@@ -17829,7 +17829,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .and_then(|rels| rels.get_by_type(rel::CALC_CHAIN))
             .is_none()
         {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &wb_uri,
                 rel::CALC_CHAIN,
                 &chain_uri,
@@ -19207,7 +19207,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             ws_xml,
         );
 
-        let sheet_rel = self.package.opc_mut().add_part_relationship(
+        let sheet_rel = self.package.add_part_relationship(
             &wb_uri,
             rel::WORKSHEET,
             &ws_uri,
@@ -19379,7 +19379,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .and_then(|rels| rels.get_by_type(rel::SHARED_STRINGS))
             .is_some();
         if !has {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &wb_uri,
                 rel::SHARED_STRINGS,
                 &sst_uri,
@@ -21012,7 +21012,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         self.package
             .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             relationship_type,
             &part_uri,
@@ -21040,7 +21040,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::DRAWINGML_CHART,
             xml,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::CHART,
             &chart_uri,
@@ -21107,7 +21107,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             b"<?xml version=\"1.0\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\"/>".to_vec(),
         );
 
-        let chart_rel = self.package.opc_mut().add_part_relationship(
+        let chart_rel = self.package.add_part_relationship(
             &drawing_uri,
             rel::CHART,
             &chart_uri,
@@ -21130,7 +21130,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         );
 
         // Worksheet → drawing relationship
-        let drawing_rel = self.package.opc_mut().add_part_relationship(
+        let drawing_rel = self.package.add_part_relationship(
             &sheet_uri,
             rel::DRAWING,
             &drawing_uri,
@@ -21214,7 +21214,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             b"<?xml version=\"1.0\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\"/>".to_vec(),
         );
 
-        let image_rel = self.package.opc_mut().add_part_relationship(
+        let image_rel = self.package.add_part_relationship(
             &drawing_uri,
             rel::IMAGE,
             &image_uri,
@@ -21230,7 +21230,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             drawing_xml,
         );
 
-        let drawing_rel = self.package.opc_mut().add_part_relationship(
+        let drawing_rel = self.package.add_part_relationship(
             &sheet_uri,
             rel::DRAWING,
             &drawing_uri,
@@ -21405,7 +21405,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             })
             .unwrap_or(false);
         if !has {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &sheet_uri,
                 rel::COMMENTS,
                 &comments_uri,
@@ -21443,7 +21443,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 })
                 .unwrap_or(false);
             if !has_vml {
-                self.package.opc_mut().add_part_relationship(
+                self.package.add_part_relationship(
                     &sheet_uri,
                     rel::VML_DRAWING,
                     &vml_uri,
@@ -22229,7 +22229,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .and_then(|rels| rels.get_by_type(rel::STYLES))
             .is_some();
         if !has {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &wb_uri,
                 rel::STYLES,
                 &styles_uri,
@@ -22344,7 +22344,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::SPREADSHEET_PIVOT_CACHE_RECORDS,
             write_element(&records_el)?,
         );
-        let records_rel = self.package.opc_mut().add_part_relationship(
+        let records_rel = self.package.add_part_relationship(
             &cache_def_uri,
             rel::PIVOT_CACHE_RECORDS,
             &cache_rec_uri,
@@ -22365,7 +22365,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
         // Workbook → cache definition
         let cache_id = cindex;
-        let cache_rel = self.package.opc_mut().add_part_relationship(
+        let cache_rel = self.package.add_part_relationship(
             &wb_uri,
             rel::PIVOT_CACHE_DEFINITION,
             &cache_def_uri,
@@ -22421,7 +22421,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         );
 
         // Target sheet → pivot table
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &target_uri,
             rel::PIVOT_TABLE,
             &pivot_uri,
@@ -22429,7 +22429,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         );
 
         // Pivot table → cache definition
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &pivot_uri,
             rel::PIVOT_CACHE_DEFINITION,
             &cache_def_uri,
@@ -22793,7 +22793,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok(existing);
         }
-        Ok(self.package.opc_mut().add_part_relationship(
+        Ok(self.package.add_part_relationship(
             &wb_uri,
             rel::STYLES,
             &styles_uri,
@@ -22905,7 +22905,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok(existing);
         }
-        Ok(self.package.opc_mut().add_part_relationship(
+        Ok(self.package.add_part_relationship(
             &wb_uri,
             rel::STYLES,
             &styles_uri,
@@ -23644,7 +23644,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok(existing);
         }
-        Ok(self.package.opc_mut().add_package_relationship(
+        Ok(self.package.add_package_relationship(
             rel::THUMBNAIL,
             &uri,
             RelationshipTargetMode::Internal,
@@ -23718,7 +23718,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::DIGITAL_SIGNATURE_ORIGIN,
             &uri,
             RelationshipTargetMode::Internal,
@@ -23745,7 +23745,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::DIGITAL_SIGNATURE_XML,
             signature_xml.as_ref().to_vec(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &origin_uri,
             rel::DIGITAL_SIGNATURE,
             &sig_uri,
@@ -23858,7 +23858,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::CUSTOM_XML,
             xml_bytes.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::CUSTOM_XML,
             &part_uri,
@@ -23893,7 +23893,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::CUSTOM_XML_PROPERTIES,
             xml,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             custom_xml_uri,
             rel::CUSTOM_XML_PROPS,
             &props_uri,
@@ -23957,7 +23957,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::PACKAGE,
             &uri,
@@ -24000,7 +24000,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             "application/vnd.openxmlformats-officedocument.oleObject",
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::OLE_OBJECT,
             &uri,
@@ -24114,7 +24114,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::VBA_PROJECT,
             &uri,
@@ -24228,7 +24228,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::CUSTOM_UI_2007,
             &uri,
             RelationshipTargetMode::Internal,
@@ -24311,7 +24311,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::SPREADSHEET_PRINTER_SETTINGS,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &wb_uri,
             rel::PRINTER_SETTINGS,
             &uri,
@@ -24401,7 +24401,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::QAT,
             &uri,
             RelationshipTargetMode::Internal,
@@ -24476,7 +24476,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::LABEL_INFO,
             &uri,
             RelationshipTargetMode::Internal,
@@ -24583,7 +24583,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::WEB_EXTENSION_TASKPANES,
             crate::element::write_element(&taskpanes)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &tp_uri,
             rel::WEB_EXTENSION,
             &we_uri,
@@ -24596,7 +24596,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .get_by_type(rel::WEB_EXTENSION_TASKPANES)
             .is_none()
         {
-            self.package.opc_mut().add_package_relationship(
+            self.package.add_package_relationship(
                 rel::WEB_EXTENSION_TASKPANES,
                 &tp_uri,
                 RelationshipTargetMode::Internal,
@@ -24824,7 +24824,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             (&colors_uri, rel::DIAGRAM_COLORS),
             (&style_uri, rel::DIAGRAM_STYLE),
         ] {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &main_uri,
                 rel_ty,
                 uri,
@@ -24832,7 +24832,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             );
         }
         // Persist layout is a child of the data part
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &data_uri,
             rel::DIAGRAM_PERSIST_LAYOUT,
             &drawing_uri,
@@ -24869,13 +24869,13 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             content_type::LEGACY_DIAGRAM_TEXT_INFO,
             crate::element::write_element(&info)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &main_uri,
             rel::LEGACY_DIAGRAM_TEXT,
             &text_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &text_uri,
             rel::LEGACY_DIAGRAM_TEXT_INFO,
             &info_uri,
@@ -24920,7 +24920,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         self.package
             .opc_mut()
             .set_part(uri.clone(), ct, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::IMAGE,
             &uri,
@@ -25766,7 +25766,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         self.package
             .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main,
             relationship_type,
             &part_uri,

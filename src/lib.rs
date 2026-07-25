@@ -67,10 +67,11 @@ pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlQuali
 pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, ApplicationType, ContentTypeFeature, DisposableFeature, DocumentTypeFeature,
-    FeatureCollection, LockFeature, MainPartFeature, PackageCapabilities, PackageEvent,
-    PackageEventType, PackageEvents, PackageFactoryFeature, PackageRelationshipBuilder,
-    ParagraphIdGenerator, PartEvents, PartRootEvents, PartsFeature, ProgrammaticIdentifierFeature,
-    RelationshipFilterFeature, SchemaTrackingFeature, StrictNamespaceFeature,
+    FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature, PackageCapabilities,
+    PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageRelationshipBuilder,
+    ParagraphIdGenerator, PartEvents, PartFactoryFeature, PartRootEvents, PartsFeature,
+    ProgrammaticIdentifierFeature, RelationshipFilterFeature, SchemaTrackingFeature,
+    StrictNamespaceFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

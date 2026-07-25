@@ -643,6 +643,88 @@ impl PartsFeature {
     }
 }
 
+/// Creates parts from relationship types (C# `IPartFactoryFeature` shell).
+///
+/// Maps relationship type → part name / content type metadata for dynamic part creation.
+#[derive(Debug, Default, Clone)]
+pub struct PartFactoryFeature {
+    /// relationship_type → part type name (e.g. `"ImagePart"`).
+    by_relationship: std::collections::HashMap<String, String>,
+}
+
+impl PartFactoryFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, relationship_type: impl Into<String>, part_name: impl Into<String>) {
+        self.by_relationship
+            .insert(relationship_type.into(), part_name.into());
+    }
+
+    /// C# `IPartFactoryFeature.Create` — returns registered part name for `relationship_type`.
+    pub fn create(&self, relationship_type: &str) -> Option<&str> {
+        self.by_relationship
+            .get(relationship_type)
+            .map(|s| s.as_str())
+    }
+
+    pub fn contains(&self, relationship_type: &str) -> bool {
+        self.by_relationship.contains_key(relationship_type)
+    }
+
+    pub fn len(&self) -> usize {
+        self.by_relationship.len()
+    }
+}
+
+/// Known data-part relationship types (C# `IKnownDataPartFeature`).
+#[derive(Debug, Clone)]
+pub struct KnownDataPartFeature {
+    types: std::collections::HashSet<String>,
+}
+
+impl Default for KnownDataPartFeature {
+    fn default() -> Self {
+        Self::with_defaults()
+    }
+}
+
+impl KnownDataPartFeature {
+    pub fn new() -> Self {
+        Self {
+            types: std::collections::HashSet::new(),
+        }
+    }
+
+    pub fn with_defaults() -> Self {
+        let mut f = Self::new();
+        // Common Office data/media relationship types
+        for t in [
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/video",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/media",
+            "http://schemas.microsoft.com/office/2007/relationships/media",
+        ] {
+            f.register(t);
+        }
+        f
+    }
+
+    pub fn register(&mut self, relationship_type: impl Into<String>) {
+        self.types.insert(relationship_type.into());
+    }
+
+    /// C# `IKnownDataPartFeature.IsKnown`.
+    pub fn is_known(&self, relationship_type: &str) -> bool {
+        self.types.contains(relationship_type)
+    }
+
+    pub fn len(&self) -> usize {
+        self.types.len()
+    }
+}
+
 /// Application host type flags (C# `ApplicationType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ApplicationType {
@@ -1001,5 +1083,29 @@ mod tests {
         assert!(parts.contains("/word/document.xml"));
         assert!(parts.remove("/word/document.xml"));
         assert!(parts.is_empty());
+    }
+
+    #[test]
+    fn part_factory_and_known_data_part() {
+        let mut factory = PartFactoryFeature::new();
+        factory.register(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+            "ImagePart",
+        );
+        assert_eq!(
+            factory.create(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+            ),
+            Some("ImagePart")
+        );
+        assert!(factory.contains(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+        ));
+
+        let known = KnownDataPartFeature::with_defaults();
+        assert!(known.is_known(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio"
+        ));
+        assert!(!known.is_known("http://example/unknown"));
     }
 }

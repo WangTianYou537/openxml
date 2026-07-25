@@ -1304,7 +1304,7 @@ impl PresentationDocument {
         {
             return Ok(existing);
         }
-        Ok(self.package.opc_mut().add_package_relationship(
+        Ok(self.package.add_package_relationship(
             rel::THUMBNAIL,
             &uri,
             RelationshipTargetMode::Internal,
@@ -1381,7 +1381,7 @@ impl PresentationDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::DIGITAL_SIGNATURE_ORIGIN,
             &uri,
             RelationshipTargetMode::Internal,
@@ -1408,7 +1408,7 @@ impl PresentationDocument {
             content_type::DIGITAL_SIGNATURE_XML,
             signature_xml.as_ref().to_vec(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &origin_uri,
             rel::DIGITAL_SIGNATURE,
             &sig_uri,
@@ -1524,7 +1524,7 @@ impl PresentationDocument {
             content_type::CUSTOM_XML,
             xml_bytes.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::CUSTOM_XML,
             &part_uri,
@@ -1558,7 +1558,7 @@ impl PresentationDocument {
             content_type::CUSTOM_XML_PROPERTIES,
             xml,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             custom_xml_uri,
             rel::CUSTOM_XML_PROPS,
             &props_uri,
@@ -1621,7 +1621,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::PACKAGE,
             &uri,
@@ -1662,7 +1662,7 @@ impl PresentationDocument {
             "application/vnd.openxmlformats-officedocument.oleObject",
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::OLE_OBJECT,
             &uri,
@@ -1750,7 +1750,7 @@ impl PresentationDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::VBA_PROJECT,
             &uri,
@@ -1864,7 +1864,7 @@ impl PresentationDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::CUSTOM_UI_2007,
             &uri,
             RelationshipTargetMode::Internal,
@@ -1948,7 +1948,7 @@ impl PresentationDocument {
             content_type::SPREADSHEET_PRINTER_SETTINGS,
             data.into(),
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::PRINTER_SETTINGS,
             &uri,
@@ -2032,7 +2032,7 @@ impl PresentationDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::ATTACHED_TOOLBARS,
             &uri,
@@ -2109,7 +2109,7 @@ impl PresentationDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::QAT,
             &uri,
             RelationshipTargetMode::Internal,
@@ -2187,7 +2187,7 @@ impl PresentationDocument {
         {
             return Ok((existing, uri));
         }
-        let rid = self.package.opc_mut().add_package_relationship(
+        let rid = self.package.add_package_relationship(
             rel::LABEL_INFO,
             &uri,
             RelationshipTargetMode::Internal,
@@ -2299,7 +2299,7 @@ impl PresentationDocument {
             content_type::WEB_EXTENSION_TASKPANES,
             crate::element::write_element(&taskpanes)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &tp_uri,
             rel::WEB_EXTENSION,
             &we_uri,
@@ -2312,7 +2312,7 @@ impl PresentationDocument {
             .get_by_type(rel::WEB_EXTENSION_TASKPANES)
             .is_none()
         {
-            self.package.opc_mut().add_package_relationship(
+            self.package.add_package_relationship(
                 rel::WEB_EXTENSION_TASKPANES,
                 &tp_uri,
                 RelationshipTargetMode::Internal,
@@ -2547,7 +2547,7 @@ impl PresentationDocument {
             (&colors_uri, rel::DIAGRAM_COLORS),
             (&style_uri, rel::DIAGRAM_STYLE),
         ] {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &main_uri,
                 rel_ty,
                 uri,
@@ -2555,7 +2555,7 @@ impl PresentationDocument {
             );
         }
         // Persist layout is a child of the data part
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &data_uri,
             rel::DIAGRAM_PERSIST_LAYOUT,
             &drawing_uri,
@@ -2591,13 +2591,13 @@ impl PresentationDocument {
             content_type::LEGACY_DIAGRAM_TEXT_INFO,
             crate::element::write_element(&info)?,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &main_uri,
             rel::LEGACY_DIAGRAM_TEXT,
             &text_uri,
             RelationshipTargetMode::Internal,
         );
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &text_uri,
             rel::LEGACY_DIAGRAM_TEXT_INFO,
             &info_uri,
@@ -2642,7 +2642,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), ct, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main_uri,
             rel::IMAGE,
             &uri,
@@ -3269,7 +3269,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &main,
             relationship_type,
             &part_uri,
@@ -3355,7 +3355,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             relationship_type,
             &part_uri,
@@ -3374,7 +3374,7 @@ impl PresentationDocument {
             self.document_type.content_type(),
             b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><p:sldIdLst/></p:presentation>".to_vec(),
         );
-        self.package.opc_mut().add_package_relationship(
+        self.package.add_package_relationship(
             rel::OFFICE_DOCUMENT,
             &pres_uri,
             RelationshipTargetMode::Internal,
@@ -3809,7 +3809,7 @@ impl PresentationDocument {
                 .and_then(|r| r.get_by_type(rel_ty))
                 .is_none()
             {
-                let _ = self.package.opc_mut().add_part_relationship(
+                let _ = self.package.add_part_relationship(
                     &pres_uri,
                     rel_ty,
                     &uri,
@@ -3827,7 +3827,7 @@ impl PresentationDocument {
                 .and_then(|r| r.get_by_type(rel::THEME))
                 .is_none()
         {
-            let _ = self.package.opc_mut().add_part_relationship(
+            let _ = self.package.add_part_relationship(
                 &pres_uri,
                 rel::THEME,
                 &theme_uri,
@@ -3851,7 +3851,7 @@ impl PresentationDocument {
             .and_then(|r| r.get_by_type(rel::TABLE_STYLES))
             .is_none()
         {
-            let _ = self.package.opc_mut().add_part_relationship(
+            let _ = self.package.add_part_relationship(
                 &pres_uri,
                 rel::TABLE_STYLES,
                 &table_uri,
@@ -3965,7 +3965,7 @@ impl PresentationDocument {
         {
             r
         } else {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &pres_uri,
                 rel::SLIDE_MASTER,
                 &master_uri,
@@ -4017,7 +4017,7 @@ impl PresentationDocument {
         let (_, layout) = self.ensure_default_master_layout()?;
         let info = self.add_slide(slide_root)?;
         // Relate slide → layout
-        let _ = self.package.opc_mut().add_part_relationship(
+        let _ = self.package.add_part_relationship(
             &info.uri,
             rel::SLIDE_LAYOUT,
             &layout.uri,
@@ -4054,14 +4054,14 @@ impl PresentationDocument {
         );
 
         // slide → notesSlide
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &slide_info.uri,
             rel::NOTES_SLIDE,
             &notes_uri,
             RelationshipTargetMode::Internal,
         );
         // notesSlide → slide
-        self.package.opc_mut().add_part_relationship(
+        self.package.add_part_relationship(
             &notes_uri,
             rel::SLIDE,
             &slide_info.uri,
@@ -10081,7 +10081,7 @@ impl PresentationDocument {
             .and_then(|rels| rels.get_by_type(rel::NOTES_MASTER))
             .is_none()
         {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &pres_uri,
                 rel::NOTES_MASTER,
                 &master_uri,
@@ -10504,7 +10504,7 @@ impl PresentationDocument {
             .and_then(|rels| rels.get_by_type(rel::HANDOUT_MASTER))
             .is_none()
         {
-            self.package.opc_mut().add_part_relationship(
+            self.package.add_part_relationship(
                 &pres_uri,
                 rel::HANDOUT_MASTER,
                 &master_uri,
@@ -10586,7 +10586,7 @@ impl PresentationDocument {
             content_type::PRESENTATION_COMMENTS,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &slide_info.uri,
             rel::COMMENTS,
             &uri,
@@ -10628,7 +10628,7 @@ impl PresentationDocument {
             content_type::USER_DEFINED_TAGS,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &slide_info.uri,
             rel::USER_DEFINED_TAGS,
             &uri,
@@ -10659,7 +10659,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type::MODEL_3D, glb_data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &slide_info.uri,
             rel::MODEL_3D,
             &uri,
@@ -10697,7 +10697,7 @@ impl PresentationDocument {
             content_type::SLIDE_SYNC,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &slide_info.uri,
             rel::SLIDE_SYNC,
             &uri,
@@ -10749,7 +10749,7 @@ impl PresentationDocument {
             content_type::DRAWINGML_CHART,
             write_element(&chart)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &slide_info.uri,
             rel::CHART,
             &uri,
@@ -10795,7 +10795,7 @@ impl PresentationDocument {
         } else {
             slide_info.uri.clone()
         };
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &parent,
             rel::CHART_DRAWING,
             &uri,
@@ -10868,7 +10868,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::FONT,
             &uri,
@@ -11166,7 +11166,7 @@ impl PresentationDocument {
             content_type::PPT_MODERN_COMMENTS,
             write_element(&root)?,
         );
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &slide_info.uri,
             rel::PPT_MODERN_COMMENTS,
             &uri,
@@ -11204,7 +11204,7 @@ impl PresentationDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::PPT_AUTHORS,
             &uri,
@@ -11247,7 +11247,7 @@ impl PresentationDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::COMMENT_AUTHORS,
             &uri,
@@ -11283,7 +11283,7 @@ impl PresentationDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::PRES_PROPS,
             &uri,
@@ -12375,7 +12375,7 @@ impl PresentationDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::TABLE_STYLES,
             &uri,
@@ -12537,7 +12537,7 @@ impl PresentationDocument {
         {
             return Ok((uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::VIEW_PROPS,
             &uri,
@@ -13721,7 +13721,7 @@ impl PresentationDocument {
         {
             return Ok((theme_uri, existing));
         }
-        let rid = self.package.opc_mut().add_part_relationship(
+        let rid = self.package.add_part_relationship(
             &pres_uri,
             rel::THEME,
             &theme_uri,
@@ -17100,7 +17100,7 @@ impl PresentationDocument {
                 } else {
                     // Resolve target relative to source, re-relativize to new slide
                     if let Ok(abs) = crate::opc::resolve_uri(&slide_info.uri, &target) {
-                        let _ = self.package.opc_mut().add_part_relationship(
+                        let _ = self.package.add_part_relationship(
                             &new_info.uri,
                             &ty,
                             &abs,
@@ -17127,7 +17127,7 @@ impl PresentationDocument {
             .opc_mut()
             .set_part(slide_uri.clone(), content_type::PRESENTATION_SLIDE, xml);
 
-        let slide_rel = self.package.opc_mut().add_part_relationship(
+        let slide_rel = self.package.add_part_relationship(
             &pres_uri,
             rel::SLIDE,
             &slide_uri,
@@ -17186,7 +17186,7 @@ impl PresentationDocument {
         self.package
             .opc_mut()
             .set_part(image_uri.clone(), content_type_str, image_bytes.to_vec());
-        let img_rel = self.package.opc_mut().add_part_relationship(
+        let img_rel = self.package.add_part_relationship(
             &slide_uri,
             rel::IMAGE,
             &image_uri,
@@ -17519,7 +17519,7 @@ impl PresentationDocument {
                 .overrides
                 .shift_remove(svg_uri.as_str());
         }
-        let svg_rel = self.package.opc_mut().add_part_relationship(
+        let svg_rel = self.package.add_part_relationship(
             &slide_uri,
             rel::IMAGE,
             &svg_uri,
