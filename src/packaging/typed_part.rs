@@ -77,7 +77,7 @@ impl TypedPart {
             .content_type
             .ok_or_else(|| Error::Package(format!("{} has no fixed content type", self.info.name)))?;
         let xml = write_element(element)?;
-        package.opc_mut().set_part(self.uri.clone(), ct, xml);
+        package.set_part(self.uri.clone(), ct, xml);
         Ok(())
     }
 
@@ -200,7 +200,7 @@ pub fn add_typed_part(
         ext,
         true,
     )?;
-    package.opc_mut().set_part(uri.clone(), ct, data.into());
+    package.set_part(uri.clone(), ct, data.into());
     let rid = package.opc_mut().add_part_relationship(
         parent,
         info.relationship_type,

@@ -301,7 +301,7 @@ impl WordprocessingDocument {
         let part = MainDocumentPart::new(ct.clone());
 
         // Register content type + package relationship
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             MainDocumentPart::URI,
             ct,
             // Minimal empty document shell; caller typically sets document immediately.
@@ -1382,7 +1382,7 @@ impl WordprocessingDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             item_uri.clone(),
             content_type::CUSTOM_XML,
             xml.as_ref().to_vec(),
@@ -1426,7 +1426,7 @@ impl WordprocessingDocument {
         extension: &str,
     ) -> Result<String> {
         let uri = PackUri::new(format!("/docProps/thumbnail.{extension}"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type_str,
             image_bytes.into(),
@@ -1526,7 +1526,7 @@ impl WordprocessingDocument {
             root.append_child(paragraph_style(id, name, *based, false));
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             styles_uri,
             content_type::WORD_STYLES,
             xml,
@@ -1559,7 +1559,7 @@ impl WordprocessingDocument {
         root.children
             .insert(0, doc_defaults(ascii_font, font_size_half_points));
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             styles_uri,
             content_type::WORD_STYLES,
             xml,
@@ -1672,7 +1672,7 @@ impl WordprocessingDocument {
                 .content_type_for(uri.as_str())
                 .unwrap_or("application/xml")
                 .to_string();
-            self.package.opc_mut().set_part(uri, ct, xml);
+            self.package.set_part(uri, ct, xml);
         }
         Ok(removed)
     }
@@ -1727,7 +1727,7 @@ impl WordprocessingDocument {
                     .content_type_for(uri.as_str())
                     .unwrap_or("application/xml")
                     .to_string();
-                self.package.opc_mut().set_part(uri, ct, xml);
+                self.package.set_part(uri, ct, xml);
             }
         }
         Ok(updated)
@@ -1767,7 +1767,7 @@ impl WordprocessingDocument {
                     .content_type_for(uri.as_str())
                     .unwrap_or("application/xml")
                     .to_string();
-                self.package.opc_mut().set_part(uri, ct, xml);
+                self.package.set_part(uri, ct, xml);
             }
         }
         Ok(updated)
@@ -2067,7 +2067,7 @@ impl WordprocessingDocument {
         if root.child("evenAndOddHeaders").is_none() {
             root.append_child(OpenXmlElement::w("evenAndOddHeaders"));
             let xml = crate::element::write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 settings_uri,
                 content_type::WORD_SETTINGS,
                 xml,
@@ -2099,7 +2099,7 @@ impl WordprocessingDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = crate::element::write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 settings_uri,
                 content_type::WORD_SETTINGS,
                 xml,
@@ -2217,7 +2217,7 @@ impl WordprocessingDocument {
             root.append_child(document_variables(vars.iter().copied()));
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -2962,7 +2962,7 @@ impl WordprocessingDocument {
             root.append_child(OpenXmlElement::w("mirrorMargins"));
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -2992,7 +2992,7 @@ impl WordprocessingDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = crate::element::write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 settings_uri,
                 content_type::WORD_SETTINGS,
                 xml,
@@ -3022,7 +3022,7 @@ impl WordprocessingDocument {
             );
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -3049,7 +3049,7 @@ impl WordprocessingDocument {
             root.append_child(OpenXmlElement::w("trackRevisions"));
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -6136,7 +6136,7 @@ impl WordprocessingDocument {
         );
         root.append_child(compat);
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -6237,7 +6237,7 @@ impl WordprocessingDocument {
             compat.append_child(OpenXmlElement::w(local_name));
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -6328,7 +6328,7 @@ impl WordprocessingDocument {
                 .with_attribute_qname("w:val", val),
         );
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -6459,7 +6459,7 @@ impl WordprocessingDocument {
         let removed = compat.children.len() < before;
         if removed {
             let xml = crate::element::write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 settings_uri,
                 content_type::WORD_SETTINGS,
                 xml,
@@ -6556,7 +6556,7 @@ impl WordprocessingDocument {
             .retain(|c| c.local_name != "documentProtection");
         root.append_child(document_protection(edit, enforcement));
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -6655,7 +6655,7 @@ impl WordprocessingDocument {
         }
         root.append_child(el);
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             settings_uri,
             content_type::WORD_SETTINGS,
             xml,
@@ -6681,7 +6681,7 @@ impl WordprocessingDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = crate::element::write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 settings_uri,
                 content_type::WORD_SETTINGS,
                 xml,
@@ -9423,7 +9423,7 @@ impl WordprocessingDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.recipients+xml",
             recipients_xml.as_ref().to_vec(),
@@ -9943,7 +9943,7 @@ impl WordprocessingDocument {
     }
 
     fn save_web_settings(&mut self, uri: PackUri, root: &OpenXmlElement) -> Result<()> {
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri,
             content_type::WORD_WEB_SETTINGS,
             crate::element::write_element(root)?,
@@ -10527,12 +10527,12 @@ impl WordprocessingDocument {
                             .with_attribute_qname("r:id", "rId1"),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             we_uri.clone(),
             content_type::WEB_EXTENSION,
             crate::element::write_element(&ext)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             tp_uri.clone(),
             content_type::WEB_EXTENSION_TASKPANES,
             crate::element::write_element(&taskpanes)?,
@@ -10582,7 +10582,7 @@ impl WordprocessingDocument {
                     .with_attribute_qname("w16cid:durableId", *durable_id),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::WORD_COMMENTS_IDS,
             crate::element::write_element(&root)?,
@@ -10607,7 +10607,7 @@ impl WordprocessingDocument {
         let w16cex = "http://schemas.microsoft.com/office/word/2018/wordml/cex";
         let root = OpenXmlElement::new("w16cex", w16cex, "commentsExtensible")
             .with_ns_decl("w16cex", w16cex);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::WORD_COMMENTS_EXTENSIBLE,
             crate::element::write_element(&root)?,
@@ -10632,7 +10632,7 @@ impl WordprocessingDocument {
             .ok_or_else(|| Error::Package("no main document part".into()))?;
         let main_uri = main.part().uri.clone();
         let uri = PackUri::new("/word/attachedToolbars.bin");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::ATTACHED_TOOLBARS,
             data.into(),
@@ -10667,7 +10667,7 @@ impl WordprocessingDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOM_PROPERTY_XML,
             data.into(),
@@ -10796,7 +10796,7 @@ impl WordprocessingDocument {
             index += 1;
         };
         let chart = crate::spreadsheet::bar_chart_space(title, categories, values);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::DRAWINGML_CHART,
             crate::element::write_element(&chart)?,
@@ -11030,7 +11030,7 @@ impl WordprocessingDocument {
             index += 1;
         };
         let info_uri = PackUri::new(format!("/word/diagrams/legacy/textInfo{index}.xml"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             text_uri.clone(),
             content_type::LEGACY_DIAGRAM_TEXT,
             text_data.into(),
@@ -11038,7 +11038,7 @@ impl WordprocessingDocument {
         let dgm = "http://schemas.microsoft.com/office/drawing/2008/diagram";
         let info = OpenXmlElement::new("dgm", dgm, "textInfo")
             .with_ns_decl("dgm", dgm);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             info_uri.clone(),
             content_type::LEGACY_DIAGRAM_TEXT_INFO,
             crate::element::write_element(&info)?,
@@ -11079,7 +11079,7 @@ impl WordprocessingDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PACKAGE_EMBEDDED,
             data.into(),
@@ -11103,7 +11103,7 @@ impl WordprocessingDocument {
         let uri = PackUri::new("/word/stylesWithEffects.xml");
         // Copy default styles content
         let styles = crate::packaging::parts::default_styles();
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::STYLES_WITH_EFFECTS,
             crate::element::write_element(&styles)?,
@@ -11146,7 +11146,7 @@ impl WordprocessingDocument {
         let root = OpenXmlElement::new("wne", wne, "vbaSuppData")
             .with_ns_decl("wne", wne)
             .with_child(OpenXmlElement::new("wne", wne, "mcds"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::VBA_DATA,
             crate::element::write_element(&root)?,
@@ -11172,7 +11172,7 @@ impl WordprocessingDocument {
         let root = OpenXmlElement::new("wne", wne, "tcg")
             .with_ns_decl("wne", wne)
             .with_child(OpenXmlElement::new("wne", wne, "keymaps"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOMIZATION,
             crate::element::write_element(&root)?,
@@ -11199,7 +11199,7 @@ impl WordprocessingDocument {
                     ),
                 ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::QAT,
             crate::element::write_element(&root)?,
@@ -11233,7 +11233,7 @@ impl WordprocessingDocument {
                     .with_attribute("name", name)
                     .with_attribute("enabled", "1"),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::LABEL_INFO,
             crate::element::write_element(&root)?,
@@ -11275,7 +11275,7 @@ impl WordprocessingDocument {
             index += 1;
         };
         let _ = prog_id;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             "application/vnd.openxmlformats-officedocument.oleObject",
             data.into(),
@@ -11371,7 +11371,7 @@ impl WordprocessingDocument {
             (&style_uri, content_type::DIAGRAM_STYLE, style),
             (&drawing_uri, content_type::DIAGRAM_PERSIST_LAYOUT, drawing),
         ] {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri.clone(),
                 ct,
                 crate::element::write_element(&el)?,
@@ -11409,7 +11409,7 @@ impl WordprocessingDocument {
         custom_ui_xml: impl AsRef<[u8]>,
     ) -> Result<(String, PackUri)> {
         let uri = PackUri::new("/customUI/customUI.xml");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOM_UI,
             custom_ui_xml.as_ref().to_vec(),
@@ -11503,7 +11503,7 @@ impl WordprocessingDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::WORD_PRINTER_SETTINGS,
             data.into(),
@@ -11581,7 +11581,7 @@ impl WordprocessingDocument {
             .with_attribute_qname("ds:itemID", item_id)
             .with_child(OpenXmlElement::new("ds", ds, "schemaRefs"));
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             props_uri.clone(),
             content_type::CUSTOM_XML_PROPERTIES,
             xml,
@@ -11653,7 +11653,7 @@ impl WordprocessingDocument {
             );
         }
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::WORD_COMMENTS_EXTENDED,
             xml,
@@ -11686,7 +11686,7 @@ impl WordprocessingDocument {
         let uri = PackUri::new("/_xmlsignatures/origin.sigs");
         if !self.package.opc().has_part(&uri) {
             // Empty origin part (binary placeholder)
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri.clone(),
                 content_type::DIGITAL_SIGNATURE_ORIGIN,
                 Vec::new(),
@@ -11726,7 +11726,7 @@ impl WordprocessingDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sig_uri.clone(),
             content_type::DIGITAL_SIGNATURE_XML,
             signature_xml.as_ref().to_vec(),
@@ -12835,7 +12835,7 @@ impl WordprocessingDocument {
                         }
                     });
                 let xml = crate::element::write_element(&root)?;
-                self.package.opc_mut().set_part(uri, ct, xml);
+                self.package.set_part(uri, ct, xml);
             }
         }
         Ok(total)
@@ -12871,7 +12871,7 @@ impl WordprocessingDocument {
                         }
                     });
                 let xml = crate::element::write_element(&root)?;
-                self.package.opc_mut().set_part(uri, ct, xml);
+                self.package.set_part(uri, ct, xml);
             }
         }
         Ok(total)
@@ -19805,7 +19805,7 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         let ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
-        self.package.opc_mut().set_part(uri.clone(), ct, xml);
+        self.package.set_part(uri.clone(), ct, xml);
         // Ensure relationship from main
         if let Some(main) = self.main_document_part.as_ref() {
             let main_uri = main.part().uri.clone();
@@ -19903,7 +19903,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             let ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
-            self.package.opc_mut().set_part(uri, ct, xml);
+            self.package.set_part(uri, ct, xml);
         }
         Ok(found)
     }
@@ -19936,7 +19936,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             let ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.people+xml";
-            self.package.opc_mut().set_part(uri, ct, xml);
+            self.package.set_part(uri, ct, xml);
         }
         Ok(found)
     }

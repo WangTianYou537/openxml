@@ -1363,7 +1363,7 @@ impl PresentationDocument {
     pub fn add_digital_signature_origin(&mut self) -> Result<(String, PackUri)> {
         let uri = PackUri::new("/_xmlsignatures/origin.sigs");
         if !self.package.opc().has_part(&uri) {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri.clone(),
                 content_type::DIGITAL_SIGNATURE_ORIGIN,
                 Vec::new(),
@@ -1400,7 +1400,7 @@ impl PresentationDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sig_uri.clone(),
             content_type::DIGITAL_SIGNATURE_XML,
             signature_xml.as_ref().to_vec(),
@@ -1516,7 +1516,7 @@ impl PresentationDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             part_uri.clone(),
             content_type::CUSTOM_XML,
             xml_bytes.into(),
@@ -1550,7 +1550,7 @@ impl PresentationDocument {
             .with_attribute_qname("ds:itemID", item_id)
             .with_child(OpenXmlElement::new("ds", ds, "schemaRefs"));
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             props_uri.clone(),
             content_type::CUSTOM_XML_PROPERTIES,
             xml,
@@ -1654,7 +1654,7 @@ impl PresentationDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             "application/vnd.openxmlformats-officedocument.oleObject",
             data.into(),
@@ -1841,7 +1841,7 @@ impl PresentationDocument {
     /// Add a Custom UI part (`/customUI/customUI.xml`) at package level.
     pub fn add_custom_ui(&mut self, custom_ui_xml: impl AsRef<[u8]>) -> Result<(String, PackUri)> {
         let uri = PackUri::new("/customUI/customUI.xml");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOM_UI,
             custom_ui_xml.as_ref().to_vec(),
@@ -1940,7 +1940,7 @@ impl PresentationDocument {
             index += 1;
         };
         // Reuse spreadsheet printer content type (binary printer blob).
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_PRINTER_SETTINGS,
             data.into(),
@@ -2092,7 +2092,7 @@ impl PresentationDocument {
                     "sharedControls",
                 )),
             ));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::QAT,
             crate::element::write_element(&root)?,
@@ -2170,7 +2170,7 @@ impl PresentationDocument {
                     .with_attribute("name", name)
                     .with_attribute("enabled", "1"),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::LABEL_INFO,
             crate::element::write_element(&root)?,
@@ -2286,12 +2286,12 @@ impl PresentationDocument {
                             .with_attribute_qname("r:id", "rId1"),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             we_uri.clone(),
             content_type::WEB_EXTENSION,
             crate::element::write_element(&ext)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             tp_uri.clone(),
             content_type::WEB_EXTENSION_TASKPANES,
             crate::element::write_element(&taskpanes)?,
@@ -2576,14 +2576,14 @@ impl PresentationDocument {
             index += 1;
         };
         let info_uri = PackUri::new(format!("/ppt/diagrams/legacy/textInfo{index}.xml"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             text_uri.clone(),
             content_type::LEGACY_DIAGRAM_TEXT,
             text_data.into(),
         );
         let dgm = "http://schemas.microsoft.com/office/drawing/2008/diagram";
         let info = OpenXmlElement::new("dgm", dgm, "textInfo").with_ns_decl("dgm", dgm);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             info_uri.clone(),
             content_type::LEGACY_DIAGRAM_TEXT_INFO,
             crate::element::write_element(&info)?,
@@ -3366,7 +3366,7 @@ impl PresentationDocument {
         if self.package.opc().has_part(&pres_uri) {
             return Ok(pres_uri);
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pres_uri.clone(),
             self.document_type.content_type(),
             b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><p:sldIdLst/></p:presentation>".to_vec(),
@@ -3558,7 +3558,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "matchingName");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
             write_element(&root)?,
@@ -3580,7 +3580,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "preserve");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
             write_element(&root)?,
@@ -3602,7 +3602,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "userDrawn");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
             write_element(&root)?,
@@ -3624,7 +3624,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "type");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
             write_element(&root)?,
@@ -3646,7 +3646,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "showMasterSp");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
             write_element(&root)?,
@@ -3669,7 +3669,7 @@ impl PresentationDocument {
         }
         root.attributes
             .retain(|a| a.local_name != "showMasterPhAnim");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
             write_element(&root)?,
@@ -3765,7 +3765,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "preserve");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             master.uri,
             content_type::PRESENTATION_SLIDE_MASTER,
             write_element(&root)?,
@@ -3833,7 +3833,7 @@ impl PresentationDocument {
         }
         let table_uri = PackUri::new("/ppt/tableStyles.xml");
         if !self.package.opc().has_part(&table_uri) {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 table_uri.clone(),
                 content_type::PRESENTATION_TABLE_STYLES,
                 include_str!("ppt_templates/tableStyles.xml")
@@ -3885,7 +3885,7 @@ impl PresentationDocument {
         let theme_uri = PackUri::new("/ppt/theme/theme1.xml");
 
         if !self.package.opc().has_part(&theme_uri) {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 theme_uri.clone(),
                 content_type::THEME,
                 include_str!("ppt_templates/theme1.xml").as_bytes().to_vec(),
@@ -3911,7 +3911,7 @@ impl PresentationDocument {
                     11 => include_str!("ppt_templates/slideLayout11.xml"),
                     _ => unreachable!(),
                 };
-                self.package.opc_mut().set_part(
+                self.package.set_part(
                     layout_uri.clone(),
                     content_type::PRESENTATION_SLIDE_LAYOUT,
                     xml.as_bytes().to_vec(),
@@ -3934,7 +3934,7 @@ impl PresentationDocument {
 
         // Master XML
         if !self.package.opc().has_part(&master_uri) {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 master_uri.clone(),
                 content_type::PRESENTATION_SLIDE_MASTER,
                 include_str!("ppt_templates/slideMaster1.xml")
@@ -4044,7 +4044,7 @@ impl PresentationDocument {
         };
 
         let xml = write_element(&notes_slide(text))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             notes_uri.clone(),
             content_type::PRESENTATION_NOTES_SLIDE,
             xml,
@@ -7525,7 +7525,7 @@ impl PresentationDocument {
         }
         visit(&mut root, shape_id, &mut found);
         if found {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 info.uri,
                 content_type::PRESENTATION_SLIDE,
                 write_element(&root)?,
@@ -8930,7 +8930,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         csld.attributes.retain(|a| a.local_name != "name");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             notes_uri,
             content_type::PRESENTATION_NOTES_SLIDE,
             write_element(&root)?,
@@ -9575,7 +9575,7 @@ impl PresentationDocument {
                     root.children.retain(|c| c.local_name != tag);
                     if root.children.len() < before {
                         let xml = write_element(&root)?;
-                        self.package.opc_mut().set_part(
+                        self.package.set_part(
                             pres_uri.clone(),
                             self.document_type.content_type(),
                             xml,
@@ -9696,7 +9696,7 @@ impl PresentationDocument {
                         .with_attribute("clrIdx", "0"),
                 );
             }
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::PRESENTATION_COMMENT_AUTHORS,
                 write_element(&root)?,
@@ -9724,7 +9724,7 @@ impl PresentationDocument {
             if root.children.is_empty() {
                 let _ = self.clear_comment_authors()?;
             } else {
-                self.package.opc_mut().set_part(
+                self.package.set_part(
                     uri,
                     content_type::PRESENTATION_COMMENT_AUTHORS,
                     write_element(&root)?,
@@ -10066,7 +10066,7 @@ impl PresentationDocument {
             index += 1;
         };
         let xml = write_element(&notes_master())?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             master_uri.clone(),
             content_type::PRESENTATION_NOTES_MASTER,
             xml,
@@ -10302,7 +10302,7 @@ impl PresentationDocument {
             root.children.retain(|c| c.local_name != "hf");
             if root.children.len() < before {
                 let xml = write_element(&root)?;
-                self.package.opc_mut().set_part(
+                self.package.set_part(
                     uri,
                     content_type::PRESENTATION_HANDOUT_MASTER,
                     xml,
@@ -10489,7 +10489,7 @@ impl PresentationDocument {
             index += 1;
         };
         let xml = write_element(&handout_master())?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             master_uri.clone(),
             content_type::PRESENTATION_HANDOUT_MASTER,
             xml,
@@ -10578,7 +10578,7 @@ impl PresentationDocument {
             .map(|(i, (aid, dt, x, y, text))| slide_comment(*aid, i as u32 + 1, dt, *x, *y, text))
             .collect();
         let root = slide_comments(cms);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PRESENTATION_COMMENTS,
             write_element(&root)?,
@@ -10620,7 +10620,7 @@ impl PresentationDocument {
                     .with_attribute("val", *val),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::USER_DEFINED_TAGS,
             write_element(&root)?,
@@ -10689,7 +10689,7 @@ impl PresentationDocument {
             .with_ns_decl("p", p)
             .with_attribute("serverSldId", server_sld_id)
             .with_attribute("serverSldModifiedTime", "2020-01-01T00:00:00");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SLIDE_SYNC,
             write_element(&root)?,
@@ -10741,7 +10741,7 @@ impl PresentationDocument {
             index += 1;
         };
         let chart = crate::spreadsheet::bar_chart_space(title, categories, values);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::DRAWINGML_CHART,
             write_element(&chart)?,
@@ -10782,7 +10782,7 @@ impl PresentationDocument {
         let root = OpenXmlElement::new("cdr", cdr, "userShapes")
             .with_ns_decl("cdr", cdr)
             .with_ns_decl("a", a);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CHART_DRAWING,
             write_element(&root)?,
@@ -11158,7 +11158,7 @@ impl PresentationDocument {
                     ),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PPT_MODERN_COMMENTS,
             write_element(&root)?,
@@ -11188,7 +11188,7 @@ impl PresentationDocument {
                     .with_attribute("providerId", "None"),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PPT_AUTHORS,
             write_element(&root)?,
@@ -11231,7 +11231,7 @@ impl PresentationDocument {
                     .with_attribute("clrIdx", "0"),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PRESENTATION_COMMENT_AUTHORS,
             write_element(&root)?,
@@ -11267,7 +11267,7 @@ impl PresentationDocument {
                         .with_attribute("val", "000000"),
                 ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PRESENTATION_PROPS,
             write_element(&root)?,
@@ -11304,7 +11304,7 @@ impl PresentationDocument {
     }
 
     fn save_presentation_properties(&mut self, uri: PackUri, root: &OpenXmlElement) -> Result<()> {
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri,
             content_type::PRESENTATION_PROPS,
             write_element(root)?,
@@ -12102,7 +12102,7 @@ impl PresentationDocument {
             break;
         }
         if found {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 pres_uri,
                 content_type::PRESENTATION,
                 write_element(&root)?,
@@ -12359,7 +12359,7 @@ impl PresentationDocument {
         let root = OpenXmlElement::new("a", a, "tblStyleLst")
             .with_ns_decl("a", a)
             .with_attribute("def", "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PRESENTATION_TABLE_STYLES,
             write_element(&root)?,
@@ -12521,7 +12521,7 @@ impl PresentationDocument {
                             .with_attribute("autoAdjust", "0"),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PRESENTATION_VIEW_PROPS,
             write_element(&root)?,
@@ -12558,7 +12558,7 @@ impl PresentationDocument {
     }
 
     fn save_view_properties(&mut self, uri: PackUri, root: &OpenXmlElement) -> Result<()> {
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri,
             content_type::PRESENTATION_VIEW_PROPS,
             write_element(root)?,
@@ -13906,7 +13906,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "showMasterSp");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             slide_info.uri,
             content_type::PRESENTATION_SLIDE,
             write_element(&root)?,
@@ -13930,7 +13930,7 @@ impl PresentationDocument {
         }
         root.attributes
             .retain(|a| a.local_name != "showMasterPhAnim");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             slide_info.uri,
             content_type::PRESENTATION_SLIDE,
             write_element(&root)?,
@@ -14097,7 +14097,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         root.attributes.retain(|a| a.local_name != "showMasterSp");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri,
             content_type::PRESENTATION_NOTES_SLIDE,
             write_element(&root)?,
@@ -14119,7 +14119,7 @@ impl PresentationDocument {
         }
         root.attributes
             .retain(|a| a.local_name != "showMasterPhAnim");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri,
             content_type::PRESENTATION_NOTES_SLIDE,
             write_element(&root)?,
@@ -15172,7 +15172,7 @@ impl PresentationDocument {
             return Ok(false);
         }
         sz.attributes.retain(|a| a.local_name != "type");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pres_uri,
             content_type::PRESENTATION,
             write_element(&root)?,
@@ -15778,7 +15778,7 @@ impl PresentationDocument {
         if pa.attributes.len() == before {
             return Ok(false);
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pres_uri,
             content_type::PRESENTATION,
             write_element(&root)?,
@@ -15839,7 +15839,7 @@ impl PresentationDocument {
         if k.attributes.len() == before {
             return Ok(false);
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pres_uri,
             content_type::PRESENTATION,
             write_element(&root)?,
@@ -15859,7 +15859,7 @@ impl PresentationDocument {
         if root.children.len() == before {
             return Ok(false);
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pres_uri,
             content_type::PRESENTATION,
             write_element(&root)?,
@@ -15991,7 +15991,7 @@ impl PresentationDocument {
         if mv.attributes.len() == before {
             return Ok(false);
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pres_uri,
             content_type::PRESENTATION,
             write_element(&root)?,
@@ -18108,7 +18108,7 @@ impl PresentationDocument {
             .get_part(&pres_uri)
             .map(|b| b.to_vec())
             .unwrap_or_default();
-        self.package.opc_mut().set_part(pres_uri, ct, data);
+        self.package.set_part(pres_uri, ct, data);
         self.document_type = new_type;
         Ok(())
     }

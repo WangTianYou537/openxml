@@ -354,7 +354,7 @@ impl SpreadsheetDocument {
         if self.package.opc().has_part(&wb_uri) {
             return Ok(wb_uri);
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri.clone(),
             self.document_type.content_type(),
             b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><x:workbook xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><x:sheets/></x:workbook>".to_vec(),
@@ -397,7 +397,7 @@ impl SpreadsheetDocument {
         }
 
         let wb_xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             wb_xml,
@@ -430,7 +430,7 @@ impl SpreadsheetDocument {
                 .insert(insert_at, crate::spreadsheet::defined_names(kids));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -1194,7 +1194,7 @@ impl SpreadsheetDocument {
             reference,
             columns,
         ))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             table_uri.clone(),
             content_type::SPREADSHEET_TABLE,
             table_xml,
@@ -3135,7 +3135,7 @@ impl SpreadsheetDocument {
                 if let Ok(mut root) = parse_element(&data) {
                     root.children.retain(|c| c.local_name != "pivotCaches");
                     let xml = write_element(&root)?;
-                    self.package.opc_mut().set_part(
+                    self.package.set_part(
                         wb_uri.clone(),
                         self.document_type.content_type(),
                         xml,
@@ -3282,7 +3282,7 @@ impl SpreadsheetDocument {
             break;
         }
         if found {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_CONNECTIONS,
                 write_element(&root)?,
@@ -3307,7 +3307,7 @@ impl SpreadsheetDocument {
         });
         let removed = root.children.len() < before;
         if removed {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_CONNECTIONS,
                 write_element(&root)?,
@@ -3431,7 +3431,7 @@ impl SpreadsheetDocument {
             .content_type_for(uri.as_str())
             .unwrap_or(content_type::SPREADSHEET_QUERY_TABLE)
             .to_string();
-        self.package.opc_mut().set_part(uri, ct, xml);
+        self.package.set_part(uri, ct, xml);
         Ok(true)
     }
 
@@ -4248,7 +4248,7 @@ impl SpreadsheetDocument {
             };
             let mut root = parse_element(data)?;
             root.set_attribute("name", new_name);
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_PIVOT_TABLE,
                 write_element(&root)?,
@@ -4291,7 +4291,7 @@ impl SpreadsheetDocument {
             if let Some(v) = page_over_then_down {
                 root.set_attribute("pageOverThenDown", if v { "1" } else { "0" });
             }
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_PIVOT_TABLE,
                 write_element(&root)?,
@@ -4336,7 +4336,7 @@ impl SpreadsheetDocument {
                     root.children.retain(|c| c.local_name != "pivotCaches");
                     if root.children.len() < before {
                         let xml = write_element(&root)?;
-                        self.package.opc_mut().set_part(
+                        self.package.set_part(
                             wb_uri,
                             self.document_type.content_type(),
                             xml,
@@ -5571,7 +5571,7 @@ impl SpreadsheetDocument {
             workbook_protection(lock_structure, lock_windows),
         );
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -5622,7 +5622,7 @@ impl SpreadsheetDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 wb_uri,
                 self.document_type.content_type(),
                 xml,
@@ -5657,7 +5657,7 @@ impl SpreadsheetDocument {
             .unwrap_or(0);
         root.children.insert(insert_at, wp);
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -5776,7 +5776,7 @@ impl SpreadsheetDocument {
             dindex += 1;
         };
         // Placeholder drawing then chart rel
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             drawing_uri.clone(),
             content_type::SPREADSHEET_DRAWING,
             b"<?xml version=\"1.0\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\"/>".to_vec(),
@@ -5789,13 +5789,13 @@ impl SpreadsheetDocument {
         );
         let anchor = two_cell_anchor_chart(0, 0, 10, 15, &chart_rel, name);
         let drawing_xml = write_element(&worksheet_drawing(vec![anchor]))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             drawing_uri.clone(),
             content_type::SPREADSHEET_DRAWING,
             drawing_xml,
         );
         // Chartsheet with drawing rel
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sheet_uri.clone(),
             content_type::SPREADSHEET_CHARTSHEET,
             b"placeholder".to_vec(),
@@ -5807,7 +5807,7 @@ impl SpreadsheetDocument {
             RelationshipTargetMode::Internal,
         );
         let cs_xml = write_element(&chartsheet(&drawing_rel))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sheet_uri.clone(),
             content_type::SPREADSHEET_CHARTSHEET,
             cs_xml,
@@ -5831,7 +5831,7 @@ impl SpreadsheetDocument {
             sheets_el.append_child(sheet(name, sheet_id + 1000, &sheet_rid));
         }
         let wb_xml = write_element(&wb_root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             wb_xml,
@@ -5923,7 +5923,7 @@ impl SpreadsheetDocument {
             );
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -5994,7 +5994,7 @@ impl SpreadsheetDocument {
                 root.children.retain(|c| c.local_name != "definedNames");
             }
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 wb_uri,
                 self.document_type.content_type(),
                 xml,
@@ -6799,7 +6799,7 @@ impl SpreadsheetDocument {
         }
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 wb_uri,
                 self.document_type.content_type(),
                 xml,
@@ -7564,7 +7564,7 @@ impl SpreadsheetDocument {
             .filter(|c| c.local_name == "numFmt")
             .count();
         fmts.set_attribute("count", count.to_string());
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri,
             content_type::SPREADSHEET_STYLES,
             write_element(&root)?,
@@ -7698,7 +7698,7 @@ impl SpreadsheetDocument {
             }
         }
         if found {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_STYLES,
                 write_element(&root)?,
@@ -7726,7 +7726,7 @@ impl SpreadsheetDocument {
             if let Some(cs) = root.child_mut("cellStyles") {
                 cs.set_attribute("count", cs.children.len().to_string());
             }
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_STYLES,
                 write_element(&root)?,
@@ -7780,7 +7780,7 @@ impl SpreadsheetDocument {
         let removed = fmts.children.len() < before;
         if removed {
             fmts.set_attribute("count", fmts.children.len().to_string());
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_STYLES,
                 write_element(&root)?,
@@ -7813,7 +7813,7 @@ impl SpreadsheetDocument {
             }
         }
         if found {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri,
                 content_type::SPREADSHEET_STYLES,
                 write_element(&root)?,
@@ -8291,7 +8291,7 @@ impl SpreadsheetDocument {
                         .get(drawing_uri.as_str())
                         .cloned()
                         .unwrap_or_else(|| content_type::SPREADSHEET_DRAWING.to_string());
-                    self.package.opc_mut().set_part(drawing_uri.clone(), ct, xml);
+                    self.package.set_part(drawing_uri.clone(), ct, xml);
                 }
             }
         }
@@ -10127,7 +10127,7 @@ impl SpreadsheetDocument {
             sheet_el.set_attribute("state", state);
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -10182,12 +10182,12 @@ impl SpreadsheetDocument {
                     .with_attribute("cache", cache_name)
                     .with_attribute("caption", name),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             cache_uri.clone(),
             content_type::TIMELINE_CACHE,
             write_element(&cache)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             timelines_uri.clone(),
             content_type::TIMELINE,
             write_element(&timelines)?,
@@ -10281,7 +10281,7 @@ impl SpreadsheetDocument {
                     .content_type_for(uri.as_str())
                     .unwrap_or("application/vnd.ms-excel.timeline+xml")
                     .to_string();
-                self.package.opc_mut().set_part(uri, ct, xml);
+                self.package.set_part(uri, ct, xml);
             }
         }
         Ok(removed)
@@ -10317,12 +10317,12 @@ impl SpreadsheetDocument {
                 )
                 .with_attribute("val", "accent1"),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             style_uri.clone(),
             content_type::CHART_STYLE,
             write_element(&style)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             colors_uri.clone(),
             content_type::CHART_COLOR_STYLE,
             write_element(&colors)?,
@@ -10368,7 +10368,7 @@ impl SpreadsheetDocument {
                         .with_attribute("workbookViewId", "0"),
                 ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_DIALOGSHEET,
             write_element(&root)?,
@@ -10390,7 +10390,7 @@ impl SpreadsheetDocument {
             sheets_el.append_child(sheet(name, sheet_id, &rid));
         }
         let wb_xml = write_element(&wb_root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             wb_xml,
@@ -10421,7 +10421,7 @@ impl SpreadsheetDocument {
                     .with_attribute("name", view_name)
                     .with_attribute("id", format!("{{{index}}}")),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::NAMED_SHEET_VIEW,
             write_element(&root)?,
@@ -10479,7 +10479,7 @@ impl SpreadsheetDocument {
             }
             visit(&mut root, old_name, new_name, &mut found);
             if found {
-                self.package.opc_mut().set_part(
+                self.package.set_part(
                     uri,
                     content_type::NAMED_SHEET_VIEW,
                     write_element(&root)?,
@@ -11023,7 +11023,7 @@ impl SpreadsheetDocument {
                     .with_child(OpenXmlElement::new("x", x, "text").with_text(*text)),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::THREADED_COMMENT,
             write_element(&root)?,
@@ -11052,7 +11052,7 @@ impl SpreadsheetDocument {
                     .with_attribute("providerId", "None"),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::PERSON,
             write_element(&root)?,
@@ -11116,17 +11116,17 @@ impl SpreadsheetDocument {
                     .with_attribute("id", "1")
                     .with_attribute("dateTime", "2020-01-01T00:00:00"),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             headers_uri.clone(),
             content_type::REVISION_HEADERS,
             write_element(&headers)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             log_uri.clone(),
             content_type::REVISION_LOG,
             write_element(&log)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             users_uri.clone(),
             content_type::USERS,
             write_element(&users)?,
@@ -11175,7 +11175,7 @@ impl SpreadsheetDocument {
                             .with_attribute("s", "1"),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SORT_MAP,
             write_element(&root)?,
@@ -11215,7 +11215,7 @@ impl SpreadsheetDocument {
             .with_child(
                 OpenXmlElement::new("x", x, "valueMetadata").with_attribute("count", "0"),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CELL_METADATA,
             write_element(&root)?,
@@ -11244,7 +11244,7 @@ impl SpreadsheetDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_PRINTER_SETTINGS,
             data.into(),
@@ -11262,7 +11262,7 @@ impl SpreadsheetDocument {
     pub fn add_attached_toolbars(&mut self, data: impl Into<Vec<u8>>) -> Result<(PackUri, String)> {
         let wb_uri = self.ensure_workbook()?;
         let uri = PackUri::new("/xl/attachedToolbars.bin");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::EXCEL_ATTACHED_TOOLBARS,
             data.into(),
@@ -11283,7 +11283,7 @@ impl SpreadsheetDocument {
         let x = "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2";
         let root = OpenXmlElement::new("x", x, "richStyleSheet")
             .with_ns_decl("x", x);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::RICH_STYLES,
             write_element(&root)?,
@@ -11309,12 +11309,12 @@ impl SpreadsheetDocument {
         let data = OpenXmlElement::new("x", x, "spbData")
             .with_ns_decl("x", x)
             .with_attribute("count", "0");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             struct_uri.clone(),
             content_type::SUPPORTING_PROPERTY_BAG_STRUCTURE,
             write_element(&structure)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             data_uri.clone(),
             content_type::SUPPORTING_PROPERTY_BAG,
             write_element(&data)?,
@@ -11342,7 +11342,7 @@ impl SpreadsheetDocument {
         let root = OpenXmlElement::new("x", x, "arrayData")
             .with_ns_decl("x", x)
             .with_attribute("count", "0");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::RD_ARRAY,
             write_element(&root)?,
@@ -11376,7 +11376,7 @@ impl SpreadsheetDocument {
             .with_attribute("objectType", "Drop")
             .with_attribute("dx", "15")
             .with_attribute("noThreeD", "1");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CONTROL_PROPS,
             write_element(&root)?,
@@ -11408,7 +11408,7 @@ impl SpreadsheetDocument {
         let root = OpenXmlElement::new("cdr", cdr, "userShapes")
             .with_ns_decl("cdr", cdr)
             .with_ns_decl("a", a);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CHART_DRAWING,
             write_element(&root)?,
@@ -11458,7 +11458,7 @@ impl SpreadsheetDocument {
                     )
                     .with_child(OpenXmlElement::new("cx", cx, "plotArea")),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::EXTENDED_CHART,
             write_element(&root)?,
@@ -11487,7 +11487,7 @@ impl SpreadsheetDocument {
         let root = OpenXmlElement::new("x", x, "intlMacrosheet")
             .with_ns_decl("x", x)
             .with_child(OpenXmlElement::new("x", x, "sheetData"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::INT_MACRO_SHEET,
             write_element(&root)?,
@@ -11509,7 +11509,7 @@ impl SpreadsheetDocument {
             sheets_el.append_child(sheet(name, sheet_id, &rid));
         }
         let wb_xml = write_element(&wb_root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             wb_xml,
@@ -11525,7 +11525,7 @@ impl SpreadsheetDocument {
         let root = OpenXmlElement::new("x", x, "webImages")
             .with_ns_decl("x", x)
             .with_attribute("count", "0");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::RD_RICH_VALUE_WEB_IMAGE,
             write_element(&root)?,
@@ -11554,7 +11554,7 @@ impl SpreadsheetDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::EMBEDDED_CONTROL_PERSISTENCE,
             data.into(),
@@ -11586,7 +11586,7 @@ impl SpreadsheetDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOM_PROPERTY_SPREADSHEET,
             data.into(),
@@ -11723,7 +11723,7 @@ impl SpreadsheetDocument {
                             ),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SINGLE_CELL_TABLE,
             write_element(&root)?,
@@ -11753,17 +11753,17 @@ impl SpreadsheetDocument {
         let data = OpenXmlElement::new("rv", rv, "rvData")
             .with_ns_decl("rv", rv)
             .with_attribute("count", "0");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             types_uri.clone(),
             content_type::RICH_VALUE_TYPES,
             write_element(&types)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             struct_uri.clone(),
             content_type::RICH_VALUE_STRUCTURE,
             write_element(&structure)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             data_uri.clone(),
             content_type::RICH_VALUE,
             write_element(&data)?,
@@ -11791,7 +11791,7 @@ impl SpreadsheetDocument {
         let root = OpenXmlElement::new("xfpb", xfpb, "FeaturePropertyBags")
             .with_ns_decl("xfpb", xfpb)
             .with_attribute("count", "0");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::FEATURE_PROPERTY_BAG,
             write_element(&root)?,
@@ -11826,7 +11826,7 @@ impl SpreadsheetDocument {
                 ),
             )
             .with_child(OpenXmlElement::new("x", x, "sheetData"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::MACRO_SHEET,
             write_element(&root)?,
@@ -11848,7 +11848,7 @@ impl SpreadsheetDocument {
             sheets_el.append_child(sheet(name, sheet_id, &rid));
         }
         let wb_xml = write_element(&wb_root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             wb_xml,
@@ -11890,7 +11890,7 @@ impl SpreadsheetDocument {
                         ),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::THEME_OVERRIDE,
             write_element(&root)?,
@@ -11920,7 +11920,7 @@ impl SpreadsheetDocument {
             index += 1;
         };
         let props_uri = PackUri::new(format!("/xl/customData/customDataProps{index}.xml"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             data_uri.clone(),
             content_type::CUSTOM_DATA,
             data.into(),
@@ -11929,7 +11929,7 @@ impl SpreadsheetDocument {
         let props = OpenXmlElement::new("x", x, "datastoreItem")
             .with_ns_decl("x", x)
             .with_attribute("id", item_id);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             props_uri.clone(),
             content_type::CUSTOM_DATA_PROPS,
             write_element(&props)?,
@@ -11961,7 +11961,7 @@ impl SpreadsheetDocument {
   <Map ID="{map_id}" Name="Map{map_id}" RootElement="{root_element}" SchemaID="Schema1" ShowImportExportValidationErrors="false" AutoFit="true" Append="false" PreserveSortAFLayout="true" PreserveFormat="true"/>
 </MapInfo>"#
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOM_XML_MAPPINGS,
             xml.into_bytes(),
@@ -12016,7 +12016,7 @@ impl SpreadsheetDocument {
             .with_attribute("applyPatternFormats", "0")
             .with_attribute("applyAlignmentFormats", "0")
             .with_attribute("applyWidthHeightFormats", "1");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_QUERY_TABLE,
             write_element(&root)?,
@@ -12036,7 +12036,7 @@ impl SpreadsheetDocument {
         let uri = PackUri::new("/xl/volatileDependencies.xml");
         let x = crate::namespace::ns::SPREADSHEETML.uri;
         let root = OpenXmlElement::new("x", x, "volTypes").with_ns_decl("x", x);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_VOLATILE_DEPS,
             write_element(&root)?,
@@ -12088,7 +12088,7 @@ impl SpreadsheetDocument {
                     ),
             );
         }
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_CONNECTIONS,
             write_element(&root)?,
@@ -12155,12 +12155,12 @@ impl SpreadsheetDocument {
                     .with_attribute("cache", cache_name)
                     .with_attribute("caption", name),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             cache_uri.clone(),
             content_type::SLICER_CACHE,
             write_element(&cache)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             slicers_uri.clone(),
             content_type::SLICER,
             write_element(&slicers)?,
@@ -12499,7 +12499,7 @@ impl SpreadsheetDocument {
                     ),
             );
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             link_uri.clone(),
             content_type::SPREADSHEET_EXTERNAL_LINK,
             xml,
@@ -12539,7 +12539,7 @@ impl SpreadsheetDocument {
             wb_root.children.insert(insert_at, refs);
         }
         let wb_xml = write_element(&wb_root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             wb_xml,
@@ -12604,7 +12604,7 @@ impl SpreadsheetDocument {
                 root.children
                     .retain(|c| c.local_name != "externalReferences");
                 let xml = write_element(&root)?;
-                self.package.opc_mut().set_part(
+                self.package.set_part(
                     wb_uri,
                     self.document_type.content_type(),
                     xml,
@@ -12659,7 +12659,7 @@ impl SpreadsheetDocument {
                     root.children
                         .retain(|c| c.local_name != "externalReferences");
                     let xml = write_element(&root)?;
-                    self.package.opc_mut().set_part(
+                    self.package.set_part(
                         wb_uri,
                         self.document_type.content_type(),
                         xml,
@@ -13681,7 +13681,7 @@ impl SpreadsheetDocument {
         root.children
             .insert(insert_at, calc_properties(full_calc_on_load, calc_mode));
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -14108,7 +14108,7 @@ impl SpreadsheetDocument {
             root.children.insert(insert_at, views);
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             wb_uri,
             self.document_type.content_type(),
             xml,
@@ -17814,7 +17814,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .map(|(r, i)| calc_chain_cell(r, *i))
             .collect();
         let xml = write_element(&calc_chain(kids))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             chain_uri.clone(),
             content_type::SPREADSHEET_CALC_CHAIN,
             xml,
@@ -19181,7 +19181,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         root: &crate::element::OpenXmlElement,
     ) -> Result<()> {
         let xml = write_element(root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sheet_uri.clone(),
             content_type::SPREADSHEET_WORKSHEET,
             xml,
@@ -19198,7 +19198,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
         let ws = worksheet(vec![sheet_data(Vec::<crate::element::OpenXmlElement>::new())]);
         let ws_xml = write_element(&ws)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             ws_uri.clone(),
             content_type::SPREADSHEET_WORKSHEET,
             ws_xml,
@@ -19362,7 +19362,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         };
         let wb_uri = self.ensure_workbook()?;
         let sst_uri = PackUri::new(SHARED_STRINGS_URI);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sst_uri.clone(),
             content_type::SPREADSHEET_SHARED_STRINGS,
             xml,
@@ -19432,7 +19432,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         }
         let ws = worksheet(vec![sheet_data(row_elems)]);
         let ws_xml = write_element(&ws)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sheet_uri,
             content_type::SPREADSHEET_WORKSHEET,
             ws_xml,
@@ -20853,7 +20853,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .ok_or_else(|| Error::PartNotFound(src_uri.to_string()))?
             .to_vec();
         let info = self.add_worksheet(new_name)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             info.uri.clone(),
             content_type::SPREADSHEET_WORKSHEET,
             data,
@@ -21032,7 +21032,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             index += 1;
         };
         let xml = write_element(chart_root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             chart_uri.clone(),
             content_type::DRAWINGML_CHART,
             xml,
@@ -21081,7 +21081,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             index += 1;
         };
         let chart_xml = write_element(&bar_chart_space(title, categories, values))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             chart_uri.clone(),
             content_type::DRAWINGML_CHART,
             chart_xml,
@@ -21098,7 +21098,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         };
 
         // Placeholder drawing so we can create the chart relationship from it
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             drawing_uri.clone(),
             content_type::SPREADSHEET_DRAWING,
             b"<?xml version=\"1.0\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\"/>".to_vec(),
@@ -21120,7 +21120,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             title,
         );
         let drawing_xml = write_element(&worksheet_drawing(vec![anchor]))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             drawing_uri.clone(),
             content_type::SPREADSHEET_DRAWING,
             drawing_xml,
@@ -21144,7 +21144,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         root.children.retain(|c| c.local_name != "drawing");
         root.append_child(worksheet_drawing_ref(&drawing_rel));
         let sheet_xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sheet_uri,
             content_type::SPREADSHEET_WORKSHEET,
             sheet_xml,
@@ -21205,7 +21205,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             dindex += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             drawing_uri.clone(),
             content_type::SPREADSHEET_DRAWING,
             b"<?xml version=\"1.0\"?><xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\"/>".to_vec(),
@@ -21221,7 +21221,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         let anchor =
             one_cell_anchor_picture(from_col, from_row, cx, cy, &image_rel, name);
         let drawing_xml = write_element(&worksheet_drawing(vec![anchor]))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             drawing_uri.clone(),
             content_type::SPREADSHEET_DRAWING,
             drawing_xml,
@@ -21244,7 +21244,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             root.append_child(worksheet_drawing_ref(&drawing_rel));
         }
         let sheet_xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sheet_uri,
             content_type::SPREADSHEET_WORKSHEET,
             sheet_xml,
@@ -21385,7 +21385,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         };
 
         let xml = write_element(&comments_for_author(author, notes))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             comments_uri.clone(),
             content_type::SPREADSHEET_COMMENTS,
             xml,
@@ -21425,7 +21425,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 vindex += 1;
             };
             let vml_xml = write_element(&vml_comments_drawing(&coords))?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 vml_uri.clone(),
                 content_type::VML_DRAWING,
                 vml_xml,
@@ -21586,7 +21586,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
         }
         if found {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 comments_uri,
                 content_type::SPREADSHEET_COMMENTS,
                 write_element(&root)?,
@@ -21640,7 +21640,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 // clear whole comments part
                 return self.clear_sheet_comments(sheet_name);
             }
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 comments_uri,
                 content_type::SPREADSHEET_COMMENTS,
                 write_element(&root)?,
@@ -22212,7 +22212,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         }
 
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             styles_uri.clone(),
             content_type::SPREADSHEET_STYLES,
             xml,
@@ -22321,7 +22321,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         ));
 
         // Placeholder cache def to create relationship
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             cache_def_uri.clone(),
             content_type::SPREADSHEET_PIVOT_CACHE_DEFINITION,
             b"<?xml version=\"1.0\"?><x:pivotCacheDefinition xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>".to_vec(),
@@ -22336,7 +22336,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         } else {
             record_count
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             cache_rec_uri.clone(),
             content_type::SPREADSHEET_PIVOT_CACHE_RECORDS,
             write_element(&records_el)?,
@@ -22354,7 +22354,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             field_names,
             actual_count,
         ))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             cache_def_uri.clone(),
             content_type::SPREADSHEET_PIVOT_CACHE_DEFINITION,
             cache_def_xml,
@@ -22387,7 +22387,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 wb_root.append_child(workbook_pivot_caches(vec![entry]));
             }
             let xml = write_element(&wb_root)?;
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 wb_uri,
                 self.document_type.content_type(),
                 xml,
@@ -22411,7 +22411,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             row_field,
             data_field,
         ))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             pivot_uri.clone(),
             content_type::SPREADSHEET_PIVOT_TABLE,
             pivot_xml,
@@ -22776,7 +22776,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         let wb_uri = self.ensure_workbook()?;
         let styles_uri = PackUri::new("/xl/styles.xml");
         let xml = write_element(&minimal_stylesheet(include_bold))?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             styles_uri.clone(),
             content_type::SPREADSHEET_STYLES,
             xml,
@@ -22889,7 +22889,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         let wb_uri = self.ensure_workbook()?;
         let styles_uri = PackUri::new("/xl/styles.xml");
         let xml = write_element(styles)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             styles_uri.clone(),
             content_type::SPREADSHEET_STYLES,
             xml,
@@ -23627,7 +23627,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         extension: &str,
     ) -> Result<String> {
         let uri = PackUri::new(format!("/docProps/thumbnail.{extension}"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type_str,
             image_bytes.into(),
@@ -23700,7 +23700,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
     pub fn add_digital_signature_origin(&mut self) -> Result<(String, PackUri)> {
         let uri = PackUri::new("/_xmlsignatures/origin.sigs");
         if !self.package.opc().has_part(&uri) {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri.clone(),
                 content_type::DIGITAL_SIGNATURE_ORIGIN,
                 Vec::new(),
@@ -23737,7 +23737,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             sig_uri.clone(),
             content_type::DIGITAL_SIGNATURE_XML,
             signature_xml.as_ref().to_vec(),
@@ -23850,7 +23850,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             part_uri.clone(),
             content_type::CUSTOM_XML,
             xml_bytes.into(),
@@ -23885,7 +23885,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .with_attribute_qname("ds:itemID", item_id)
             .with_child(OpenXmlElement::new("ds", ds, "schemaRefs"));
         let xml = crate::element::write_element(&root)?;
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             props_uri.clone(),
             content_type::CUSTOM_XML_PROPERTIES,
             xml,
@@ -23992,7 +23992,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             "application/vnd.openxmlformats-officedocument.oleObject",
             data.into(),
@@ -24205,7 +24205,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         custom_ui_xml: impl AsRef<[u8]>,
     ) -> Result<(String, PackUri)> {
         let uri = PackUri::new("/customUI/customUI.xml");
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::CUSTOM_UI,
             custom_ui_xml.as_ref().to_vec(),
@@ -24303,7 +24303,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::SPREADSHEET_PRINTER_SETTINGS,
             data.into(),
@@ -24384,7 +24384,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                     ),
                 ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::QAT,
             crate::element::write_element(&root)?,
@@ -24459,7 +24459,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                     .with_attribute("name", name)
                     .with_attribute("enabled", "1"),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             uri.clone(),
             content_type::LABEL_INFO,
             crate::element::write_element(&root)?,
@@ -24570,12 +24570,12 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                             .with_attribute_qname("r:id", "rId1"),
                     ),
             );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             we_uri.clone(),
             content_type::WEB_EXTENSION,
             crate::element::write_element(&ext)?,
         );
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             tp_uri.clone(),
             content_type::WEB_EXTENSION_TASKPANES,
             crate::element::write_element(&taskpanes)?,
@@ -24808,7 +24808,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             (&style_uri, content_type::DIAGRAM_STYLE, style),
             (&drawing_uri, content_type::DIAGRAM_PERSIST_LAYOUT, drawing),
         ] {
-            self.package.opc_mut().set_part(
+            self.package.set_part(
                 uri.clone(),
                 ct,
                 crate::element::write_element(&el)?,
@@ -24854,14 +24854,14 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             index += 1;
         };
         let info_uri = PackUri::new(format!("/xl/diagrams/legacy/textInfo{index}.xml"));
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             text_uri.clone(),
             content_type::LEGACY_DIAGRAM_TEXT,
             text_data.into(),
         );
         let dgm = "http://schemas.microsoft.com/office/drawing/2008/diagram";
         let info = OpenXmlElement::new("dgm", dgm, "textInfo").with_ns_decl("dgm", dgm);
-        self.package.opc_mut().set_part(
+        self.package.set_part(
             info_uri.clone(),
             content_type::LEGACY_DIAGRAM_TEXT_INFO,
             crate::element::write_element(&info)?,
@@ -26000,7 +26000,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 if n > 0 {
                     count += n;
                     let xml = write_element(&sst)?;
-                    self.package.opc_mut().set_part(
+                    self.package.set_part(
                         sst_uri,
                         content_type::SPREADSHEET_SHARED_STRINGS,
                         xml,
@@ -26099,7 +26099,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .get_part(&wb_uri)
             .map(|b| b.to_vec())
             .unwrap_or_default();
-        self.package.opc_mut().set_part(wb_uri, ct, data);
+        self.package.set_part(wb_uri, ct, data);
         self.document_type = new_type;
         Ok(())
     }

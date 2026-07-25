@@ -812,6 +812,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ApplicationType` / `DisposableFeature` / `MainPartFeature` / `DocumentTypeFeature`; wired on Word/Excel/PPT packages
 - [x] `OpenXmlContent` + `OpenXmlElement::with` (C# functional `With` extensions)
 - [x] `SchemaTrackingFeature` / `StrictNamespaceFeature` shells on package features
+- [x] `OpenXmlPart::{standalone_declaration,save_to_stream,save_to_part}` (C# part-root Save/Stream)
+- [x] Wire public `McContext` into `process_markup_compatibility` (+ `process_markup_compatibility_with_context`)
+- [x] Route document/part `set_part` writes through `OpenXmlPackage::set_part` so `PartEvents` fire
 
 **Still intentionally deferred / partial:**
 

@@ -188,7 +188,7 @@ pub fn process_markup_compatibility(
     supported_prefixes: &[&str],
 ) -> usize {
     expand_alternate_content(root, supported_prefixes);
-    let mut ctx = McProcessContext::default();
+    let mut ctx = McContext::with_exception_on_error(false);
     process_mc_node(root, supported_prefixes, &mut ctx)
 }
 
@@ -204,21 +204,14 @@ pub fn process_markup_compatibility_for_version(
     process_markup_compatibility(root, &prefixes)
 }
 
-#[derive(Default)]
-struct McProcessContext {
-    ignorable: HashSet<String>,
-    /// "prefix:local" or "prefix:*"
-    process_content: HashSet<String>,
-    preserve_elements: HashSet<String>,
-    preserve_attributes: HashSet<String>,
-}
-
-fn parse_qname_list(value: &str) -> HashSet<String> {
-    value
-        .split_whitespace()
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect()
+/// Process MC on a tree with a caller-supplied [`McContext`] (C# processing path with shared context).
+pub fn process_markup_compatibility_with_context(
+    root: &mut OpenXmlElement,
+    supported_prefixes: &[&str],
+    ctx: &mut McContext,
+) -> usize {
+    expand_alternate_content(root, supported_prefixes);
+    process_mc_node(root, supported_prefixes, ctx)
 }
 
 fn mc_attr(elem: &OpenXmlElement, local: &str) -> Option<String> {
@@ -230,63 +223,47 @@ fn mc_attr(elem: &OpenXmlElement, local: &str) -> Option<String> {
     None
 }
 
-fn qname_matches(set: &HashSet<String>, prefix: &str, local: &str) -> bool {
-    set.contains(&format!("{prefix}:{local}")) || set.contains(&format!("{prefix}:*"))
+/// Resolve element/attribute "namespace key" for MC decisions without a full URI lookup.
+///
+/// Uses the element prefix as a stand-in so prefix-based MC lists (`w14:*`) keep working
+/// when no package-level prefix→URI map is available (same contract as C# when only prefixes
+/// are known).
+fn mc_ns_key<'a>(prefix: &'a str, namespace_uri: &'a str) -> &'a str {
+    if !prefix.is_empty() {
+        prefix
+    } else {
+        namespace_uri
+    }
 }
 
 fn process_mc_node(
     elem: &mut OpenXmlElement,
     supported: &[&str],
-    ctx: &mut McProcessContext,
+    ctx: &mut McContext,
 ) -> usize {
     let mut removed = 0usize;
 
-    // Push this element's MC attributes
-    let mut pushed_ign = Vec::new();
-    let mut pushed_pc = Vec::new();
-    let mut pushed_pe = Vec::new();
-    let mut pushed_pa = Vec::new();
-
-    if let Some(v) = mc_attr(elem, "Ignorable") {
-        for p in parse_ignorable_prefixes(&v) {
-            if ctx.ignorable.insert(p.clone()) {
-                pushed_ign.push(p);
-            }
-        }
-    }
-    if let Some(v) = mc_attr(elem, "ProcessContent") {
-        for q in parse_qname_list(&v) {
-            if ctx.process_content.insert(q.clone()) {
-                pushed_pc.push(q);
-            }
-        }
-    }
-    if let Some(v) = mc_attr(elem, "PreserveElements") {
-        for q in parse_qname_list(&v) {
-            if ctx.preserve_elements.insert(q.clone()) {
-                pushed_pe.push(q);
-            }
-        }
-    }
-    if let Some(v) = mc_attr(elem, "PreserveAttributes") {
-        for q in parse_qname_list(&v) {
-            if ctx.preserve_attributes.insert(q.clone()) {
-                pushed_pa.push(q);
-            }
-        }
+    // Push this element's MC attributes through the public context.
+    // No lookup: prefix tokens are stored as stand-in namespace keys.
+    let bag = MarkupCompatibilityAttributes::from_element(elem);
+    if !bag.is_empty() {
+        ctx.push_mc_attributes(&bag, None);
     }
 
     // Strip ignorable attributes (unless preserved)
     let before = elem.attributes.len();
     elem.attributes.retain(|a| match &a.prefix {
-        Some(pfx)
-            if ctx.ignorable.contains(pfx.as_str())
-                && !supported.contains(&pfx.as_str())
-                && !qname_matches(&ctx.preserve_attributes, pfx, &a.local_name) =>
-        {
-            false
+        Some(pfx) => {
+            let uri = a.namespace_uri.as_deref().unwrap_or("");
+            let key = mc_ns_key(pfx, uri);
+            let ignorable = ctx.is_ignorable_ns(key) && !supported.contains(&pfx.as_str());
+            if ignorable && !ctx.is_preserved_attribute(key, &a.local_name) {
+                false
+            } else {
+                true
+            }
         }
-        _ => true,
+        None => true,
     });
     removed += before - elem.attributes.len();
 
@@ -294,16 +271,16 @@ fn process_mc_node(
     let mut kept = Vec::new();
     for mut child in std::mem::take(&mut elem.children) {
         let pfx = child.prefix.as_str();
-        let is_ignorable_ns = !pfx.is_empty()
-            && ctx.ignorable.contains(pfx)
-            && !supported.contains(&pfx);
+        let key = mc_ns_key(pfx, child.namespace_uri.as_str());
+        let is_ignorable_ns =
+            !pfx.is_empty() && ctx.is_ignorable_ns(key) && !supported.contains(&pfx);
 
         if is_ignorable_ns {
-            if qname_matches(&ctx.preserve_elements, pfx, &child.local_name) {
+            if ctx.is_preserved_element(key, &child.local_name) {
                 // keep as-is, still recurse inside
                 removed += process_mc_node(&mut child, supported, ctx);
                 kept.push(child);
-            } else if qname_matches(&ctx.process_content, pfx, &child.local_name) {
+            } else if ctx.is_process_content(key, &child.local_name) {
                 // unwrap: process grandchildren and promote them
                 removed += 1; // the wrapper itself
                 removed += process_mc_node(&mut child, supported, ctx);
@@ -319,18 +296,8 @@ fn process_mc_node(
     }
     elem.children = kept;
 
-    // Pop
-    for p in pushed_ign {
-        ctx.ignorable.remove(&p);
-    }
-    for p in pushed_pc {
-        ctx.process_content.remove(&p);
-    }
-    for p in pushed_pe {
-        ctx.preserve_elements.remove(&p);
-    }
-    for p in pushed_pa {
-        ctx.preserve_attributes.remove(&p);
+    if !bag.is_empty() {
+        ctx.pop_mc_attributes();
     }
 
     removed
@@ -791,6 +758,24 @@ mod tests {
         process_markup_compatibility(&mut root, &["w", "w14"]);
         assert_eq!(root.children.len(), 1);
         assert_eq!(root.children[0].prefix, "w14");
+    }
+
+    #[test]
+    fn process_with_shared_mc_context() {
+        let mut root = with_ignorable(
+            OpenXmlElement::w("document").with_child(OpenXmlElement::new(
+                "w14",
+                "http://schemas.microsoft.com/office/word/2010/wordml",
+                "docId",
+            )),
+            "w14",
+        );
+        let mut ctx = McContext::with_exception_on_error(false);
+        let n = process_markup_compatibility_with_context(&mut root, &["w"], &mut ctx);
+        assert!(n >= 1);
+        assert!(root.children.is_empty());
+        // shared context should be fully popped after processing
+        assert!(!ctx.has_ignorable());
     }
 }
 

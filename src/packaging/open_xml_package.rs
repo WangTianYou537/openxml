@@ -716,6 +716,37 @@ mod part_events_tests {
     }
 
     #[test]
+    fn feed_data_and_save_to_package_raise_part_events() {
+        use crate::packaging::OpenXmlPart;
+        use crate::namespace::rel;
+
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let added = Arc::new(AtomicUsize::new(0));
+        let a = added.clone();
+        pkg.part_events().subscribe(move |e| {
+            if e.event_type == PackageEventType::Added {
+                a.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        let uri = PackUri::new("/word/document.xml");
+        let mut part = OpenXmlPart::new(
+            uri.clone(),
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        part.feed_data(&mut pkg, b"<w:document/>".to_vec());
+        assert_eq!(added.load(Ordering::SeqCst), 1);
+        part.set_root(crate::element::OpenXmlElement::new(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+        ));
+        part.save_to_package(&mut pkg).unwrap();
+        assert!(added.load(Ordering::SeqCst) >= 2);
+    }
+
+    #[test]
     fn compatibility_level_effective_and_at_least() {
         assert_eq!(
             CompatibilityLevel::Default.effective(),

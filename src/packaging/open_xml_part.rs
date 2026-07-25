@@ -1,9 +1,10 @@
 //! OpenXmlPart — a single part within an Open XML package.
 
-use crate::element::{parse_element, write_element, OpenXmlElement};
+use crate::element::{parse_element, write_element, write_element_fragment, OpenXmlElement};
 use crate::error::{Error, Result};
 use crate::opc::{PackUri, RelationshipTargetMode};
 use crate::packaging::OpenXmlPackage;
+use std::io::Write;
 
 /// A part in an Open XML package (e.g. `/word/document.xml`).
 #[derive(Debug)]
@@ -14,6 +15,8 @@ pub struct OpenXmlPart {
     /// Loaded root element (lazily populated).
     pub(crate) root: Option<OpenXmlElement>,
     pub(crate) dirty: bool,
+    /// XML declaration standalone flag when known (C# `OpenXmlPartRootElement` shell).
+    pub(crate) standalone_declaration: Option<bool>,
 }
 
 impl OpenXmlPart {
@@ -28,6 +31,7 @@ impl OpenXmlPart {
             relationship_type: relationship_type.into(),
             root: None,
             dirty: false,
+            standalone_declaration: Some(true),
         }
     }
 
@@ -126,20 +130,14 @@ impl OpenXmlPart {
                 // Still ensure part exists
                 if !package.opc().has_part(&self.uri) {
                     let xml = write_element(root)?;
-                    package.opc_mut().set_part(
-                        self.uri.clone(),
-                        self.content_type.clone(),
-                        xml,
-                    );
+                    package.set_part(self.uri.clone(), self.content_type.clone(), xml);
                 }
             }
             return Ok(());
         }
         let root = self.root.as_ref().ok_or(Error::NoRootElement)?;
         let xml = write_element(root)?;
-        package
-            .opc_mut()
-            .set_part(self.uri.clone(), self.content_type.clone(), xml);
+        package.set_part(self.uri.clone(), self.content_type.clone(), xml);
         self.dirty = false;
         Ok(())
     }
@@ -160,9 +158,7 @@ impl OpenXmlPart {
 
     /// Replace part content with raw bytes (clears loaded root).
     pub fn feed_data(&mut self, package: &mut OpenXmlPackage, data: impl Into<Vec<u8>>) {
-        package
-            .opc_mut()
-            .set_part(self.uri.clone(), self.content_type.clone(), data.into());
+        package.set_part(self.uri.clone(), self.content_type.clone(), data.into());
         self.root = None;
         self.dirty = false;
     }
@@ -234,6 +230,65 @@ impl OpenXmlPart {
         );
         self.dirty = true;
         self.save_to_package(package)?;
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Saved,
+            self.uri.as_str(),
+        );
+        Ok(())
+    }
+
+    /// Standalone flag used when writing the XML declaration (C# part-root `_standaloneDeclaration`).
+    pub fn standalone_declaration(&self) -> Option<bool> {
+        self.standalone_declaration
+    }
+
+    pub fn set_standalone_declaration(&mut self, standalone: Option<bool>) {
+        self.standalone_declaration = standalone;
+    }
+
+    /// Serialize the loaded root to a stream with an XML declaration (C# `OpenXmlPartRootElement.Save(Stream)`).
+    pub fn save_to_stream<W: std::io::Write>(&self, mut writer: W) -> Result<()> {
+        let root = self.root.as_ref().ok_or(Error::NoRootElement)?;
+        let standalone = match self.standalone_declaration {
+            Some(true) => r#" standalone="yes""#,
+            Some(false) => r#" standalone="no""#,
+            None => "",
+        };
+        write!(
+            writer,
+            r#"<?xml version="1.0" encoding="UTF-8"{standalone}?>"#
+        )
+        .map_err(Error::Io)?;
+        let body = write_element_fragment(root)?;
+        writer.write_all(&body).map_err(Error::Io)?;
+        Ok(())
+    }
+
+    /// Save root XML into the package part, forcing a write even when not dirty
+    /// (C# `SaveToPart` / forced save).
+    pub fn save_to_part(&mut self, package: &mut OpenXmlPackage) -> Result<()> {
+        package.raise_part_root_event(
+            crate::features::PackageEventType::Saving,
+            self.uri.as_str(),
+        );
+        let root = self.root.as_ref().ok_or(Error::NoRootElement)?;
+        let mut buf = Vec::new();
+        {
+            let standalone = match self.standalone_declaration {
+                Some(true) => r#" standalone="yes""#,
+                Some(false) => r#" standalone="no""#,
+                None => "",
+            };
+            write!(
+                buf,
+                r#"<?xml version="1.0" encoding="UTF-8"{standalone}?>"#
+            )
+            .map_err(Error::Io)?;
+            let body = write_element_fragment(root)?;
+            buf.extend_from_slice(&body);
+        }
+        package.set_part(self.uri.clone(), self.content_type.clone(), buf);
+        self.dirty = false;
         package.raise_part_root_event(
             crate::features::PackageEventType::Saved,
             self.uri.as_str(),
@@ -464,5 +519,58 @@ mod tests {
         assert_eq!(reloaded.load(Ordering::SeqCst), 1);
         let _ = part.unload_root_element_with_events(&pkg);
         assert!(!part.is_root_element_loaded());
+    }
+
+    #[test]
+    fn save_to_stream_includes_standalone_declaration() {
+        let mut part = OpenXmlPart::new(
+            "/word/document.xml",
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        part.set_root(OpenXmlElement::new(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+        ));
+        part.set_standalone_declaration(Some(false));
+        let mut buf = Vec::new();
+        part.save_to_stream(&mut buf).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.starts_with(r#"<?xml version="1.0" encoding="UTF-8" standalone="no"?>"#));
+        assert!(s.contains("document"));
+
+        part.set_standalone_declaration(None);
+        let mut buf = Vec::new();
+        part.save_to_stream(&mut buf).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.starts_with(r#"<?xml version="1.0" encoding="UTF-8"?>"#));
+        assert!(!s.contains("standalone="));
+    }
+
+    #[test]
+    fn save_to_part_writes_even_when_not_dirty() {
+        let mut opc = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        opc.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.to_vec(),
+        );
+        let mut pkg = OpenXmlPackage::from_opc(opc, Default::default());
+        let mut part = OpenXmlPart::new(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            rel::OFFICE_DOCUMENT,
+        );
+        let _ = part.root(&pkg).unwrap();
+        assert!(!part.is_dirty());
+        part.set_standalone_declaration(Some(true));
+        part.save_to_part(&mut pkg).unwrap();
+        assert!(!part.is_dirty());
+        let bytes = pkg.opc().get_part(&doc).unwrap();
+        let s = std::str::from_utf8(bytes).unwrap();
+        assert!(s.contains(r#"standalone="yes""#));
+        assert!(s.contains("document"));
     }
 }
