@@ -232,6 +232,7 @@ pub fn validate_relationship_refs(
                                 "relationship id `{rid}` on `<{}>` does not exist",
                                 el.local_name
                             ),
+                            ..Default::default()
                         });
                     }
                 }
@@ -249,6 +250,7 @@ pub fn validate_relationship_refs(
                                     "relationship `{rid}` has type `{}`, expected `{}`",
                                     rel.relationship_type, expected
                                 ),
+                                ..Default::default()
                             });
                         }
                     }
@@ -306,6 +308,7 @@ pub fn validate_unique_attributes(
                         "duplicate {} `@{}` value `{}`",
                         rule.element_local_name, rule.attribute, raw
                     ),
+                    ..Default::default()
                 });
             }
         }

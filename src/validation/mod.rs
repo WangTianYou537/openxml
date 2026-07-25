@@ -119,10 +119,16 @@ pub enum ValidationErrorType {
 ///
 /// `id` and `error_type` are derived from the conventional `MessageId: detail`
 /// prefix used throughout this crate (mirrors C# resource ids).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ValidationError {
     pub path: String,
     pub message: String,
+    /// Invalid node location (C# `ValidationErrorInfo.Node` path shell).
+    pub node_path: Option<String>,
+    /// Related element location (C# `RelatedNode`).
+    pub related_node_path: Option<String>,
+    /// Related part URI (C# `RelatedPart`).
+    pub related_part_uri: Option<String>,
 }
 
 impl ValidationError {
@@ -130,6 +136,7 @@ impl ValidationError {
         Self {
             path: path.into(),
             message: message.into(),
+            ..Default::default()
         }
     }
 
@@ -142,7 +149,23 @@ impl ValidationError {
         Self {
             path: path.into(),
             message: format!("{id}: {}", description.as_ref()),
+            ..Default::default()
         }
+    }
+
+    pub fn with_node_path(mut self, path: impl Into<String>) -> Self {
+        self.node_path = Some(path.into());
+        self
+    }
+
+    pub fn with_related_node_path(mut self, path: impl Into<String>) -> Self {
+        self.related_node_path = Some(path.into());
+        self
+    }
+
+    pub fn with_related_part_uri(mut self, uri: impl Into<String>) -> Self {
+        self.related_part_uri = Some(uri.into());
+        self
     }
 
     /// Human-readable description (C# `ValidationErrorInfo.Description`).
@@ -296,6 +319,7 @@ pub fn validate_children(
                     "unexpected child `<{}>` on `<{}>`",
                     child.local_name, element.local_name
                 ),
+                ..Default::default()
             });
         }
     }
@@ -309,6 +333,7 @@ pub fn validate_children(
                     "missing required child `<{}>` on `<{}>`",
                     rule.local_name, element.local_name
                 ),
+                ..Default::default()
             });
         }
         if rule.max_one && n > 1 {
@@ -318,6 +343,7 @@ pub fn validate_children(
                     "child `<{}>` occurs {n} times but at most one is allowed on `<{}>`",
                     rule.local_name, element.local_name
                 ),
+                ..Default::default()
             });
         }
     }
@@ -567,8 +593,20 @@ mod tests {
         let e = ValidationError {
             path: "x".into(),
             message: "MC_InvalidIgnorableAttribute: bad prefix".into(),
+            ..Default::default()
         };
         assert_eq!(e.id(), Some("MC_InvalidIgnorableAttribute"));
         assert_eq!(e.error_type(), ValidationErrorType::MarkupCompatibility);
+    }
+
+    #[test]
+    fn related_node_path_roundtrip() {
+        let e = ValidationError::new("/a", "x")
+            .with_node_path("/a/b")
+            .with_related_node_path("/a/c")
+            .with_related_part_uri("/word/document.xml");
+        assert_eq!(e.node_path.as_deref(), Some("/a/b"));
+        assert_eq!(e.related_node_path.as_deref(), Some("/a/c"));
+        assert_eq!(e.related_part_uri.as_deref(), Some("/word/document.xml"));
     }
 }

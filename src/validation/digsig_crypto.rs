@@ -235,6 +235,7 @@ pub fn validate_signature_digests(package: &OpcPackage) -> Vec<ValidationError> 
                 format!("{}#{}", r.signature_uri, r.reference_uri)
             },
             message: r.message,
+            ..Default::default()
         })
         .collect()
 }

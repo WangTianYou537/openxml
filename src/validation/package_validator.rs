@@ -28,6 +28,7 @@ fn err(path: impl Into<String>, message_id: &str, detail: impl Into<String>) -> 
     ValidationError {
         path: path.into(),
         message: format!("{message_id}: {}", detail.into()),
+        ..Default::default()
     }
 }
 

@@ -504,6 +504,7 @@ fn validate_mc_xml_attrs(elem: &OpenXmlElement, path: &str, errors: &mut Vec<Val
                     "MC_InvalidXmlAttribute: xml:{} is not allowed on <{}>",
                     a.local_name, elem.local_name
                 ),
+                ..Default::default()
             });
         }
     }
@@ -538,6 +539,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
         errors.push(ValidationError {
             path: path.to_string(),
             message: "MC_ShallContainChoice: AlternateContent must contain one or more Choice elements".into(),
+            ..Default::default()
         });
         return;
     }
@@ -550,6 +552,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
             errors.push(ValidationError {
                 path: cpath.clone(),
                 message: "MC_ShallNotContainAlternateContent: AlternateContent cannot nest directly".into(),
+                ..Default::default()
             });
             continue;
         }
@@ -565,6 +568,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
                             "MC_ShallContainChoice: expected Choice, found <{}>",
                             child.local_name
                         ),
+                        ..Default::default()
                     });
                     if child.local_name == "Fallback" {
                         validate_mc_xml_attrs(child, &cpath, errors);
@@ -585,6 +589,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
                             "Sch_InvalidElementContentExpectingComplex: unexpected <{}> in AlternateContent",
                             child.local_name
                         ),
+                        ..Default::default()
                     });
                 }
             }
@@ -595,6 +600,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
                         "Sch_InvalidElementContentExpectingComplex: content after Fallback (<{}>)",
                         child.local_name
                     ),
+                    ..Default::default()
                 });
             }
             _ => {}
@@ -604,6 +610,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
         errors.push(ValidationError {
             path: path.to_string(),
             message: "MC_ShallContainChoice: AlternateContent must contain one or more Choice elements".into(),
+            ..Default::default()
         });
     }
 }
@@ -622,6 +629,7 @@ fn validate_choice(
         errors.push(ValidationError {
             path: path.to_string(),
             message: "MC_MissedRequiresAttribute: Choice must have a Requires attribute".into(),
+            ..Default::default()
         });
         return;
     };
@@ -636,6 +644,7 @@ fn validate_choice(
                 message: format!(
                     "MC_InvalidRequiresAttribute: prefix `{prefix}` in Requires=\"{requires}\" is not defined"
                 ),
+                ..Default::default()
             });
         }
     }
@@ -771,6 +780,7 @@ fn validate_mc_attrs_on(elem: &OpenXmlElement, path: &str, errors: &mut Vec<Vali
                         message: format!(
                             "MC_InvalidIgnorableAttribute: prefix `{prefix}` in Ignorable=\"{ign}\" is not defined"
                         ),
+                        ..Default::default()
                     });
                 }
             }
@@ -791,6 +801,7 @@ fn validate_mc_attrs_on(elem: &OpenXmlElement, path: &str, errors: &mut Vec<Vali
                         message: format!(
                             "{err_id}: {attr_local}=\"{list}\" requires mc:Ignorable on the same element"
                         ),
+                        ..Default::default()
                     });
                 }
                 Some(ns_set) => {
@@ -800,6 +811,7 @@ fn validate_mc_attrs_on(elem: &OpenXmlElement, path: &str, errors: &mut Vec<Vali
                             message: format!(
                                 "{err_id}: `{bad}` in {attr_local}=\"{list}\" is not in an Ignorable namespace"
                             ),
+                            ..Default::default()
                         });
                     }
                 }
@@ -810,6 +822,7 @@ fn validate_mc_attrs_on(elem: &OpenXmlElement, path: &str, errors: &mut Vec<Vali
                         errors.push(ValidationError {
                             path: path.to_string(),
                             message: "MC_InvalidXmlAttributeWithProcessContent: xml:lang/space with ProcessContent".into(),
+                            ..Default::default()
                         });
                     }
                 }
@@ -828,6 +841,7 @@ fn validate_mc_attrs_on(elem: &OpenXmlElement, path: &str, errors: &mut Vec<Vali
                     message: format!(
                         "MC_InvalidMustUnderstandAttribute: prefix `{prefix}` in MustUnderstand=\"{mu}\" is not defined"
                     ),
+                    ..Default::default()
                 });
             }
         }

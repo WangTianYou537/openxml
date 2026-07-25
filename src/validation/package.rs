@@ -21,6 +21,7 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
         errors.push(ValidationError {
             path: "/_rels/.rels".into(),
             message: "missing package relationship of type officeDocument".into(),
+            ..Default::default()
         });
     }
 
@@ -34,6 +35,7 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
                             "officeDocument target `{}` does not exist",
                             main.target
                         ),
+                        ..Default::default()
                     });
                 } else if package
                     .content_types()
@@ -43,12 +45,14 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
                     errors.push(ValidationError {
                         path: uri.as_str().to_string(),
                         message: "main part has no content type".into(),
+                        ..Default::default()
                     });
                 }
             }
             Err(msg) => errors.push(ValidationError {
                 path: "/_rels/.rels".into(),
                 message: msg,
+                ..Default::default()
             }),
         }
     }
@@ -74,12 +78,14 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
                             rel_item.id,
                             uri.as_str()
                         ),
+                        ..Default::default()
                     });
                 }
             }
             Err(msg) => errors.push(ValidationError {
                 path: format!("/_rels/.rels#{}", rel_item.id),
                 message: msg,
+                ..Default::default()
             }),
         }
     }
@@ -113,12 +119,14 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
                                 rel_item.id,
                                 target.as_str()
                             ),
+                            ..Default::default()
                         });
                     }
                 }
                 Err(e) => errors.push(ValidationError {
                     path: format!("{}#_rels#{}", part_uri.as_str(), rel_item.id),
                     message: e.to_string(),
+                    ..Default::default()
                 }),
             }
         }

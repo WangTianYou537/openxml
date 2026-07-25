@@ -39,6 +39,7 @@ pub fn validate_digital_signatures(package: &OpcPackage) -> Vec<ValidationError>
                     ct.unwrap_or("<missing>"),
                     expected
                 ),
+                ..Default::default()
             });
         }
     } else {
@@ -46,6 +47,7 @@ pub fn validate_digital_signatures(package: &OpcPackage) -> Vec<ValidationError>
             path: ORIGIN_URI.into(),
             message: "package has digital signature origin relationship but origin part is missing"
                 .into(),
+            ..Default::default()
         });
     }
 
@@ -53,6 +55,7 @@ pub fn validate_digital_signatures(package: &OpcPackage) -> Vec<ValidationError>
         errors.push(ValidationError {
             path: "/_rels/.rels".into(),
             message: "digital signature origin part exists without package relationship".into(),
+            ..Default::default()
         });
     }
 
@@ -79,6 +82,7 @@ pub fn validate_digital_signatures(package: &OpcPackage) -> Vec<ValidationError>
                                 r.id,
                                 uri.as_str()
                             ),
+                            ..Default::default()
                         });
                     } else {
                         let ct = package.content_types().content_type_for(uri.as_str());
@@ -100,6 +104,7 @@ pub fn validate_digital_signatures(package: &OpcPackage) -> Vec<ValidationError>
                                     "signature part has unexpected content type `{}`",
                                     ct.unwrap_or("<missing>")
                                 ),
+                                ..Default::default()
                             });
                         }
                     }
@@ -107,6 +112,7 @@ pub fn validate_digital_signatures(package: &OpcPackage) -> Vec<ValidationError>
                 Err(e) => errors.push(ValidationError {
                     path: format!("{ORIGIN_URI}#{}", r.id),
                     message: format!("cannot resolve signature relationship: {e}"),
+                    ..Default::default()
                 }),
             }
         }

@@ -176,12 +176,14 @@ pub fn validate_particle(
                 "unexpected child `<{}>` at position {} under `<{}>` (particle mismatch)",
                 extra.local_name, result.consumed, element.local_name
             ),
+            ..Default::default()
         });
     }
     for e in result.errors {
         errors.push(ValidationError {
             path: path.to_string(),
             message: e,
+            ..Default::default()
         });
     }
     errors

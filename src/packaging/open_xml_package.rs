@@ -36,6 +36,39 @@ impl Default for MarkupCompatibilityProcessSettings {
     }
 }
 
+/// SDK behavioral compatibility level (C# `CompatibilityLevel`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CompatibilityLevel {
+    /// Latest behavior (C# `Default` / resolves to Version_3_0).
+    #[default]
+    Default,
+    /// Maintain compatibility with Open XML SDK v2.20 where possible.
+    Version2_20,
+    /// Maintain compatibility with Open XML SDK v3.0 where possible.
+    Version3_0,
+}
+
+impl CompatibilityLevel {
+    /// Effective level (C# getter maps `Default` → `Version_3_0`).
+    pub fn effective(self) -> Self {
+        match self {
+            Self::Default => Self::Version3_0,
+            other => other,
+        }
+    }
+
+    /// Whether this level is at least the given version (Default counts as 3.0).
+    pub fn at_least(self, min: CompatibilityLevel) -> bool {
+        fn rank(c: CompatibilityLevel) -> u8 {
+            match c.effective() {
+                CompatibilityLevel::Version2_20 => 1,
+                CompatibilityLevel::Version3_0 | CompatibilityLevel::Default => 2,
+            }
+        }
+        rank(self) >= rank(min)
+    }
+}
+
 /// Settings used when opening a package.
 #[derive(Debug, Clone)]
 pub struct OpenSettings {
@@ -47,6 +80,8 @@ pub struct OpenSettings {
     pub markup_compatibility: MarkupCompatibilityProcessSettings,
     /// ZIP compression for ordinary parts (C# `OpenXmlPackage.CompressionOption`).
     pub compression: crate::opc::CompressionOption,
+    /// Behavioral compatibility with prior SDK major versions (C# `CompatibilityLevel`).
+    pub compatibility_level: CompatibilityLevel,
 }
 
 impl Default for OpenSettings {
@@ -56,6 +91,7 @@ impl Default for OpenSettings {
             max_characters_in_part: 0,
             markup_compatibility: MarkupCompatibilityProcessSettings::default(),
             compression: crate::opc::CompressionOption::Normal,
+            compatibility_level: CompatibilityLevel::Default,
         }
     }
 }
@@ -580,5 +616,18 @@ mod part_events_tests {
         assert_eq!(added.load(Ordering::SeqCst), 1);
         assert!(pkg.delete_part(&uri).is_some());
         assert_eq!(removed.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn compatibility_level_effective_and_at_least() {
+        assert_eq!(
+            CompatibilityLevel::Default.effective(),
+            CompatibilityLevel::Version3_0
+        );
+        assert!(CompatibilityLevel::Default.at_least(CompatibilityLevel::Version3_0));
+        assert!(CompatibilityLevel::Version3_0.at_least(CompatibilityLevel::Version2_20));
+        assert!(!CompatibilityLevel::Version2_20.at_least(CompatibilityLevel::Version3_0));
+        let s = OpenSettings::default();
+        assert_eq!(s.compatibility_level, CompatibilityLevel::Default);
     }
 }

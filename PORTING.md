@@ -796,6 +796,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Stream/Part reader real `XmlLineInfo` line tracking (byte consume counter)
 - [x] Part reader `read_misc_nodes`/`encoding`/`standalone_xml`/`has_value` shells
 - [x] `FileOpenAccess` alias + `PackageMode::{can_read,can_write}`
+- [x] `OpenXmlPartReaderOptions` (IgnoreWhitespace / MaxCharactersInPart / ReadMiscellaneousNodes)
+- [x] `CompatibilityLevel` on OpenSettings
+- [x] `ValidationError` Node/RelatedNode/RelatedPart path shells
 
 **Still intentionally deferred / partial:**
 

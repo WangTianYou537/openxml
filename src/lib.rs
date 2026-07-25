@@ -64,7 +64,7 @@ pub mod spreadsheet;
 pub mod validation;
 pub mod wordprocessing;
 
-pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartWriter, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
+pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
 pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, FeatureCollection, PackageEvent, PackageEventType, PackageEvents,
@@ -84,7 +84,7 @@ pub use packaging::{
     add_typed_part, add_typed_part_element, default_settings, default_styles, find_typed_parts,
     footer, footer_reference, header, header_reference, hyperlink, AlternativeFormatImportType,
     DocumentSettingsPart, ExtendedPart, ImageFormat, ImagePart, MainDocumentPart,
-    MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
+    CompatibilityLevel, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
     OpenXmlPackage, PackageMiddleware, PresentationDocument, PresentationDocumentBuilder,
     PresentationDocumentType, SlideInfo, SlideLayoutInfo, SlideMasterInfo, SpreadsheetDocument,
     SpreadsheetDocumentBuilder, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart,

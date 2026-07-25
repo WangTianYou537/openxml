@@ -320,6 +320,7 @@ mod tests {
         let e = ValidationError {
             path: "root".into(),
             message: "MC_ShallContainChoice: missing Choice".into(),
+            ..Default::default()
         };
         assert_eq!(e.id(), Some("MC_ShallContainChoice"));
         assert_eq!(e.description(), "missing Choice");
@@ -331,6 +332,7 @@ mod tests {
         let e = ValidationError {
             path: "/word".into(),
             message: "PartIsNotAllowed: foo".into(),
+            ..Default::default()
         };
         assert_eq!(e.id(), Some("PartIsNotAllowed"));
         assert_eq!(e.error_type(), crate::validation::ValidationErrorType::Package);

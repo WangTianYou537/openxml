@@ -50,6 +50,7 @@ pub fn validate_attribute_value(
             message: format!(
                 "attribute `{attr_name}` value `{value}` is not a valid {ty:?}"
             ),
+            ..Default::default()
         })
     }
 }
@@ -88,6 +89,7 @@ pub fn validate_attributes(
                         "missing required attribute `{}` on `<{}>`",
                         rule.local_name, element.local_name
                     ),
+                    ..Default::default()
                 });
             }
             Some(v) => {
@@ -134,10 +136,12 @@ pub fn validate_attribute_range(
             message: format!(
                 "attribute `{attr_name}` value `{n}` is outside range [{min}, {max}]"
             ),
+            ..Default::default()
         }),
         Err(_) => Some(ValidationError {
             path: format!("{path}/@{attr_name}"),
             message: format!("attribute `{attr_name}` value `{value}` is not numeric"),
+            ..Default::default()
         }),
     }
 }

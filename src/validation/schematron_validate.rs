@@ -66,6 +66,7 @@ pub fn validate_schematron_numeric_ranges(root: &OpenXmlElement) -> Vec<Validati
                 errors.push(ValidationError {
                     path: format!("{}/@{}", rule.element, rule.attribute),
                     message: e.message,
+                    ..Default::default()
                 });
             }
         }
@@ -93,6 +94,7 @@ pub fn validate_schematron_string_lengths(root: &OpenXmlElement) -> Vec<Validati
                         "attribute `{}` length {len} is outside range [{}, {}]",
                         rule.attribute, rule.min, rule.max
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -126,6 +128,7 @@ pub fn validate_schematron_patterns(root: &OpenXmlElement) -> Vec<ValidationErro
                             "attribute `{}` value `{v}` does not match pattern `{}`",
                             rule.attribute, rule.pattern
                         ),
+                        ..Default::default()
                     });
                 }
                 PatternResult::Unsupported => {}
@@ -251,6 +254,7 @@ pub fn validate_schematron_enums(root: &OpenXmlElement) -> Vec<ValidationError> 
                         "attribute `{}` value `{v}` is not one of {:?}",
                         rule.attribute, rule.values
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -294,6 +298,7 @@ pub fn validate_schematron_ancestor_unique(root: &OpenXmlElement) -> Vec<Validat
                             "duplicate {} `@{}` value `{}` under `<{}>`",
                             rule.element, rule.attribute, raw, rule.ancestor
                         ),
+                        ..Default::default()
                     });
                 }
             }
@@ -327,6 +332,7 @@ pub fn validate_schematron_conditional_attrs(root: &OpenXmlElement) -> Vec<Valid
                         rule.flag_attribute,
                         rule.flag_value
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -354,6 +360,7 @@ pub fn validate_schematron_nonzero_guids(root: &OpenXmlElement) -> Vec<Validatio
                         "attribute `{}` must not be the nil UUID",
                         rule.attribute
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -391,6 +398,7 @@ pub fn validate_schematron_attr_compare(root: &OpenXmlElement) -> Vec<Validation
                         "attribute `{}` ({left}) is not {} `{}` ({right})",
                         rule.left, rule.op, rule.right
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -418,6 +426,7 @@ pub fn validate_schematron_fixed_bools(root: &OpenXmlElement) -> Vec<ValidationE
                         "attribute `{}` must be `{}` (got `{v}`)",
                         rule.attribute, rule.expected
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -538,6 +547,7 @@ pub fn validate_schematron_cross_part(
                         "attribute `{}` value `{v}` not found among `{}/@{}` (part `{}`)",
                         rule.attribute, rule.target_element, rule.target_attribute, rule.part_hint
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -568,6 +578,7 @@ pub fn validate_schematron_cross_part(
                         "attribute `{}` value {n} must be < {limit} (count of `{}` + {})",
                         rule.attribute, rule.target_element, rule.offset
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -595,6 +606,7 @@ pub fn validate_schematron_fixed_values(root: &OpenXmlElement) -> Vec<Validation
                         "attribute `{}` must be `{}` (got `{v}`)",
                         rule.attribute, rule.value
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -620,6 +632,7 @@ pub fn validate_schematron_fixed_nes(root: &OpenXmlElement) -> Vec<ValidationErr
                         "attribute `{}` must not be `{}`",
                         rule.attribute, rule.forbidden
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -645,6 +658,7 @@ pub fn validate_schematron_multi_nes(root: &OpenXmlElement) -> Vec<ValidationErr
                         "attribute `{}` value `{v}` is forbidden ({:?})",
                         rule.attribute, rule.forbidden
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -669,6 +683,7 @@ pub fn validate_schematron_both_present(root: &OpenXmlElement) -> Vec<Validation
                         "attributes `{}` and `{}` must both be present or both absent",
                         rule.left, rule.right
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -698,6 +713,7 @@ pub fn validate_schematron_finite_numbers(root: &OpenXmlElement) -> Vec<Validati
                         "attribute `{}` must be a finite number (got `{v}`)",
                         rule.attribute
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -720,6 +736,7 @@ pub fn validate_schematron_required_attrs(root: &OpenXmlElement) -> Vec<Validati
                         "attribute `{}` is required on `<{}>`",
                         rule.attribute, rule.element
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -747,6 +764,7 @@ pub fn validate_schematron_absent_when_not(root: &OpenXmlElement) -> Vec<Validat
                         "attribute `{}` must be absent unless `@{}` is one of {:?}",
                         rule.absent_attribute, rule.condition_attribute, rule.allowed_values
                     ),
+                    ..Default::default()
                 });
                 continue;
             };
@@ -757,6 +775,7 @@ pub fn validate_schematron_absent_when_not(root: &OpenXmlElement) -> Vec<Validat
                         "attribute `{}` must be absent when `@{}` is `{cond}` (allowed: {:?})",
                         rule.absent_attribute, rule.condition_attribute, rule.allowed_values
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -785,6 +804,7 @@ pub fn validate_schematron_mutual_exclusive(root: &OpenXmlElement) -> Vec<Valida
                         "attributes {:?} are mutually exclusive; found {:?}",
                         rule.attributes, present
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -819,6 +839,7 @@ pub fn validate_schematron_bool_pair_impl(root: &OpenXmlElement) -> Vec<Validati
                         rule.flag_value,
                         actual.unwrap_or("<missing>")
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -844,6 +865,7 @@ pub fn validate_schematron_attr_and_enum(root: &OpenXmlElement) -> Vec<Validatio
                         "attribute `{}` is required when `{}` is present (allowed: {:?})",
                         rule.flag_attribute, rule.required_attribute, rule.flag_values
                     ),
+                    ..Default::default()
                 });
                 continue;
             };
@@ -854,6 +876,7 @@ pub fn validate_schematron_attr_and_enum(root: &OpenXmlElement) -> Vec<Validatio
                         "attribute `{}` value `{flag}` not in {:?} when `{}` present",
                         rule.flag_attribute, rule.flag_values, rule.required_attribute
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -891,6 +914,7 @@ pub fn validate_schematron_enum_when_flag(root: &OpenXmlElement) -> Vec<Validati
                         flag,
                         actual.unwrap_or("<missing>")
                     ),
+                    ..Default::default()
                 });
             }
         }
@@ -933,6 +957,7 @@ pub fn validate_schematron_special_patterns(root: &OpenXmlElement) -> Vec<Valida
                         "attribute `{}` value `{v}` fails special pattern `{}`",
                         rule.attribute, rule.kind
                     ),
+                    ..Default::default()
                 });
             }
         }

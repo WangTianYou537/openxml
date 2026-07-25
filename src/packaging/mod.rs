@@ -18,8 +18,8 @@ pub use builder::{
     WordprocessingDocumentBuilder,
 };
 pub use open_xml_package::{
-    MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
-    OpenXmlPackage,
+    CompatibilityLevel, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
+    OpenSettings, OpenXmlPackage,
 };
 pub use open_xml_part::{ExtendedPart, MainDocumentPart, OpenXmlPart};
 pub use parts::{

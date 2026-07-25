@@ -21,6 +21,48 @@ pub enum ElementState {
     EOF,
 }
 
+/// Options for constructing a part reader (C# `OpenXmlPartReaderOptions`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OpenXmlPartReaderOptions {
+    /// Report miscellaneous nodes (C# `ReadMiscellaneousNodes`).
+    pub read_miscellaneous_nodes: bool,
+    /// Maximum characters allowed in the part (0 = unlimited; C# `MaxCharactersInPart`).
+    pub max_characters_in_part: u64,
+    /// Skip insignificant whitespace text nodes (C# `IgnoreWhitespace`; default true).
+    pub ignore_whitespace: bool,
+}
+
+impl Default for OpenXmlPartReaderOptions {
+    fn default() -> Self {
+        Self {
+            read_miscellaneous_nodes: false,
+            max_characters_in_part: 0,
+            ignore_whitespace: true,
+        }
+    }
+}
+
+impl OpenXmlPartReaderOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_read_miscellaneous_nodes(mut self, yes: bool) -> Self {
+        self.read_miscellaneous_nodes = yes;
+        self
+    }
+
+    pub fn with_max_characters_in_part(mut self, max: u64) -> Self {
+        self.max_characters_in_part = max;
+        self
+    }
+
+    pub fn with_ignore_whitespace(mut self, yes: bool) -> Self {
+        self.ignore_whitespace = yes;
+        self
+    }
+}
+
 /// Cursor over an XML part stream (C# `OpenXmlReader` shell).
 pub struct OpenXmlPartReader<R: BufRead> {
     inner: OpenXmlStreamReader<R>,
@@ -30,8 +72,9 @@ pub struct OpenXmlPartReader<R: BufRead> {
     attributes: Vec<(String, String)>,
     text: String,
     depth: usize,
-    #[allow(dead_code)]
     read_misc_nodes: bool,
+    ignore_whitespace: bool,
+    max_characters_in_part: u64,
     /// Stack of open element qnames for LoadCurrentElement reconstruction.
     open_stack: Vec<StackFrame>,
     /// Buffered events for LoadCurrentElement of the current start node.
@@ -61,10 +104,19 @@ impl<'a> OpenXmlPartReader<&'a [u8]> {
     pub fn create_with_misc(data: &'a [u8], read_misc_nodes: bool) -> Self {
         Self::from_bytes(data).with_read_misc_nodes(read_misc_nodes)
     }
+
+    /// C# `OpenXmlPartReader` with [`OpenXmlPartReaderOptions`].
+    pub fn create_with_options(data: &'a [u8], options: OpenXmlPartReaderOptions) -> Self {
+        Self::from_reader_with_options(data, options)
+    }
 }
 
 impl<R: BufRead> OpenXmlPartReader<R> {
     pub fn from_reader(reader: R) -> Self {
+        Self::from_reader_with_options(reader, OpenXmlPartReaderOptions::default())
+    }
+
+    pub fn from_reader_with_options(reader: R, options: OpenXmlPartReaderOptions) -> Self {
         Self {
             inner: OpenXmlStreamReader::from_reader(reader),
             state: ElementState::Null,
@@ -73,7 +125,9 @@ impl<R: BufRead> OpenXmlPartReader<R> {
             attributes: Vec::new(),
             text: String::new(),
             depth: 0,
-            read_misc_nodes: false,
+            read_misc_nodes: options.read_miscellaneous_nodes,
+            ignore_whitespace: options.ignore_whitespace,
+            max_characters_in_part: options.max_characters_in_part,
             open_stack: Vec::new(),
             pending_load: None,
             eof: false,
@@ -84,6 +138,38 @@ impl<R: BufRead> OpenXmlPartReader<R> {
     pub fn with_read_misc_nodes(mut self, yes: bool) -> Self {
         self.read_misc_nodes = yes;
         self
+    }
+
+    /// Whether insignificant whitespace text is skipped (C# `IgnoreWhitespace`).
+    pub fn with_ignore_whitespace(mut self, yes: bool) -> Self {
+        self.ignore_whitespace = yes;
+        self
+    }
+
+    /// Cap characters read from the part (0 = unlimited).
+    pub fn with_max_characters_in_part(mut self, max: u64) -> Self {
+        self.max_characters_in_part = max;
+        self
+    }
+
+    pub fn ignore_whitespace(&self) -> bool {
+        self.ignore_whitespace
+    }
+
+    pub fn max_characters_in_part(&self) -> u64 {
+        self.max_characters_in_part
+    }
+
+    fn check_max_characters(&self) -> Result<()> {
+        if self.max_characters_in_part > 0
+            && self.inner.buffer_position() > self.max_characters_in_part
+        {
+            return Err(Error::Xml(format!(
+                "part exceeds MaxCharactersInPart limit ({})",
+                self.max_characters_in_part
+            )));
+        }
+        Ok(())
     }
 
     pub fn element_state(&self) -> ElementState {
@@ -191,6 +277,7 @@ impl<R: BufRead> OpenXmlPartReader<R> {
                     local_name,
                     attributes,
                 }) => {
+                    self.check_max_characters()?;
                     self.prefix = prefix.clone();
                     self.local_name = local_name.clone();
                     self.attributes = attributes.clone();
@@ -209,6 +296,7 @@ impl<R: BufRead> OpenXmlPartReader<R> {
                     local_name,
                     attributes,
                 }) => {
+                    self.check_max_characters()?;
                     self.prefix = prefix;
                     self.local_name = local_name;
                     self.attributes = attributes;
@@ -223,6 +311,7 @@ impl<R: BufRead> OpenXmlPartReader<R> {
                     prefix,
                     local_name,
                 }) => {
+                    self.check_max_characters()?;
                     if !self.open_stack.is_empty() {
                         self.open_stack.pop();
                     }
@@ -235,8 +324,9 @@ impl<R: BufRead> OpenXmlPartReader<R> {
                     return Ok(true);
                 }
                 Some(XmlEvent::Text(t)) => {
+                    self.check_max_characters()?;
                     let is_ws = t.chars().all(|c| c.is_whitespace());
-                    if is_ws {
+                    if is_ws && self.ignore_whitespace {
                         continue;
                     }
                     self.text = t;
@@ -592,5 +682,39 @@ mod tests {
         assert!(!r.read_misc_nodes());
         assert!(r.encoding().is_none());
         assert!(r.standalone_xml().is_none());
+    }
+
+    #[test]
+    fn part_reader_options_preserve_whitespace() {
+        let xml = b"<p>\n  <t>x</t>\n</p>";
+        let mut r = OpenXmlPartReader::create_with_options(
+            xml,
+            OpenXmlPartReaderOptions::default().with_ignore_whitespace(false),
+        );
+        assert!(r.read().unwrap()); // p
+        assert!(r.read().unwrap()); // whitespace text
+        assert_eq!(r.element_state(), ElementState::LeafText);
+        assert!(!r.ignore_whitespace());
+    }
+
+    #[test]
+    fn part_reader_max_characters_limit() {
+        let xml = br#"<root><a/><b/><c/><d/><e/></root>"#;
+        let mut r = OpenXmlPartReader::create_with_options(
+            xml,
+            OpenXmlPartReaderOptions::default().with_max_characters_in_part(8),
+        );
+        let mut hit_limit = false;
+        loop {
+            match r.read() {
+                Ok(false) => break,
+                Ok(true) => continue,
+                Err(e) => {
+                    hit_limit = e.to_string().contains("MaxCharactersInPart");
+                    break;
+                }
+            }
+        }
+        assert!(hit_limit, "expected MaxCharactersInPart error");
     }
 }
