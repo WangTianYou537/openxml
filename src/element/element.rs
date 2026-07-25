@@ -833,6 +833,11 @@ impl OpenXmlElement {
         String::from_utf8(bytes).map_err(|e| crate::error::Error::Xml(e.to_string()))
     }
 
+    /// Write this element (no XML declaration) to `dest` (C# `WriteTo`).
+    pub fn write_to<W: std::io::Write>(&self, dest: W) -> crate::error::Result<()> {
+        super::writer::write_element_to(self, dest)
+    }
+
     /// Serialize inner content only — children + text, no wrapper element
     /// (approximation of C# `InnerXml` getter).
     pub fn inner_xml(&self) -> crate::error::Result<String> {
@@ -1289,5 +1294,15 @@ mod element_api_parity_tests {
         assert!(el.has_attributes());
         el.clear_all_attributes();
         assert!(!el.has_attributes());
+    }
+
+    #[test]
+    fn write_to_roundtrip() {
+        let el = OpenXmlElement::w("t").with_text("hi");
+        let mut buf = Vec::new();
+        el.write_to(&mut buf).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("hi"));
+        assert!(s.contains("t"));
     }
 }

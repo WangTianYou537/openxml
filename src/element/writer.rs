@@ -16,11 +16,18 @@ pub fn write_element(root: &OpenXmlElement) -> Result<Vec<u8>> {
 }
 
 /// Serialize without XML declaration (for fragments).
-#[allow(dead_code)]
 pub fn write_element_fragment(root: &OpenXmlElement) -> Result<Vec<u8>> {
     let mut writer = Writer::new(Cursor::new(Vec::new()));
     write_node(&mut writer, root, true)?;
     Ok(writer.into_inner().into_inner())
+}
+
+/// Write an element tree (no XML declaration) to any [`std::io::Write`]
+/// (C# `OpenXmlElement.WriteTo`).
+pub fn write_element_to<W: std::io::Write>(root: &OpenXmlElement, dest: W) -> Result<()> {
+    let mut writer = Writer::new(dest);
+    write_node(&mut writer, root, true)?;
+    Ok(())
 }
 
 fn write_node<W: std::io::Write>(
