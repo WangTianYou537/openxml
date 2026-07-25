@@ -38,6 +38,6 @@ pub use typed::{
     Table, TableCell, TableRow, Text, Worksheet,
 };
 pub use part_reader::{ElementState, OpenXmlPartReader, OpenXmlPartReaderOptions};
-pub use part_writer::OpenXmlPartWriter;
+pub use part_writer::{OpenXmlPartWriter, OpenXmlPartWriterSettings};
 pub use writer::{write_element, write_element_fragment, write_element_to};
 pub use xml_path::{xpath_index_among_siblings, OpenXmlUnknownMarker, XmlLineInfo, XmlPath};

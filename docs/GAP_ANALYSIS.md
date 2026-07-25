@@ -66,7 +66,7 @@
 |------|---------|------|--------|
 | **强类型元素类** | 生成 `Paragraph : OpenXmlCompositeElement` 等 | Rust 仅有 `paragraph()` 工厂返回通用 DOM，无 `struct Paragraph` 属性访问器 | 高（API 体验） |
 | **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | ✅ `OpenXmlMiscKind` + **`is_leaf_element` / `is_composite_element`** + Unknown marker | 🟡 非独立类型 |
-| **OpenXmlReader / OpenXmlWriter 流式** | `OpenXmlReader.cs`, `OpenXmlPartReader` | ✅ Stream/Part/Dom Reader + PartWriter | 🟡 |
+| **OpenXmlReader / OpenXmlWriter 流式** | `OpenXmlReader.cs`, `OpenXmlPartReader` | ✅ Stream/Part/Dom Reader + PartWriter + `OpenXmlPartWriterSettings` | 🟡 |
 | **OpenXmlLoadMode** | Full / Lazy（默认缓存 OuterXml） | ✅ `OpenXmlLoadMode` + ElementContext | 🟡 |
 | **MaxCharactersInPart** | OpenSettings DoS 防护 | ✅ 有 DoS 防护 | ✅ |
 | **CompressionOption** | 包压缩选项 | ✅ `CompressionOption` + `OpenSettings.compression` | ✅ |
@@ -202,6 +202,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | Strict→Transitional 命名空间与关系 | ✅ |
 | CompatibilityRuleAttributes 校验 | ✅ `validate_mc_attributes` |
 | OpenSettings 驱动的打开时 MC 处理模式 | ✅ `MarkupCompatibilityProcessMode` |
+| **MCContext** push/pop 栈 | C# `MCContext` | ✅ 公共 `McContext`（Ignorable/Preserve*/ProcessContent + AttributeAction/ElementAction） | 🟡 |
 | 反向 Transitional→Strict | ❌（C# 也主要推 Strict→Transitional） |
 
 ---

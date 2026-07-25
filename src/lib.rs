@@ -53,7 +53,6 @@ pub mod features;
 pub mod file_format;
 pub mod generated;
 pub mod markup_compatibility;
-pub use markup_compatibility::MarkupCompatibilityAttributes;
 pub mod namespace;
 pub mod namespace_rewrite;
 pub mod opc;
@@ -64,13 +63,16 @@ pub mod spreadsheet;
 pub mod validation;
 pub mod wordprocessing;
 
-pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
+pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, OpenXmlPartWriterSettings, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
 pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, FeatureCollection, PackageCapabilities, PackageEvent, PackageEventType, PackageEvents,
     ParagraphIdGenerator, PartEvents, PartRootEvents,
 };
 pub use file_format::FileFormatVersions;
+pub use markup_compatibility::{
+    AttributeAction, ElementAction, McContext, MarkupCompatibilityAttributes,
+};
 pub use namespace::{Namespace, OpenXmlNamespace};
 pub use opc::{
     add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, FileOpenAccess,

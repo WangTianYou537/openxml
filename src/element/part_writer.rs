@@ -4,23 +4,85 @@ use super::element::{OpenXmlAttribute, OpenXmlElement};
 use crate::error::{Error, Result};
 use std::io::Write;
 
+/// Settings for constructing a part writer (C# `OpenXmlPartWriterSettings`).
+#[derive(Debug, Clone)]
+pub struct OpenXmlPartWriterSettings {
+    /// Close the underlying writer on [`OpenXmlPartWriter::finish`] / drop (advisory; Rust ownership usually handles this).
+    pub close_output: bool,
+    /// Encoding name written into the XML declaration (default `UTF-8`).
+    pub encoding: String,
+    /// Whether to emit an XML declaration.
+    pub write_declaration: bool,
+    /// Standalone flag in the XML declaration when writing one (`None` omits the attribute).
+    pub standalone: Option<bool>,
+}
+
+impl Default for OpenXmlPartWriterSettings {
+    fn default() -> Self {
+        Self {
+            close_output: false,
+            encoding: "UTF-8".into(),
+            write_declaration: true,
+            standalone: Some(true),
+        }
+    }
+}
+
+impl OpenXmlPartWriterSettings {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_encoding(mut self, encoding: impl Into<String>) -> Self {
+        self.encoding = encoding.into();
+        self
+    }
+
+    pub fn with_close_output(mut self, yes: bool) -> Self {
+        self.close_output = yes;
+        self
+    }
+
+    pub fn without_declaration(mut self) -> Self {
+        self.write_declaration = false;
+        self
+    }
+
+    pub fn with_standalone(mut self, standalone: Option<bool>) -> Self {
+        self.standalone = standalone;
+        self
+    }
+}
+
 /// Write Open XML elements to a stream without building a full intermediate string.
 pub struct OpenXmlPartWriter<W: Write> {
     writer: W,
     stack: Vec<String>,
     wrote_decl: bool,
     write_declaration: bool,
+    encoding: String,
+    standalone: Option<bool>,
+    #[allow(dead_code)]
+    close_output: bool,
     /// When true, a start tag is open (`<name` written, `>` deferred) so attributes can still be written.
     open_start: bool,
 }
 
 impl<W: Write> OpenXmlPartWriter<W> {
     pub fn new(writer: W) -> Self {
+        Self::with_settings(writer, OpenXmlPartWriterSettings::default())
+    }
+
+    /// Construct with explicit settings (C# `OpenXmlPartWriter(..., OpenXmlPartWriterSettings)`).
+    pub fn with_settings(writer: W, settings: OpenXmlPartWriterSettings) -> Self {
         Self {
             writer,
             stack: Vec::new(),
             wrote_decl: false,
-            write_declaration: true,
+            write_declaration: settings.write_declaration,
+            encoding: settings.encoding,
+            standalone: settings.standalone,
+            close_output: settings.close_output,
             open_start: false,
         }
     }
@@ -28,6 +90,14 @@ impl<W: Write> OpenXmlPartWriter<W> {
     /// C# `OpenXmlWriter.Create(Stream)` shell.
     pub fn create(writer: W) -> Self {
         Self::new(writer)
+    }
+
+    /// C# `OpenXmlWriter.Create` with encoding name for the XML declaration.
+    pub fn create_with_encoding(writer: W, encoding: impl Into<String>) -> Self {
+        Self::with_settings(
+            writer,
+            OpenXmlPartWriterSettings::default().with_encoding(encoding),
+        )
     }
 
     /// C# `OpenXmlWriter.Create` without XML declaration.
@@ -42,8 +112,17 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     fn ensure_decl(&mut self) -> Result<()> {
         if self.write_declaration && !self.wrote_decl {
+            let standalone = match self.standalone {
+                Some(true) => r#" standalone="yes""#,
+                Some(false) => r#" standalone="no""#,
+                None => "",
+            };
+            let decl = format!(
+                r#"<?xml version="1.0" encoding="{}"{standalone}?>"#,
+                self.encoding
+            );
             self.writer
-                .write_all(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)
+                .write_all(decl.as_bytes())
                 .map_err(|e| Error::Io(e))?;
             self.wrote_decl = true;
         }
@@ -711,5 +790,35 @@ mod tests {
         assert!(s.contains("<w:p"), "{s}");
         assert!(s.contains("</w:p>"), "{s}");
         assert!(s.contains("/>"), "{s}");
+    }
+
+    #[test]
+    fn writer_settings_encoding_and_standalone() {
+        let mut buf = Vec::new();
+        {
+            let settings = OpenXmlPartWriterSettings::new()
+                .with_encoding("UTF-16")
+                .with_standalone(Some(false));
+            let mut w = OpenXmlPartWriter::with_settings(&mut buf, settings);
+            w.write_start(None, "root", &[]).unwrap();
+            w.write_end_element().unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains(r#"encoding="UTF-16""#), "{s}");
+        assert!(s.contains(r#"standalone="no""#), "{s}");
+    }
+
+    #[test]
+    fn create_with_encoding_factory() {
+        let mut buf = Vec::new();
+        {
+            let mut w = OpenXmlPartWriter::create_with_encoding(&mut buf, "ISO-8859-1");
+            w.write_start(None, "a", &[]).unwrap();
+            w.write_end_element().unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains(r#"encoding="ISO-8859-1""#), "{s}");
     }
 }

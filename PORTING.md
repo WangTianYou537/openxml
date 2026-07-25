@@ -804,6 +804,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Document-order `order_at_paths` / `is_before_at` / `is_after_at`
 - [x] `PackageCapabilities` + OpenXmlPackage::package_capabilities
 - [x] `ValidationContext` shell (settings/cache/errors/expected children)
+- [x] `OpenXmlPartWriterSettings` + `with_settings` / `create_with_encoding` / encoding+standalone declaration
+- [x] Public `McContext` push/pop shell (`AttributeAction` / `ElementAction` / `McQualifiedName`)
 
 **Still intentionally deferred / partial:**
 

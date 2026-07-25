@@ -336,6 +336,334 @@ fn process_mc_node(
     removed
 }
 
+/// Attribute-level MC action (C# `AttributeAction`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttributeAction {
+    Normal,
+    Ignore,
+}
+
+/// Element-level MC action (C# `ElementAction`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ElementAction {
+    Normal,
+    Ignore,
+    ProcessContent,
+    /// `mc:AlternateContent` block.
+    AcBlock,
+}
+
+/// Qualified name entry used by MC preserve / process-content stacks.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct McQualifiedName {
+    /// Namespace URI (empty for no namespace).
+    pub namespace_uri: String,
+    /// Local name, or `"*"` for wildcards.
+    pub local_name: String,
+}
+
+impl McQualifiedName {
+    pub fn new(namespace_uri: impl Into<String>, local_name: impl Into<String>) -> Self {
+        Self {
+            namespace_uri: namespace_uri.into(),
+            local_name: local_name.into(),
+        }
+    }
+
+    pub fn matches(&self, namespace_uri: &str, local_name: &str) -> bool {
+        if self.namespace_uri != namespace_uri {
+            return false;
+        }
+        self.local_name == "*" || self.local_name == local_name
+    }
+}
+
+/// Markup Compatibility push/pop context (C# `MCContext` shell).
+///
+/// Tracks ignorable namespace URIs and preserve/process-content QName stacks across
+/// nested elements. Prefix → URI resolution is supplied via an optional lookup.
+#[derive(Debug, Default, Clone)]
+pub struct McContext {
+    ignorable: Vec<String>,
+    preserve_attrs: Vec<McQualifiedName>,
+    preserve_eles: Vec<McQualifiedName>,
+    process_content: Vec<McQualifiedName>,
+    pushed_ignorable: Vec<usize>,
+    pushed_pa: Vec<usize>,
+    pushed_pe: Vec<usize>,
+    pushed_pc: Vec<usize>,
+    no_exception_on_error: bool,
+}
+
+impl McContext {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// C# `MCContext(resolver, exceptionOnError)` — when `exception_on_error` is false,
+    /// invalid prefix/QName tokens are skipped instead of panicking.
+    pub fn with_exception_on_error(exception_on_error: bool) -> Self {
+        Self {
+            no_exception_on_error: !exception_on_error,
+            ..Self::default()
+        }
+    }
+
+    pub fn has_ignorable(&self) -> bool {
+        !self.ignorable.is_empty()
+    }
+
+    pub fn is_ignorable_ns(&self, namespace_uri: &str) -> bool {
+        !namespace_uri.is_empty() && self.ignorable.iter().any(|u| u == namespace_uri)
+    }
+
+    pub fn is_preserved_attribute(&self, namespace_uri: &str, local_name: &str) -> bool {
+        self.preserve_attrs
+            .iter()
+            .any(|q| q.matches(namespace_uri, local_name))
+    }
+
+    pub fn is_preserved_element(&self, namespace_uri: &str, local_name: &str) -> bool {
+        self.preserve_eles
+            .iter()
+            .any(|q| q.matches(namespace_uri, local_name))
+    }
+
+    pub fn is_process_content(&self, namespace_uri: &str, local_name: &str) -> bool {
+        self.process_content
+            .iter()
+            .any(|q| q.matches(namespace_uri, local_name))
+    }
+
+    /// Push all four MC attribute stacks (C# `PushMCAttributes`).
+    ///
+    /// `lookup` maps a namespace *prefix* to its URI; when `None`, tokens are treated as URIs/prefix-local pairs without resolution.
+    pub fn push_mc_attributes(
+        &mut self,
+        attr: &MarkupCompatibilityAttributes,
+        lookup: Option<&dyn Fn(&str) -> Option<String>>,
+    ) {
+        let n_ign = self.push_ignorable(attr.ignorable.as_deref(), lookup);
+        let n_pa = self.push_qnames(
+            attr.preserve_attributes.as_deref(),
+            lookup,
+            |ctx, q| ctx.preserve_attrs.push(q),
+        );
+        let n_pe = self.push_qnames(
+            attr.preserve_elements.as_deref(),
+            lookup,
+            |ctx, q| ctx.preserve_eles.push(q),
+        );
+        let n_pc = self.push_qnames(
+            attr.process_content.as_deref(),
+            lookup,
+            |ctx, q| ctx.process_content.push(q),
+        );
+        self.pushed_ignorable.push(n_ign);
+        self.pushed_pa.push(n_pa);
+        self.pushed_pe.push(n_pe);
+        self.pushed_pc.push(n_pc);
+    }
+
+    /// Pop stacks pushed by the last [`push_mc_attributes`](Self::push_mc_attributes).
+    pub fn pop_mc_attributes(&mut self) {
+        if let Some(n) = self.pushed_ignorable.pop() {
+            for _ in 0..n {
+                self.ignorable.pop();
+            }
+        }
+        if let Some(n) = self.pushed_pa.pop() {
+            for _ in 0..n {
+                self.preserve_attrs.pop();
+            }
+        }
+        if let Some(n) = self.pushed_pe.pop() {
+            for _ in 0..n {
+                self.preserve_eles.pop();
+            }
+        }
+        if let Some(n) = self.pushed_pc.pop() {
+            for _ in 0..n {
+                self.process_content.pop();
+            }
+        }
+    }
+
+    /// Validation-only push: Ignorable + ProcessContent (C# `PushMCAttributes2`).
+    pub fn push_mc_attributes_for_validation(
+        &mut self,
+        attr: &MarkupCompatibilityAttributes,
+        lookup: Option<&dyn Fn(&str) -> Option<String>>,
+    ) {
+        let n_ign = self.push_ignorable(attr.ignorable.as_deref(), lookup);
+        let n_pc = self.push_qnames(
+            attr.process_content.as_deref(),
+            lookup,
+            |ctx, q| ctx.process_content.push(q),
+        );
+        self.pushed_ignorable.push(n_ign);
+        self.pushed_pc.push(n_pc);
+    }
+
+    /// Validation-only pop (C# `PopMCAttributes2`).
+    pub fn pop_mc_attributes_for_validation(&mut self) {
+        if let Some(n) = self.pushed_ignorable.pop() {
+            for _ in 0..n {
+                self.ignorable.pop();
+            }
+        }
+        if let Some(n) = self.pushed_pc.pop() {
+            for _ in 0..n {
+                self.process_content.pop();
+            }
+        }
+    }
+
+    /// Split a space-separated MC list value (C# `GetPrefixes`).
+    pub fn get_prefixes(value: Option<&str>) -> Vec<String> {
+        match value {
+            None => Vec::new(),
+            Some(v) => v
+                .split_whitespace()
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
+
+    /// Resolve prefix list to namespace URIs via `lookup` (C# `ParsePrefixList`).
+    pub fn parse_prefix_list(
+        &self,
+        value: &str,
+        lookup: Option<&dyn Fn(&str) -> Option<String>>,
+    ) -> Vec<String> {
+        let mut out = Vec::new();
+        for prefix in Self::get_prefixes(Some(value)) {
+            match lookup.and_then(|f| f(&prefix)) {
+                Some(uri) if !uri.is_empty() => out.push(uri),
+                _ if self.no_exception_on_error => continue,
+                _ => continue, // soft-skip; full InvalidMCContentException not ported
+            }
+        }
+        out
+    }
+
+    /// Parse `pfx:local` / `pfx:*` list into [`McQualifiedName`]s (C# `ParseQNameList`).
+    pub fn parse_qname_list(
+        &self,
+        value: &str,
+        lookup: Option<&dyn Fn(&str) -> Option<String>>,
+    ) -> Vec<McQualifiedName> {
+        let mut out = Vec::new();
+        for token in Self::get_prefixes(Some(value)) {
+            let parts: Vec<&str> = token.splitn(2, ':').collect();
+            if parts.len() != 2 {
+                if self.no_exception_on_error {
+                    continue;
+                }
+                continue;
+            }
+            let (prefix, local) = (parts[0], parts[1]);
+            let uri = match lookup.and_then(|f| f(prefix)) {
+                Some(u) if !u.is_empty() => u,
+                // Without lookup, keep the prefix as a stand-in namespace key.
+                _ if lookup.is_none() => prefix.to_string(),
+                _ if self.no_exception_on_error => continue,
+                _ => continue,
+            };
+            out.push(McQualifiedName::new(uri, local));
+        }
+        out
+    }
+
+    /// Attribute action for an ignorable-aware read (simplified C# `GetAttributeAction`).
+    ///
+    /// When `known_in_version` is true the attribute is treated as in-version (`Normal`).
+    pub fn get_attribute_action(
+        &self,
+        namespace_uri: &str,
+        local_name: &str,
+        known_in_version: bool,
+    ) -> AttributeAction {
+        if known_in_version || namespace_uri.is_empty() {
+            return AttributeAction::Normal;
+        }
+        if !self.is_ignorable_ns(namespace_uri) {
+            return AttributeAction::Normal;
+        }
+        if self.is_preserved_attribute(namespace_uri, local_name) {
+            return AttributeAction::Normal;
+        }
+        AttributeAction::Ignore
+    }
+
+    /// Element action (simplified C# `GetElementAction` without full version resolver).
+    pub fn get_element_action(
+        &self,
+        local_name: &str,
+        namespace_uri: &str,
+        known_in_version: bool,
+        is_alternate_content: bool,
+    ) -> ElementAction {
+        if is_alternate_content || local_name == "AlternateContent" {
+            return ElementAction::AcBlock;
+        }
+        if known_in_version {
+            return ElementAction::Normal;
+        }
+        if self.is_ignorable_ns(namespace_uri) {
+            if self.is_preserved_element(namespace_uri, local_name) {
+                return ElementAction::Normal;
+            }
+            if self.is_process_content(namespace_uri, local_name) {
+                return ElementAction::ProcessContent;
+            }
+            return ElementAction::Ignore;
+        }
+        ElementAction::Normal
+    }
+
+    fn push_ignorable(
+        &mut self,
+        value: Option<&str>,
+        lookup: Option<&dyn Fn(&str) -> Option<String>>,
+    ) -> usize {
+        let Some(v) = value.filter(|s| !s.is_empty()) else {
+            return 0;
+        };
+        let mut n = 0;
+        for prefix in Self::get_prefixes(Some(v)) {
+            let uri = match lookup.and_then(|f| f(&prefix)) {
+                Some(u) if !u.is_empty() => u,
+                // Without lookup, treat token as URI/prefix key (prefix-based processing).
+                _ if lookup.is_none() => prefix.clone(),
+                _ if self.no_exception_on_error => continue,
+                _ => continue,
+            };
+            self.ignorable.push(uri);
+            n += 1;
+        }
+        n
+    }
+
+    fn push_qnames(
+        &mut self,
+        value: Option<&str>,
+        lookup: Option<&dyn Fn(&str) -> Option<String>>,
+        push: fn(&mut Self, McQualifiedName),
+    ) -> usize {
+        let Some(v) = value.filter(|s| !s.is_empty()) else {
+            return 0;
+        };
+        let names = self.parse_qname_list(v, lookup);
+        let n = names.len();
+        for q in names {
+            push(self, q);
+        }
+        n
+    }
+}
+
 /// Attach `mc:Ignorable` to an element (and ensure mc xmlns is declared).
 pub fn with_ignorable(mut elem: OpenXmlElement, prefixes: &str) -> OpenXmlElement {
     let has_mc = elem.namespace_declarations.iter().any(|(p, _)| p == "mc");
@@ -933,5 +1261,119 @@ mod mc_attributes_bag_tests {
         bag.apply_to(&mut el2);
         let bag2 = MarkupCompatibilityAttributes::from_element(&el2);
         assert_eq!(bag, bag2);
+    }
+}
+
+#[cfg(test)]
+mod mc_context_tests {
+    use super::*;
+
+    fn w14_uri() -> &'static str {
+        "http://schemas.microsoft.com/office/word/2010/wordml"
+    }
+
+    #[test]
+    fn push_pop_ignorable_and_actions() {
+        let mut ctx = McContext::new();
+        let attr = MarkupCompatibilityAttributes {
+            ignorable: Some("w14".into()),
+            process_content: Some("w14:*".into()),
+            preserve_elements: Some("w14:docId".into()),
+            preserve_attributes: Some("w14:paraId".into()),
+            must_understand: None,
+        };
+        // No lookup: prefixes are used as namespace keys (prefix-based processing path).
+        ctx.push_mc_attributes(&attr, None);
+        assert!(ctx.has_ignorable());
+        assert!(ctx.is_ignorable_ns("w14"));
+        assert!(ctx.is_process_content("w14", "anything"));
+        assert!(ctx.is_preserved_element("w14", "docId"));
+        assert!(ctx.is_preserved_attribute("w14", "paraId"));
+
+        assert_eq!(
+            ctx.get_attribute_action("w14", "other", false),
+            AttributeAction::Ignore
+        );
+        assert_eq!(
+            ctx.get_attribute_action("w14", "paraId", false),
+            AttributeAction::Normal
+        );
+        assert_eq!(
+            ctx.get_element_action("wrapper", "w14", false, false),
+            ElementAction::ProcessContent
+        );
+        assert_eq!(
+            ctx.get_element_action("docId", "w14", false, false),
+            ElementAction::Normal
+        );
+        // w14:* ProcessContent matches any local name that is not PreserveElements.
+        assert_eq!(
+            ctx.get_element_action("gone", "w14", false, false),
+            ElementAction::ProcessContent
+        );
+        assert_eq!(
+            ctx.get_element_action("AlternateContent", MC, false, true),
+            ElementAction::AcBlock
+        );
+
+        ctx.pop_mc_attributes();
+        assert!(!ctx.has_ignorable());
+        assert!(!ctx.is_ignorable_ns("w14"));
+    }
+
+    #[test]
+    fn push_with_namespace_lookup() {
+        let mut ctx = McContext::new();
+        let attr = MarkupCompatibilityAttributes {
+            ignorable: Some("w14".into()),
+            process_content: None,
+            preserve_elements: None,
+            preserve_attributes: None,
+            must_understand: None,
+        };
+        let lookup = |p: &str| {
+            if p == "w14" {
+                Some(w14_uri().into())
+            } else {
+                None
+            }
+        };
+        ctx.push_mc_attributes(&attr, Some(&lookup));
+        assert!(ctx.is_ignorable_ns(w14_uri()));
+        assert!(!ctx.is_ignorable_ns("w14"));
+        ctx.pop_mc_attributes();
+    }
+
+    #[test]
+    fn validation_push_pop_only_ignorable_and_pc() {
+        let mut ctx = McContext::new();
+        let attr = MarkupCompatibilityAttributes {
+            ignorable: Some("w14".into()),
+            process_content: Some("w14:*".into()),
+            preserve_elements: Some("w14:docId".into()),
+            preserve_attributes: Some("w14:paraId".into()),
+            must_understand: None,
+        };
+        ctx.push_mc_attributes_for_validation(&attr, None);
+        assert!(ctx.is_ignorable_ns("w14"));
+        assert!(ctx.is_process_content("w14", "x"));
+        // Preserve stacks are not pushed by validation-only path.
+        assert!(!ctx.is_preserved_element("w14", "docId"));
+        assert!(!ctx.is_preserved_attribute("w14", "paraId"));
+        ctx.pop_mc_attributes_for_validation();
+        assert!(!ctx.has_ignorable());
+    }
+
+    #[test]
+    fn parse_helpers() {
+        let ctx = McContext::new();
+        assert_eq!(
+            McContext::get_prefixes(Some("  a  b ")),
+            vec!["a".to_string(), "b".to_string()]
+        );
+        let qnames = ctx.parse_qname_list("w14:docId w15:*", None);
+        assert_eq!(qnames.len(), 2);
+        assert!(qnames[0].matches("w14", "docId"));
+        assert!(qnames[1].matches("w15", "anything"));
     }
 }
