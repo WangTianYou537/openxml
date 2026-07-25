@@ -1,0 +1,222 @@
+//! Walk an existing DOM tree with the OpenXmlReader cursor model
+//! (C# `OpenXmlDomReader` shell).
+
+use super::element::{OpenXmlAttribute, OpenXmlElement};
+use super::part_reader::ElementState;
+
+#[derive(Clone, Copy)]
+enum Phase {
+    /// About to emit Start for stack top.
+    Enter,
+    /// Visiting children; `child_index` is next child.
+    Children { child_index: usize },
+    /// About to emit End for stack top.
+    Leave,
+}
+
+struct Frame<'a> {
+    elem: &'a OpenXmlElement,
+    phase: Phase,
+}
+
+/// Depth-first cursor over an [`OpenXmlElement`] tree.
+pub struct OpenXmlDomReader<'a> {
+    stack: Vec<Frame<'a>>,
+    state: ElementState,
+    read_misc_nodes: bool,
+    eof: bool,
+    /// Element mirrored for End/Start queries.
+    current: Option<&'a OpenXmlElement>,
+}
+
+impl<'a> OpenXmlDomReader<'a> {
+    pub fn new(root: &'a OpenXmlElement) -> Self {
+        Self {
+            stack: vec![Frame {
+                elem: root,
+                phase: Phase::Enter,
+            }],
+            state: ElementState::Null,
+            read_misc_nodes: false,
+            eof: false,
+            current: None,
+        }
+    }
+
+    pub fn with_read_misc_nodes(mut self, yes: bool) -> Self {
+        self.read_misc_nodes = yes;
+        self
+    }
+
+    pub fn element_state(&self) -> ElementState {
+        self.state
+    }
+
+    pub fn is_eof(&self) -> bool {
+        self.eof || self.state == ElementState::EOF
+    }
+
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn current(&self) -> Option<&'a OpenXmlElement> {
+        self.current
+    }
+
+    pub fn local_name(&self) -> Option<&str> {
+        self.current.map(|e| e.local_name.as_str())
+    }
+
+    pub fn prefix(&self) -> Option<&str> {
+        self.current
+            .map(|e| e.prefix.as_str())
+            .filter(|p| !p.is_empty())
+    }
+
+    pub fn attributes(&self) -> &'a [OpenXmlAttribute] {
+        self.current.map(|e| e.get_attributes()).unwrap_or(&[])
+    }
+
+    pub fn get_text(&self) -> Option<&str> {
+        self.current.and_then(|e| e.text_value())
+    }
+
+    pub fn is_start_element(&self) -> bool {
+        self.state == ElementState::Start
+    }
+
+    pub fn is_end_element(&self) -> bool {
+        self.state == ElementState::End
+    }
+
+    pub fn is_misc_node(&self) -> bool {
+        self.state == ElementState::Misc
+    }
+
+    /// Move to the next node (C# `Read`). Returns false at EOF.
+    pub fn read(&mut self) -> bool {
+        if self.eof {
+            self.state = ElementState::EOF;
+            return false;
+        }
+        loop {
+            let Some(frame) = self.stack.last_mut() else {
+                self.eof = true;
+                self.state = ElementState::EOF;
+                self.current = None;
+                return false;
+            };
+            match frame.phase {
+                Phase::Enter => {
+                    let elem = frame.elem;
+                    frame.phase = Phase::Children { child_index: 0 };
+                    self.current = Some(elem);
+                    if elem.is_misc_node() {
+                        if !self.read_misc_nodes {
+                            // skip: go straight to leave without reporting
+                            frame.phase = Phase::Leave;
+                            continue;
+                        }
+                        self.state = ElementState::Misc;
+                    } else {
+                        self.state = ElementState::Start;
+                    }
+                    return true;
+                }
+                Phase::Children { child_index } => {
+                    let elem = frame.elem;
+                    let idx = child_index;
+                    if idx < elem.children.len() {
+                        frame.phase = Phase::Children {
+                            child_index: idx + 1,
+                        };
+                        let child = &elem.children[idx];
+                        self.stack.push(Frame {
+                            elem: child,
+                            phase: Phase::Enter,
+                        });
+                        continue;
+                    }
+                    frame.phase = Phase::Leave;
+                    continue;
+                }
+                Phase::Leave => {
+                    let elem = frame.elem;
+                    self.stack.pop();
+                    self.current = Some(elem);
+                    if elem.is_misc_node() && !self.read_misc_nodes {
+                        // was skipped; don't report end either
+                        continue;
+                    }
+                    self.state = ElementState::End;
+                    return true;
+                }
+            }
+        }
+    }
+
+    /// Skip the subtree under the current Start (C# `Skip`).
+    pub fn skip(&mut self) {
+        if self.state != ElementState::Start {
+            return;
+        }
+        // Drop children visitation: mark top as Leave
+        if let Some(frame) = self.stack.last_mut() {
+            frame.phase = Phase::Leave;
+        }
+        let _ = self.read(); // consume End
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::element::OpenXmlElement;
+
+    #[test]
+    fn dom_reader_walk() {
+        let root = OpenXmlElement::w("document").with_child(
+            OpenXmlElement::w("body").with_child(
+                OpenXmlElement::w("p").with_child(
+                    OpenXmlElement::w("r")
+                        .with_child(OpenXmlElement::w("t").with_text("Hi")),
+                ),
+            ),
+        );
+        let mut r = OpenXmlDomReader::new(&root);
+        let mut starts = Vec::new();
+        while r.read() {
+            if r.is_start_element() {
+                starts.push(r.local_name().unwrap().to_string());
+            }
+        }
+        assert_eq!(
+            starts,
+            vec!["document", "body", "p", "r", "t"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn dom_reader_skip_body() {
+        let root = OpenXmlElement::w("document").with_child(
+            OpenXmlElement::w("body")
+                .with_child(OpenXmlElement::w("p"))
+                .with_child(OpenXmlElement::w("p")),
+        );
+        let mut r = OpenXmlDomReader::new(&root);
+        assert!(r.read());
+        assert_eq!(r.local_name(), Some("document"));
+        assert!(r.read());
+        assert_eq!(r.local_name(), Some("body"));
+        r.skip(); // skip body subtree end
+        // after skip we consumed body's End; next should be document End
+        assert!(r.read());
+        assert!(r.is_end_element());
+        assert_eq!(r.local_name(), Some("document"));
+        assert!(!r.read());
+    }
+}

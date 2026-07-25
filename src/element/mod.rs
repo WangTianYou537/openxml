@@ -6,6 +6,7 @@
 //! - attribute bag + optional text content
 
 mod element;
+mod dom_reader;
 mod element_context;
 mod equality;
 mod linq;
@@ -17,6 +18,7 @@ mod part_writer;
 mod writer;
 
 pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
+pub use dom_reader::OpenXmlDomReader;
 pub use element_context::{ElementEvent, ElementEventKind, OpenXmlElementContext, OpenXmlLoadMode};
 pub use equality::{
     element_hash, element_hash_with, elements_equal, elements_equal_with, ElementComparer,
