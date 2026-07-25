@@ -749,6 +749,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] DOM path/sibling helpers: Next/PreviousSibling-at, Remove/Replace path, GetOrAddFirstChild, find_path
 - [x] `ExtendedPart` type; `OpenXmlPart::reload`/`save_root`; `CanSave`/`FileOpenAccess`/`Close` + unused data-part cleanup
 - [x] Cross-package `copy_part_from` / `import_part` (C# `AddPart` when part is foreign)
+- [x] Excel/PPT packaging parity: delete_parts, ChangeIdOfPart, IdPartPair, media data parts, CreateRelationshipToPart, ExtendedPart
+- [x] Word `add_typed_child_part` (AddNewPart via PartInfo)
 
 **Still intentionally deferred / partial:**
 

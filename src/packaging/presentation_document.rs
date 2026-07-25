@@ -3040,6 +3040,225 @@ impl PresentationDocument {
     }
 
 
+
+    /// Delete multiple parts by URI (C# `DeleteParts`).
+    pub fn delete_parts(&mut self, uris: &[PackUri]) -> usize {
+        self.package.opc_mut().delete_parts(uris)
+    }
+
+    /// C# `StrictRelationshipFound`.
+    pub fn strict_relationship_found(&self) -> bool {
+        self.package.strict_relationship_found()
+    }
+
+    /// Hyperlink relationships on the main part (C# `HyperlinkRelationships`).
+    pub fn hyperlink_relationships(&self) -> Vec<crate::opc::HyperlinkRelationship> {
+        let Ok(main) = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+        else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .hyperlink_relationships(Some(&main))
+    }
+
+    /// Relationship id of a part under the main part (C# `GetIdOfPart`).
+    pub fn get_id_of_part(&self, part_uri: &PackUri) -> Option<String> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .ok()?;
+        self.package
+            .opc()
+            .get_id_of_part(Some(&main), part_uri)
+    }
+
+    /// Part URI for relationship id on the main part (C# `GetPartById`).
+    pub fn get_part_by_id(&self, id: &str) -> Option<PackUri> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .ok()?;
+        self.package.opc().get_part_by_id(Some(&main), id)
+    }
+
+    /// Change the relationship id of a child part (C# `ChangeIdOfPart`).
+    pub fn change_id_of_part(&mut self, part_uri: &PackUri, new_id: &str) -> Result<String> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        self.package
+            .opc_mut()
+            .change_id_of_part(Some(&main), part_uri, new_id)
+    }
+
+    /// Child parts as IdPartPair under the main part (C# `Parts`).
+    pub fn id_part_pairs(&self) -> Vec<crate::opc::IdPartPair> {
+        let Ok(main) = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+        else {
+            return Vec::new();
+        };
+        self.package.opc().id_part_pairs(Some(&main))
+    }
+
+    /// Create a media data part in the package (C# `CreateMediaDataPart`).
+    pub fn create_media_data_part(
+        &mut self,
+        content_type: &str,
+        extension: Option<&str>,
+    ) -> Result<crate::opc::DataPart> {
+        self.package
+            .opc_mut()
+            .create_media_data_part(content_type, extension)
+    }
+
+    /// Add a data-part reference from the main part (C# `AddDataPartReferenceRelationship`).
+    pub fn add_data_part_reference_relationship(
+        &mut self,
+        data_part: &crate::opc::DataPart,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> Result<crate::opc::DataPartReferenceRelationship> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        self.package.opc_mut().add_data_part_reference_relationship(
+            &main,
+            data_part,
+            relationship_type,
+            id,
+        )
+    }
+
+    /// Data-part references on the main part.
+    pub fn data_part_reference_relationships(
+        &self,
+    ) -> Vec<crate::opc::DataPartReferenceRelationship> {
+        let Ok(main) = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+        else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .data_part_reference_relationships(Some(&main))
+    }
+
+    /// Delete a reference relationship by id on the main part
+    /// (C# `DeleteReferenceRelationship`).
+    pub fn delete_reference_relationship(&mut self, id: &str) -> Option<crate::opc::Relationship> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .ok()?;
+        self.package
+            .opc_mut()
+            .delete_reference_relationship(Some(&main), id)
+    }
+
+    /// Get a reference relationship by id on the main part.
+    pub fn get_reference_relationship(&self, id: &str) -> Option<crate::opc::ReferenceRelationship> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .ok()?;
+        self.package
+            .opc()
+            .get_reference_relationship(Some(&main), id)
+    }
+
+    /// Create a relationship from the main part to an existing part
+    /// (C# `CreateRelationshipToPart` same-package).
+    pub fn create_relationship_to_part(
+        &mut self,
+        target: &PackUri,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> Result<String> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        self.package
+            .opc_mut()
+            .add_part_relationship_to_existing(&main, target, relationship_type, id)
+    }
+
+    /// Create an [`ExtendedPart`] under `ppt/udata/` with auto URI.
+    pub fn create_extended_part(
+        &mut self,
+        content_type_str: &str,
+        relationship_type: &str,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<(String, crate::packaging::ExtendedPart)> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        let mut index = 1u32;
+        let part_uri = loop {
+            let candidate = PackUri::new(format!("/ppt/udata/data{index}.dat"));
+            if !self.package.opc().has_part(&candidate) {
+                break candidate;
+            }
+            index += 1;
+        };
+        self.package
+            .opc_mut()
+            .set_part(part_uri.clone(), content_type_str, data.into());
+        let rid = self.package.opc_mut().add_part_relationship(
+            &main,
+            relationship_type,
+            &part_uri,
+            RelationshipTargetMode::Internal,
+        );
+        let part = crate::packaging::ExtendedPart::new(
+            part_uri,
+            content_type_str,
+            relationship_type,
+        );
+        Ok((rid, part))
+    }
+
+    /// Add a new typed child part under the presentation via generated PartInfo
+    /// (C# `AddNewPart<T>` shell).
+    pub fn add_typed_child_part(
+        &mut self,
+        part_name: &str,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<crate::packaging::TypedPart> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        crate::packaging::add_typed_part(
+            &mut self.package,
+            &main,
+            Some("PresentationPart"),
+            part_name,
+            data,
+        )
+    }
+
     /// Clone this presentation into a new in-memory package (deep copy of all parts).
     pub fn clone_document(&self) -> Result<Self> {
         let bytes = self.to_bytes()?;

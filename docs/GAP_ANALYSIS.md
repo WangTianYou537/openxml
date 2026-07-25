@@ -112,6 +112,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | **ExternalRelationship 专用类型** | Hyperlink/Audio/Video reference types | 超链接有；音视频引用无 | 中 |
 | **ExtendedPart** 任意扩展部件 | 有 | ✅ ExtendedPart 类型 + create_extended_part | ✅ |
 | **AddPart / 跨包 copy_part_from** | 有 | ✅ import_part + recursive copy_part_from | ✅ |
+| **Excel/PPT PartContainer helpers** | 有 | ✅ delete_parts / ChangeId / IdPartPair / media / ExtendedPart / AddNewPart | ✅ |
 | **DeletePartsRecursivelyOfType** | 有 | 无递归按类型删除 | 低 |
 | **CreateFromTemplate** | Word/Excel/PPT | ✅ Word/Excel/PPT `create_from_template` / clone | ✅ |
 | **ChangeDocumentType** | 有 | ✅ Word `change_document_type` | ✅ |

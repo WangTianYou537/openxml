@@ -13280,6 +13280,28 @@ impl WordprocessingDocument {
             .add_part_relationship_to_existing(&main, target, relationship_type, id)
     }
 
+    /// Add a new typed child part under the main document via generated PartInfo
+    /// (C# `AddNewPart<T>` shell).
+    pub fn add_typed_child_part(
+        &mut self,
+        part_name: &str,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<crate::packaging::TypedPart> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?
+            .uri()
+            .clone();
+        crate::packaging::add_typed_part(
+            &mut self.package,
+            &main,
+            Some("MainDocumentPart"),
+            part_name,
+            data,
+        )
+    }
+
     pub fn create_extended_part(
         &mut self,
         content_type_str: &str,

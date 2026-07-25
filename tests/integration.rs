@@ -3356,6 +3356,74 @@ fn copy_part_from_other_package() {
 }
 
 
+
+#[test]
+fn excel_ppt_packaging_parity_helpers() {
+    use officexml::ExtendedPart;
+
+    // Excel — write a sheet so the workbook main part exists
+    let mut xlsx =
+        SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
+    xlsx
+        .write_sheet_strings("S", &[vec!["a"]])
+        .unwrap();
+    assert!(!xlsx.strict_relationship_found());
+    let (rid, part): (String, ExtendedPart) = xlsx
+        .create_extended_part("application/octet-stream", "http://example/xl-ext", b"x")
+        .unwrap();
+    assert!(rid.starts_with('r'));
+    assert!(part.uri().as_str().contains("/xl/udata/"));
+    let pairs = xlsx.id_part_pairs();
+    assert!(pairs.iter().any(|p| p.part_uri == *part.uri()));
+    let old_id = xlsx.change_id_of_part(part.uri(), "rIdExtX").unwrap();
+    assert!(old_id.starts_with("rId")); // C# ChangeIdOfPart returns the previous id
+    assert_eq!(xlsx.get_part_by_id("rIdExtX").as_ref(), Some(part.uri()));
+    assert_eq!(xlsx.get_id_of_part(part.uri()).as_deref(), Some("rIdExtX"));
+    let n = xlsx.delete_parts(&[part.uri().clone()]);
+    assert_eq!(n, 1);
+
+    // PPT — add a slide so the presentation main part exists
+    let mut pptx =
+        PresentationDocument::create_in_memory(PresentationDocumentType::Presentation).unwrap();
+    pptx.add_slide_with_text("hello").unwrap();
+    assert!(!pptx.strict_relationship_found());
+    let (rid, part): (String, ExtendedPart) = pptx
+        .create_extended_part("application/octet-stream", "http://example/ppt-ext", b"p")
+        .unwrap();
+    assert!(part.uri().as_str().contains("/ppt/udata/"));
+    assert_eq!(pptx.get_id_of_part(part.uri()).as_deref(), Some(rid.as_str()));
+    let media = pptx
+        .create_media_data_part("audio/mpeg", Some("mp3"))
+        .unwrap();
+    let dref = pptx
+        .add_data_part_reference_relationship(
+            &media,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio",
+            None,
+        )
+        .unwrap();
+    assert!(!dref.id().is_empty());
+    assert!(pptx
+        .data_part_reference_relationships()
+        .iter()
+        .any(|r| r.id() == dref.id()));
+
+    // Word typed AddNewPart
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("t")]));
+    let styles = doc
+        .add_typed_child_part(
+            "StyleDefinitionsPart",
+            br#"<?xml version="1.0"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.to_vec(),
+        )
+        .unwrap();
+    assert_eq!(styles.name(), "StyleDefinitionsPart");
+    assert!(doc.package().opc().has_part(&styles.uri));
+}
+
+
 #[test]
 fn delete_parts_and_strict_flag() {
     use officexml::opc::PackUri;
