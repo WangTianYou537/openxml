@@ -70,8 +70,9 @@ pub use features::{
     FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature, PackageCapabilities,
     PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageInitializerFeature,
     PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature, ParagraphIdGenerator,
-    PartEvents, PartFactoryFeature, PartRootEvents, PartsFeature, ProgrammaticIdentifierFeature,
-    RelationshipFilterFeature, SchemaTrackingFeature, StrictNamespaceFeature,
+    PartEvents, PartFactoryFeature, PartRootEvents, PartsFeature, PartUriFeature,
+    ProgrammaticIdentifierFeature, RelationshipFilterFeature, SchemaTrackingFeature,
+    StrictNamespaceFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

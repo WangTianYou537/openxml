@@ -111,12 +111,24 @@ pub struct OpenXmlPackage {
 impl OpenXmlPackage {
     pub(crate) fn from_opc(mut opc: OpcPackage, settings: OpenSettings) -> Self {
         opc.set_compression_option(settings.compression);
-        Self {
+        let mut pkg = Self {
             opc,
             settings,
             closed: false,
             features: FeatureCollection::new(),
+        };
+        // Seed PartsFeature + PartUriFeature from existing package parts.
+        let uris: Vec<_> = pkg.opc.part_uris();
+        {
+            let parts = pkg.parts_feature_mut();
+            for uri in &uris {
+                parts.add(uri.as_str());
+            }
         }
+        pkg.features.set(crate::features::PartUriFeature::from_helper(
+            crate::opc::PartUriHelper::from_package(pkg.opc()),
+        ));
+        pkg
     }
 
     /// Write package bytes to a stream (after callers flush typed dirty parts).
@@ -250,8 +262,9 @@ impl OpenXmlPackage {
             self.raise_part_event(crate::features::PackageEventType::Creating, &uri_str);
             self.raise_part_event(crate::features::PackageEventType::Adding, &uri_str);
         }
-        self.opc.set_part(uri, content_type, data);
+        self.opc.set_part(uri.clone(), content_type, data);
         self.parts_feature_mut().add(&uri_str);
+        self.part_uri_feature().reserve(&uri);
         if existed {
             self.raise_part_event(crate::features::PackageEventType::Added, &uri_str);
         } else {
@@ -743,6 +756,23 @@ impl OpenXmlPackage {
         }
     }
 
+    /// Part URI allocator (C# `IPartUriFeature`).
+    pub fn part_uri_feature(&mut self) -> &mut crate::features::PartUriFeature {
+        if !self.features.contains::<crate::features::PartUriFeature>() {
+            let helper = crate::opc::PartUriHelper::from_package(&self.opc);
+            self.features
+                .set(crate::features::PartUriFeature::from_helper(helper));
+        }
+        self.features
+            .get_mut::<crate::features::PartUriFeature>()
+            .expect("just inserted")
+    }
+
+    /// Record package source bytes on the stream feature (C# open-from-stream path).
+    pub fn set_package_stream_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
+        self.package_stream_feature().set_bytes(bytes);
+    }
+
     /// Add a package-level relationship after running any registered relationship filters
     /// (C# relationship create + `IRelationshipFilterFeature`).
     pub fn add_package_relationship(
@@ -1111,5 +1141,19 @@ mod part_events_tests {
         });
         pkg.run_package_initializers();
         assert_eq!(ran.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn from_opc_seeds_parts_and_part_uri_features() {
+        let mut opc = crate::opc::OpcPackage::create();
+        let uri = PackUri::new("/word/document.xml");
+        opc.set_part(
+            uri.clone(),
+            content_type::WORD_DOCUMENT,
+            b"<w:document/>".to_vec(),
+        );
+        let mut pkg = OpenXmlPackage::from_opc(opc, OpenSettings::default());
+        assert!(pkg.parts_feature().contains(uri.as_str()));
+        assert!(pkg.part_uri_feature().is_reserved(&uri));
     }
 }

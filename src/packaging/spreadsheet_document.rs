@@ -182,10 +182,13 @@ impl SpreadsheetDocument {
 
     /// Open from raw package bytes.
     pub fn open_bytes(data: impl AsRef<[u8]>) -> Result<Self> {
-        let opc = OpcPackage::open_bytes(data)?;
+        let bytes = data.as_ref().to_vec();
+        let opc = OpcPackage::open_bytes(&bytes)?;
         let mut settings = OpenSettings::default();
         settings.auto_save = false;
-        Self::from_opc(opc, settings)
+        let mut doc = Self::from_opc(opc, settings)?;
+        doc.package_mut().set_package_stream_bytes(bytes);
+        Ok(doc)
     }
 
     /// Open a Spreadsheet package from any `Read + Seek` stream (C# `Open(Stream, …)`).

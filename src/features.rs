@@ -777,6 +777,38 @@ impl PackagePartFeature {
     }
 }
 
+/// Part URI allocation feature (C# `IPartUriFeature` shell wrapping [`crate::opc::PartUriHelper`]).
+#[derive(Debug, Default)]
+pub struct PartUriFeature {
+    helper: crate::opc::PartUriHelper,
+}
+
+impl PartUriFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from_helper(helper: crate::opc::PartUriHelper) -> Self {
+        Self { helper }
+    }
+
+    pub fn helper(&self) -> &crate::opc::PartUriHelper {
+        &self.helper
+    }
+
+    pub fn helper_mut(&mut self) -> &mut crate::opc::PartUriHelper {
+        &mut self.helper
+    }
+
+    pub fn reserve(&mut self, uri: &crate::opc::PackUri) {
+        self.helper.reserve(uri);
+    }
+
+    pub fn is_reserved(&self, uri: &crate::opc::PackUri) -> bool {
+        self.helper.is_reserved(uri)
+    }
+}
+
 /// Package initializer callbacks (C# `IPackageInitializer` shell).
 ///
 /// Runs registered hooks after a package is constructed (builder path).
@@ -1231,5 +1263,14 @@ mod tests {
         init.run_all();
         assert_eq!(fired.load(Ordering::SeqCst), 1);
         assert_eq!(init.pending_count(), 0);
+    }
+
+    #[test]
+    fn part_uri_feature_reserves() {
+        let mut f = PartUriFeature::new();
+        let uri = crate::opc::PackUri::new("/word/styles.xml");
+        assert!(!f.is_reserved(&uri));
+        f.reserve(&uri);
+        assert!(f.is_reserved(&uri));
     }
 }
