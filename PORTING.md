@@ -810,6 +810,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Stream `XmlEvent::{Comment,ProcessingInstruction,CData}`; PartReader `is_misc_node` + ReadMiscellaneousNodes
 - [x] `OpenXmlElement::{create_from_text,create_from_cdata,create_from_significant_whitespace}`
 - [x] `ApplicationType` / `DisposableFeature` / `MainPartFeature` / `DocumentTypeFeature`; wired on Word/Excel/PPT packages
+- [x] `OpenXmlContent` + `OpenXmlElement::with` (C# functional `With` extensions)
+- [x] `SchemaTrackingFeature` / `StrictNamespaceFeature` shells on package features
 
 **Still intentionally deferred / partial:**
 

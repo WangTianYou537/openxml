@@ -122,6 +122,38 @@ impl std::fmt::Display for OpenXmlAttribute {
     }
 }
 
+/// Content item for functional element construction (C# `OpenXmlElementFunctionalExtensions.With`).
+#[derive(Debug)]
+pub enum OpenXmlContent {
+    Element(OpenXmlElement),
+    Attribute(OpenXmlAttribute),
+    Many(Vec<OpenXmlContent>),
+}
+
+impl From<OpenXmlElement> for OpenXmlContent {
+    fn from(e: OpenXmlElement) -> Self {
+        Self::Element(e)
+    }
+}
+
+impl From<OpenXmlAttribute> for OpenXmlContent {
+    fn from(a: OpenXmlAttribute) -> Self {
+        Self::Attribute(a)
+    }
+}
+
+impl From<Vec<OpenXmlContent>> for OpenXmlContent {
+    fn from(v: Vec<OpenXmlContent>) -> Self {
+        Self::Many(v)
+    }
+}
+
+impl From<Vec<OpenXmlElement>> for OpenXmlContent {
+    fn from(v: Vec<OpenXmlElement>) -> Self {
+        Self::Many(v.into_iter().map(OpenXmlContent::Element).collect())
+    }
+}
+
 /// Kind of non-element DOM node (mirrors C# `OpenXmlMiscNode` / `XmlNodeType`).
 ///
 /// Regular elements use [`OpenXmlMiscKind::None`]. Misc nodes are stored in the
@@ -815,6 +847,40 @@ impl OpenXmlElement {
     pub fn with_children(mut self, children: impl IntoIterator<Item = OpenXmlElement>) -> Self {
         self.children.extend(children);
         self
+    }
+
+    /// Functional content builder (C# `OpenXmlElementFunctionalExtensions.With`).
+    ///
+    /// Accepts children, attributes, or nested slices of the same.
+    pub fn with(mut self, content: impl IntoIterator<Item = OpenXmlContent>) -> Self {
+        for item in content {
+            self.add_content(item);
+        }
+        self
+    }
+
+    /// Add one piece of functional content (child / attribute / nested list).
+    pub fn add_content(&mut self, content: OpenXmlContent) {
+        match content {
+            OpenXmlContent::Element(child) => self.append_child(child),
+            OpenXmlContent::Attribute(attr) => {
+                // Replace existing attribute with same prefix+local when present.
+                let prefix = attr.prefix.clone();
+                let local = attr.local_name.clone();
+                if let Some(a) = self.attributes.iter_mut().find(|a| {
+                    a.local_name == local && a.prefix == prefix
+                }) {
+                    *a = attr;
+                } else {
+                    self.attributes.push(attr);
+                }
+            }
+            OpenXmlContent::Many(items) => {
+                for item in items {
+                    self.add_content(item);
+                }
+            }
+        }
     }
 
     pub fn append_child(&mut self, child: OpenXmlElement) {
@@ -1791,4 +1857,23 @@ mod element_api_parity_tests {
         assert_eq!(w.local_name, "#significant-whitespace");
         assert_eq!(w.text.as_deref(), Some("  "));
     }
+
+    #[test]
+    fn functional_with_content() {
+        let p = OpenXmlElement::w("p").with([
+            OpenXmlContent::Attribute(OpenXmlAttribute::from_parts(
+                "w",
+                "rsidR",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "00AB",
+            )),
+            OpenXmlContent::Element(OpenXmlElement::w("r").with_text("hi")),
+            OpenXmlContent::Many(vec![OpenXmlContent::Element(OpenXmlElement::w("br"))]),
+        ]);
+        assert_eq!(p.get_attribute("rsidR"), Some("00AB"));
+        assert_eq!(p.children.len(), 2);
+        assert_eq!(p.children[0].local_name, "r");
+        assert_eq!(p.children[1].local_name, "br");
+    }
 }
+

@@ -556,6 +556,49 @@ impl DocumentTypeFeature {
     }
 }
 
+/// Tracks schema elements / relationships observed during open (C# `ISchemaTrackingFeature` shell).
+#[derive(Debug, Clone, Default)]
+pub struct SchemaTrackingFeature {
+    pub root_elements: Vec<crate::element::OpenXmlQualifiedName>,
+    pub relationships: Vec<String>,
+}
+
+impl SchemaTrackingFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn track_root(&mut self, qname: crate::element::OpenXmlQualifiedName) {
+        if !self.root_elements.iter().any(|q| q == &qname) {
+            self.root_elements.push(qname);
+        }
+    }
+
+    pub fn track_relationship(&mut self, rel: impl Into<String>) {
+        let rel = rel.into();
+        if !self.relationships.iter().any(|r| r == &rel) {
+            self.relationships.push(rel);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.root_elements.clear();
+        self.relationships.clear();
+    }
+}
+
+/// Whether a strict-namespace package was observed (C# `IStrictNamespaceFeature` shell).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct StrictNamespaceFeature {
+    pub found: bool,
+}
+
+impl StrictNamespaceFeature {
+    pub fn new(found: bool) -> Self {
+        Self { found }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -676,5 +719,16 @@ mod tests {
         assert_eq!(main.part_uri.as_deref(), Some("/word/document.xml"));
         let doc = DocumentTypeFeature::new("WordprocessingDocument");
         assert_eq!(doc.document_type, "WordprocessingDocument");
+
+        let mut track = SchemaTrackingFeature::new();
+        track.track_root(crate::element::OpenXmlQualifiedName::new(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+        ));
+        track.track_relationship("http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument");
+        assert_eq!(track.root_elements.len(), 1);
+        assert_eq!(track.relationships.len(), 1);
+        assert!(!StrictNamespaceFeature::new(false).found);
+        assert!(StrictNamespaceFeature::new(true).found);
     }
 }

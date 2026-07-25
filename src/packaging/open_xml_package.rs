@@ -551,6 +551,36 @@ impl OpenXmlPackage {
         self.disposable_feature().register(f);
     }
 
+    /// Schema tracking feature (C# `ISchemaTrackingFeature` shell).
+    pub fn schema_tracking(&mut self) -> &mut crate::features::SchemaTrackingFeature {
+        if !self
+            .features
+            .contains::<crate::features::SchemaTrackingFeature>()
+        {
+            self.features
+                .set(crate::features::SchemaTrackingFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::SchemaTrackingFeature>()
+            .expect("just inserted")
+    }
+
+    /// Strict-namespace observation feature (C# `IStrictNamespaceFeature`).
+    pub fn strict_namespace_feature(&self) -> crate::features::StrictNamespaceFeature {
+        self.features
+            .get::<crate::features::StrictNamespaceFeature>()
+            .copied()
+            .unwrap_or_else(|| {
+                crate::features::StrictNamespaceFeature::new(self.strict_namespace_found())
+            })
+    }
+
+    /// Record strict-namespace observation on the feature bag.
+    pub fn set_strict_namespace_feature(&mut self, found: bool) {
+        self.features
+            .set(crate::features::StrictNamespaceFeature::new(found));
+    }
+
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
     pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()

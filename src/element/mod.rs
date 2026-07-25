@@ -18,7 +18,7 @@ mod part_writer;
 mod writer;
 mod xml_path;
 
-pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind, OpenXmlQualifiedName};
+pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlMiscKind, OpenXmlQualifiedName};
 pub use dom_reader::OpenXmlDomReader;
 pub use element_context::{
     ElementEvent, ElementEventKind, OpenXmlElementContext, OpenXmlLoadMode, LAZY_STEPS, XMLNS_PREFIX,
