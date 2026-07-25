@@ -951,6 +951,37 @@ impl PartUriFeature {
     pub fn is_reserved(&self, uri: &crate::opc::PackUri) -> bool {
         self.helper.is_reserved(uri)
     }
+
+    /// Allocate a unique part URI (C# `IPartUriFeature.CreatePartUri`).
+    pub fn create_part_uri(
+        &mut self,
+        content_type: &str,
+        parent: &crate::opc::PackUri,
+        target_path: &str,
+        target_name: &str,
+        target_ext: &str,
+        force_unique: bool,
+    ) -> crate::error::Result<crate::opc::PackUri> {
+        self.helper.create_part_uri(
+            content_type,
+            parent,
+            target_path,
+            target_name,
+            target_ext,
+            force_unique,
+        )
+    }
+
+    /// Ensure a target URI is unique under the package (C# ensure unique shell).
+    pub fn ensure_unique_part_uri(
+        &mut self,
+        content_type: &str,
+        parent: &crate::opc::PackUri,
+        target: &str,
+    ) -> crate::error::Result<crate::opc::PackUri> {
+        self.helper
+            .ensure_unique_part_uri(content_type, parent, target)
+    }
 }
 
 /// Registry of package-level data parts (C# `IDataPartsFeature` shell).
@@ -2363,6 +2394,30 @@ mod tests {
         assert!(!f.is_reserved(&uri));
         f.reserve(&uri);
         assert!(f.is_reserved(&uri));
+        let parent = crate::opc::PackUri::new("/word/document.xml");
+        let u1 = f
+            .create_part_uri(
+                "image/png",
+                &parent,
+                "media",
+                "image",
+                ".png",
+                true,
+            )
+            .unwrap();
+        assert!(u1.as_str().starts_with("/word/media/image"));
+        assert!(f.is_reserved(&u1));
+        let u2 = f
+            .create_part_uri(
+                "image/png",
+                &parent,
+                "media",
+                "image",
+                ".png",
+                true,
+            )
+            .unwrap();
+        assert_ne!(u1, u2);
     }
 
     #[test]

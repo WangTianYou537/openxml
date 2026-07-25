@@ -862,6 +862,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackage::{to_flat_opc,to_flat_opc_string,from_flat_opc}` + feature seed on open
 - [x] `AnnotationsFeature::{len,is_empty,clear}` + `OpenXmlPackage::annotations`
 
+- [x] `PartUriFeature::{create_part_uri,ensure_unique_part_uri}` + `OpenXmlPackage::create_part_uri`
+- [x] `OpenXmlPackage` compression_option / package_properties getters / has_package_properties
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

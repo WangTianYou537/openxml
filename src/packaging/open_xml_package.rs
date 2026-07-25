@@ -2040,6 +2040,59 @@ impl OpenXmlPackage {
         self.opc.mode()
     }
 
+    /// ZIP compression option (C# `OpenXmlPackage.CompressionOption`).
+    pub fn compression_option(&self) -> crate::opc::CompressionOption {
+        self.settings.compression
+    }
+
+    /// Set ZIP compression option for subsequent saves.
+    pub fn set_compression_option(&mut self, option: crate::opc::CompressionOption) {
+        self.settings.compression = option;
+        self.opc.set_compression_option(option);
+    }
+
+    /// Read package core properties (`docProps/core.xml`).
+    pub fn package_properties(&self) -> crate::error::Result<crate::opc::PackageProperties> {
+        crate::opc::PackageProperties::load_from(self.opc())
+    }
+
+    /// Read extended properties (`docProps/app.xml`).
+    pub fn extended_properties(&self) -> crate::error::Result<crate::opc::ExtendedProperties> {
+        crate::opc::ExtendedProperties::load_from(self.opc())
+    }
+
+    /// Read custom properties (`docProps/custom.xml`).
+    pub fn custom_properties(&self) -> crate::error::Result<crate::opc::CustomProperties> {
+        crate::opc::CustomProperties::load_from(self.opc())
+    }
+
+    /// Whether a core properties part exists.
+    pub fn has_package_properties(&self) -> bool {
+        self.opc
+            .has_part(&crate::opc::PackUri::new("/docProps/core.xml"))
+    }
+
+    /// Allocate a unique part URI via the package PartUri feature
+    /// (C# `IPartUriFeature.CreatePartUri`).
+    pub fn create_part_uri(
+        &mut self,
+        content_type: &str,
+        parent: &crate::opc::PackUri,
+        target_path: &str,
+        target_name: &str,
+        target_ext: &str,
+        force_unique: bool,
+    ) -> crate::error::Result<crate::opc::PackUri> {
+        self.part_uri_feature().create_part_uri(
+            content_type,
+            parent,
+            target_path,
+            target_name,
+            target_ext,
+            force_unique,
+        )
+    }
+
     /// Max characters per part from open settings (C# `MaxCharactersInPart`).
     pub fn max_characters_in_part(&self) -> u64 {
         self.settings.max_characters_in_part
@@ -2852,5 +2905,40 @@ mod part_events_tests {
             .contains::<crate::features::OpenXmlNamespaceResolverFeature>());
         assert!(opened.features().contains::<crate::features::PackageFeature>());
         assert!(opened.parts_feature().contains(doc.as_str()));
+    }
+
+    #[test]
+    fn package_properties_and_create_part_uri() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        assert!(!pkg.has_package_properties());
+        assert_eq!(
+            pkg.compression_option(),
+            crate::opc::CompressionOption::Normal
+        );
+        pkg.set_compression_option(crate::opc::CompressionOption::Maximum);
+        assert_eq!(
+            pkg.compression_option(),
+            crate::opc::CompressionOption::Maximum
+        );
+        let mut props = crate::opc::PackageProperties::new();
+        props.creator = Some("me".into());
+        pkg.set_package_properties(&props).unwrap();
+        assert!(pkg.has_package_properties());
+        assert_eq!(
+            pkg.package_properties().unwrap().creator.as_deref(),
+            Some("me")
+        );
+        let parent = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            parent.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        let uri = pkg
+            .create_part_uri("image/png", &parent, "media", "image", ".png", true)
+            .unwrap();
+        assert!(uri.as_str().contains("/word/media/image"));
+        assert!(pkg.part_uri_feature().is_reserved(&uri));
     }
 }
