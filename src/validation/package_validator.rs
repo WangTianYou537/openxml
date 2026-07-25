@@ -67,7 +67,8 @@ impl OpenXmlPackageValidationResult {
             path: self.part_uri.clone().unwrap_or_default(),
             message: self.message,
             ..Default::default()
-        };
+        }
+        .with_error_type(super::ValidationErrorType::Package);
         if let Some(sub) = self.sub_part_uri {
             err = err.with_related_part_uri(sub);
         }
@@ -191,6 +192,7 @@ fn err(path: impl Into<String>, message_id: &str, detail: impl Into<String>) -> 
         message: format!("{message_id}: {}", detail.into()),
         ..Default::default()
     }
+    .with_error_type(super::ValidationErrorType::Package)
 }
 
 /// Infer the parent part type name for the package container (C# package-level constraints).
@@ -491,6 +493,7 @@ mod tests {
         assert!(r.message.contains("PartIsNotAllowed"));
         let e = r.into_validation_error();
         assert_eq!(e.path, "/word/styles.xml");
+        assert_eq!(e.error_type(), super::super::ValidationErrorType::Package);
     }
 
     use super::*;

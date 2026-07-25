@@ -105,13 +105,15 @@ impl ValidationContext {
         error_type: super::ValidationErrorType,
         description: impl AsRef<str>,
     ) -> bool {
-        let _ = error_type; // encoded in message id prefix for error_type() inference
         let path = if self.current_path.is_empty() {
             String::new()
         } else {
             self.current_path.clone()
         };
-        self.add_error(super::ValidationError::with_id(path, id, description.as_ref()))
+        self.add_error(
+            super::ValidationError::with_id(path, id, description.as_ref())
+                .with_error_type(error_type),
+        )
     }
 
     /// Add a schema error with id (C# `AddError` convenience).
@@ -209,6 +211,10 @@ mod tests {
             Some("Sch_InvalidElementContentExpectingComplexType")
         );
         assert_eq!(ctx.errors()[0].path, "/w:document[1]");
+        assert_eq!(
+            ctx.errors()[0].error_type(),
+            crate::validation::ValidationErrorType::Schema
+        );
         assert_eq!(ctx.max_number_of_errors(), ValidationSettings::DEFAULT_MAX_ERRORS);
 
         let mc = crate::markup_compatibility::McContext::new();

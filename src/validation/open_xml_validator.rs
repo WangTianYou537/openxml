@@ -6,6 +6,7 @@
 use super::{
     validate_alternate_content, validate_mc_attributes, validate_package, validate_package_constraints,
     validate_word_document, validate_word_document_full, ValidationCache, ValidationError,
+    ValidationErrorEventArgs,
 };
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
@@ -54,8 +55,10 @@ pub struct OpenXmlValidator {
     settings: ValidationSettings,
     /// Version-scoped particle/memo cache (C# `ValidationCache`).
     cache: ValidationCache,
-    /// Optional per-error callback (C# `ValidationErrorEventArgs` subscriber).
+    /// Optional per-error callback retained for compatibility.
     error_callback: Option<Box<dyn FnMut(&ValidationError) + Send>>,
+    /// Mutable per-error callback (C# `ValidationErrorEventArgs` subscriber).
+    error_event_callback: Option<Box<dyn FnMut(&mut ValidationErrorEventArgs) + Send>>,
 }
 
 impl std::fmt::Debug for OpenXmlValidator {
@@ -64,6 +67,7 @@ impl std::fmt::Debug for OpenXmlValidator {
             .field("file_format", &self.settings.file_format)
             .field("max_number_of_errors", &self.settings.max_number_of_errors)
             .field("has_error_callback", &self.error_callback.is_some())
+            .field("has_error_event_callback", &self.error_event_callback.is_some())
             .field("cache_version", &self.cache.version())
             .finish()
     }
@@ -83,6 +87,7 @@ impl OpenXmlValidator {
             cache: ValidationCache::new(settings.file_format),
             settings,
             error_callback: None,
+            error_event_callback: None,
         }
     }
 
@@ -91,6 +96,7 @@ impl OpenXmlValidator {
             settings: ValidationSettings::new(file_format),
             cache: ValidationCache::new(file_format),
             error_callback: None,
+            error_event_callback: None,
         }
     }
 
@@ -100,6 +106,7 @@ impl OpenXmlValidator {
             settings,
             cache,
             error_callback: None,
+            error_event_callback: None,
         }
     }
 
@@ -143,8 +150,7 @@ impl OpenXmlValidator {
         self
     }
 
-    /// Register a callback invoked for each validation error before the list is returned
-    /// (C# validation error event).
+    /// Register a callback invoked for each validation error before the list is returned.
     pub fn on_validation_error<F>(mut self, callback: F) -> Self
     where
         F: FnMut(&ValidationError) + Send + 'static,
@@ -153,9 +159,19 @@ impl OpenXmlValidator {
         self
     }
 
-    /// Clear any error callback.
+    /// Register a mutable validation-error callback (C# `ValidationErrorEventArgs` event).
+    pub fn on_validation_error_event<F>(mut self, callback: F) -> Self
+    where
+        F: FnMut(&mut ValidationErrorEventArgs) + Send + 'static,
+    {
+        self.error_event_callback = Some(Box::new(callback));
+        self
+    }
+
+    /// Clear all validation-error callbacks.
     pub fn clear_validation_error_callback(&mut self) {
         self.error_callback = None;
+        self.error_event_callback = None;
     }
 
     fn cap(&mut self, mut errors: Vec<ValidationError>) -> Vec<ValidationError> {
@@ -163,9 +179,14 @@ impl OpenXmlValidator {
         if max > 0 && errors.len() > max {
             errors.truncate(max);
         }
-        if let Some(cb) = self.error_callback.as_mut() {
-            for e in &errors {
-                cb(e);
+        for error in &mut errors {
+            if let Some(cb) = self.error_event_callback.as_mut() {
+                let mut args = ValidationErrorEventArgs::new(error.clone());
+                cb(&mut args);
+                *error = args.validation_error;
+            }
+            if let Some(cb) = self.error_callback.as_mut() {
+                cb(error);
             }
         }
         errors
@@ -329,6 +350,34 @@ mod tests {
     }
 
     #[test]
+    fn validation_error_event_can_replace_error() {
+        use std::sync::{Arc, Mutex};
+        let observed_path = Arc::new(Mutex::new(String::new()));
+        let observed_path2 = Arc::clone(&observed_path);
+        let mut v = OpenXmlValidator::new()
+            .on_validation_error_event(|args| {
+                args.set_validation_error(
+                    ValidationError::with_id("/replacement", "Sem_Replaced", "replaced")
+                        .with_error_type(crate::validation::ValidationErrorType::Semantic),
+                );
+            })
+            .on_validation_error(move |error| {
+                *observed_path2.lock().unwrap() = error.path.clone();
+            });
+        let errors = v.validate_element(&document(vec![])).unwrap();
+        assert!(!errors.is_empty());
+        assert!(errors.iter().all(|error| error.path == "/replacement"));
+        assert!(errors.iter().all(|error| {
+            error.error_type() == crate::validation::ValidationErrorType::Semantic
+        }));
+        assert_eq!(*observed_path.lock().unwrap(), "/replacement");
+
+        v.clear_validation_error_callback();
+        let errors = v.validate_element(&document(vec![])).unwrap();
+        assert!(errors.iter().all(|error| error.path != "/replacement"));
+    }
+
+    #[test]
     fn error_id_and_type_from_message() {
         let e = ValidationError {
             path: "root".into(),
@@ -355,6 +404,14 @@ mod tests {
         assert_eq!(e2.id(), Some("Sch_InvalidElementContent"));
         assert_eq!(e2.description(), "bad child");
         assert!(e2.xml_path().xpath.contains("w:p"), "{:?}", e2.xml_path());
+
+        let mut explicit = ValidationError::with_id("/a", "Sch_Invalid", "bad")
+            .with_error_type(crate::validation::ValidationErrorType::Semantic);
+        assert_eq!(explicit.error_type(), crate::validation::ValidationErrorType::Semantic);
+        explicit.clear_error_type();
+        assert_eq!(explicit.error_type(), crate::validation::ValidationErrorType::Schema);
+        explicit.set_error_type(crate::validation::ValidationErrorType::Package);
+        assert_eq!(explicit.error_type(), crate::validation::ValidationErrorType::Package);
     }
 
     #[test]

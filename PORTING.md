@@ -940,6 +940,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartUriHelper` reserved URI enumerate/unreserve/sequence inspection
 - [x] `PartUriFeature` + `OpenXmlPackage` ensure-unique/unreserve/query wrappers
 
+- [x] Explicit `ValidationErrorType` storage/builders with heuristic fallback
+- [x] `OpenXmlValidator::on_validation_error_event` mutable replacement callback
+- [x] Package constraint errors carry explicit `ValidationErrorType::Package`
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

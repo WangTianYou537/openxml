@@ -127,6 +127,8 @@ pub enum ValidationErrorType {
 pub struct ValidationError {
     pub path: String,
     pub message: String,
+    /// Explicit category when the producer knows it (C# `ErrorType`).
+    pub explicit_error_type: Option<ValidationErrorType>,
     /// Invalid node location (C# `ValidationErrorInfo.Node` path shell).
     pub node_path: Option<String>,
     /// Related element location (C# `RelatedNode`).
@@ -170,6 +172,19 @@ impl ValidationError {
     pub fn with_related_part_uri(mut self, uri: impl Into<String>) -> Self {
         self.related_part_uri = Some(uri.into());
         self
+    }
+
+    pub fn with_error_type(mut self, error_type: ValidationErrorType) -> Self {
+        self.explicit_error_type = Some(error_type);
+        self
+    }
+
+    pub fn set_error_type(&mut self, error_type: ValidationErrorType) {
+        self.explicit_error_type = Some(error_type);
+    }
+
+    pub fn clear_error_type(&mut self) {
+        self.explicit_error_type = None;
     }
 
     /// Human-readable description (C# `ValidationErrorInfo.Description`).
@@ -243,8 +258,11 @@ impl ValidationError {
         ok.then_some(head)
     }
 
-    /// Infer error category from [`Self::id`] / message (C# `ValidationErrorInfo.ErrorType`).
+    /// Return the explicit error category, or infer it from [`Self::id`] / message.
     pub fn error_type(&self) -> ValidationErrorType {
+        if let Some(error_type) = self.explicit_error_type {
+            return error_type;
+        }
         let id = self.id().unwrap_or("");
         if id.starts_with("MC_") || id.starts_with("MC") {
             ValidationErrorType::MarkupCompatibility
