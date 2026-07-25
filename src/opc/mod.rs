@@ -39,7 +39,7 @@ pub use part_extension::PartExtensionProvider;
 pub use part_uri::{PartUriHelper, RelatedPart};
 pub use properties::PackageProperties;
 pub use reference_relationship::{
-    AudioReferenceRelationship, HyperlinkRelationship, MediaReferenceRelationship,
+    AudioReferenceRelationship, ExternalRelationship, HyperlinkRelationship, MediaReferenceRelationship,
     ReferenceRelationship, VideoReferenceRelationship,
 };
 pub use relationships::{Relationship, RelationshipTargetMode, Relationships};

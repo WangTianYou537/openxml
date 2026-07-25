@@ -87,7 +87,7 @@ pub use markup_compatibility::{
 };
 pub use namespace::{Namespace, OpenXmlNamespace};
 pub use opc::{
-    add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, FileOpenAccess,
+    add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, ExternalRelationship, FileOpenAccess,
     PackageDiff, PackageEqualityOptions, PackageMode, compare_packages, packages_equal,
     CustomProperties, DataPart, DataPartReferenceRelationship, IdPartPair, MediaDataPart, CustomProperty,
     CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaDataPartType, MediaKind, media_rel,

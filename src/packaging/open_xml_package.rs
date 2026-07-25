@@ -2566,6 +2566,41 @@ impl OpenXmlPackage {
             .collect()
     }
 
+    /// Typed external relationships (C# `ExternalRelationship` collection shell).
+    pub fn typed_external_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::ExternalRelationship> {
+        self.external_relationships(source)
+            .into_iter()
+            .filter_map(|r| crate::opc::ExternalRelationship::from_relationship(&r))
+            .collect()
+    }
+
+    /// Audio reference relationships under `source`.
+    pub fn audio_reference_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::AudioReferenceRelationship> {
+        self.opc.audio_reference_relationships(source)
+    }
+
+    /// Video reference relationships under `source`.
+    pub fn video_reference_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::VideoReferenceRelationship> {
+        self.opc.video_reference_relationships(source)
+    }
+
+    /// Media reference relationships under `source`.
+    pub fn media_reference_relationships(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+    ) -> Vec<crate::opc::MediaReferenceRelationship> {
+        self.opc.media_reference_relationships(source)
+    }
+
     /// Clone package bytes into a new feature-seeded package (C# `Clone` to memory shell).
     pub fn clone_package(&self) -> crate::error::Result<Self> {
         let bytes = self.to_bytes()?;

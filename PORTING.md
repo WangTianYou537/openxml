@@ -901,6 +901,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `MediaDataPart` alias + DataPart target defaults / is_media_data_part
 - [x] `OpenXmlPackage` data-part stream/feed/reference-query helpers
 
+- [x] `ExternalRelationship` type + ReferenceRelationship accessors
+- [x] Audio/Video/Media reference relationship constructors + package typed lists
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

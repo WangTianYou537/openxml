@@ -15,6 +15,20 @@ pub struct ReferenceRelationship {
 }
 
 impl ReferenceRelationship {
+    pub fn new(
+        id: impl Into<String>,
+        relationship_type: impl Into<String>,
+        target: impl Into<String>,
+        is_external: bool,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            relationship_type: relationship_type.into(),
+            target: target.into(),
+            is_external,
+        }
+    }
+
     pub fn from_relationship(rel: &Relationship) -> Self {
         Self {
             id: rel.id.clone(),
@@ -22,6 +36,22 @@ impl ReferenceRelationship {
             target: rel.target.clone(),
             is_external: rel.target_mode == RelationshipTargetMode::External,
         }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
+
+    pub fn target_uri(&self) -> &str {
+        &self.target
+    }
+
+    pub fn is_external(&self) -> bool {
+        self.is_external
     }
 
     pub fn is_hyperlink(&self) -> bool {
@@ -38,6 +68,49 @@ impl ReferenceRelationship {
 
     pub fn is_media(&self) -> bool {
         self.relationship_type == media_rel::MEDIA
+    }
+}
+
+/// External relationship (C# `ExternalRelationship`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalRelationship {
+    pub inner: ReferenceRelationship,
+}
+
+impl ExternalRelationship {
+    pub fn new(
+        target: impl Into<String>,
+        relationship_type: impl Into<String>,
+        id: impl Into<String>,
+    ) -> Self {
+        Self {
+            inner: ReferenceRelationship::new(id, relationship_type, target, true),
+        }
+    }
+
+    pub fn from_relationship(rel: &Relationship) -> Option<Self> {
+        if rel.target_mode != RelationshipTargetMode::External {
+            return None;
+        }
+        Some(Self {
+            inner: ReferenceRelationship::from_relationship(rel),
+        })
+    }
+
+    pub fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+    }
+
+    pub fn target_uri(&self) -> &str {
+        self.inner.target_uri()
+    }
+
+    pub fn into_inner(self) -> ReferenceRelationship {
+        self.inner
     }
 }
 
@@ -81,6 +154,14 @@ impl HyperlinkRelationship {
     pub fn is_external(&self) -> bool {
         self.inner.is_external
     }
+
+    pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+    }
+
+    pub fn into_inner(self) -> ReferenceRelationship {
+        self.inner
+    }
 }
 
 /// Audio reference to a media data part (C# `AudioReferenceRelationship`).
@@ -92,6 +173,12 @@ pub struct AudioReferenceRelationship {
 impl AudioReferenceRelationship {
     pub const RELATIONSHIP_TYPE: &'static str = media_rel::AUDIO;
 
+    pub fn new(target: impl Into<String>, id: impl Into<String>) -> Self {
+        Self {
+            inner: ReferenceRelationship::new(id, Self::RELATIONSHIP_TYPE, target, false),
+        }
+    }
+
     pub fn from_relationship(rel: &Relationship) -> Option<Self> {
         if rel.relationship_type != Self::RELATIONSHIP_TYPE {
             return None;
@@ -99,6 +186,22 @@ impl AudioReferenceRelationship {
         Some(Self {
             inner: ReferenceRelationship::from_relationship(rel),
         })
+    }
+
+    pub fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    pub fn target(&self) -> &str {
+        self.inner.target_uri()
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+    }
+
+    pub fn into_inner(self) -> ReferenceRelationship {
+        self.inner
     }
 }
 
@@ -111,6 +214,12 @@ pub struct VideoReferenceRelationship {
 impl VideoReferenceRelationship {
     pub const RELATIONSHIP_TYPE: &'static str = media_rel::VIDEO;
 
+    pub fn new(target: impl Into<String>, id: impl Into<String>) -> Self {
+        Self {
+            inner: ReferenceRelationship::new(id, Self::RELATIONSHIP_TYPE, target, false),
+        }
+    }
+
     pub fn from_relationship(rel: &Relationship) -> Option<Self> {
         if rel.relationship_type != Self::RELATIONSHIP_TYPE {
             return None;
@@ -118,6 +227,22 @@ impl VideoReferenceRelationship {
         Some(Self {
             inner: ReferenceRelationship::from_relationship(rel),
         })
+    }
+
+    pub fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    pub fn target(&self) -> &str {
+        self.inner.target_uri()
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+    }
+
+    pub fn into_inner(self) -> ReferenceRelationship {
+        self.inner
     }
 }
 
@@ -130,6 +255,12 @@ pub struct MediaReferenceRelationship {
 impl MediaReferenceRelationship {
     pub const RELATIONSHIP_TYPE: &'static str = media_rel::MEDIA;
 
+    pub fn new(target: impl Into<String>, id: impl Into<String>) -> Self {
+        Self {
+            inner: ReferenceRelationship::new(id, Self::RELATIONSHIP_TYPE, target, false),
+        }
+    }
+
     pub fn from_relationship(rel: &Relationship) -> Option<Self> {
         if rel.relationship_type != Self::RELATIONSHIP_TYPE {
             return None;
@@ -137,6 +268,22 @@ impl MediaReferenceRelationship {
         Some(Self {
             inner: ReferenceRelationship::from_relationship(rel),
         })
+    }
+
+    pub fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    pub fn target(&self) -> &str {
+        self.inner.target_uri()
+    }
+
+    pub fn relationship_type(&self) -> &str {
+        self.inner.relationship_type()
+    }
+
+    pub fn into_inner(self) -> ReferenceRelationship {
+        self.inner
     }
 }
 
@@ -249,5 +396,22 @@ mod tests {
         assert_eq!(hls[0].id(), id);
         assert!(hls[0].is_external());
         assert_eq!(hls[0].target(), "https://example.com");
+    }
+
+    #[test]
+    fn external_relationship_typed() {
+        let rel = Relationship {
+            id: "rId1".into(),
+            relationship_type: "http://example/rel".into(),
+            target: "https://example.com".into(),
+            target_mode: RelationshipTargetMode::External,
+        };
+        let ext = ExternalRelationship::from_relationship(&rel).unwrap();
+        assert_eq!(ext.id(), "rId1");
+        assert_eq!(ext.target_uri(), "https://example.com");
+        assert!(ext.into_inner().is_external());
+        let a = AudioReferenceRelationship::new("/media/a.mp3", "rIdA");
+        assert_eq!(a.relationship_type(), media_rel::AUDIO);
+        assert_eq!(a.target(), "/media/a.mp3");
     }
 }
