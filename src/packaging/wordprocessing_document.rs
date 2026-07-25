@@ -68,8 +68,8 @@ impl WordprocessingDocumentType {
 /// # Example
 ///
 /// ```no_run
-/// use openxml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
-/// use openxml::wordprocessing::{document, body, paragraph, run, text};
+/// use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+/// use officexml::wordprocessing::{document, body, paragraph, run, text};
 ///
 /// let mut doc = WordprocessingDocument::create(
 ///     "hello.docx",

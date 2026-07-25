@@ -1,8 +1,8 @@
 //! Read paragraphs from a Word document.
 
-use openxml::packaging::WordprocessingDocument;
+use officexml::packaging::WordprocessingDocument;
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "hello.docx".into());

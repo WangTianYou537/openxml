@@ -1,17 +1,20 @@
-//! Convert one or more SVGs into native PowerPoint DrawingML shapes (no SVG media embed).
+//! Convert one or more SVGs to native PowerPoint DrawingML shapes (no SVG media embed).
 //!
-//! Usage:
-//!   create_ppt_from_svg_shapes [options] -o out.pptx a.svg [b.svg ...]
-//!   create_ppt_from_svg_shapes [options] out.pptx a.svg [b.svg ...]
-//!   create_ppt_from_svg_shapes [options] a.svg [b.svg ...]
+//! Each input SVG becomes its own slide (16:9 widescreen).
 //!
-//! Options (mutually exclusive font modes; last one wins):
+//! ```text
+//! svg2pptx [options] -o out.pptx a.svg b.svg c.svg
+//! svg2pptx [options] out.pptx a.svg b.svg
+//! svg2pptx [options] a.svg b.svg          # writes a.pptx (stem of first SVG)
+//! ```
+//!
+//! Font modes (mutually exclusive; last flag wins):
 //!   --font-shape         Outline glyphs as shapes (no text boxes, no font embed)
 //!   --embed-font         Editable text boxes + subset EOT of used fonts
 //!   --embed-font-fully   Editable text boxes + full EOT of used fonts
 //!
-//! Default (no flag): editable text boxes, no font embed (Windows system faces).
-//! Each input SVG becomes one 16:9 slide.
+//! Default: editable text boxes, no font embed (Windows system faces:
+//! Times New Roman + Microsoft YaHei when SVG omits font-family).
 
 use officexml::packaging::{
     PresentationDocument, PresentationDocumentType, SvgFontEmbedMode, SvgShapesOnSlideOptions,
@@ -19,7 +22,24 @@ use officexml::packaging::{
 
 fn print_usage() {
     eprintln!(
-        "usage: create_ppt_from_svg_shapes [--font-shape|--embed-font|--embed-font-fully] [-o out.pptx] in.svg [in.svg ...]"
+        "\
+svg2pptx — SVG(s) → native PowerPoint shapes (.pptx)
+
+USAGE:
+  svg2pptx [OPTIONS] -o OUT.pptx IN.svg [IN.svg ...]
+  svg2pptx [OPTIONS] OUT.pptx IN.svg [IN.svg ...]
+  svg2pptx [OPTIONS] IN.svg [IN.svg ...]          # OUT = <first-stem>.pptx
+
+Each input SVG is placed on its own 16:9 slide (full-bleed).
+
+OPTIONS:
+  -o, --output <file>   Output .pptx path
+  --font-shape          Text as outline shapes (no text boxes / font embed)
+  --embed-font          Editable text + subset-embed used fonts (EOT .fntdata)
+  --embed-font-fully    Editable text + full-embed used fonts
+  -h, --help            Show this help
+
+Default (no font flag): editable text boxes, system faces only (no embed)."
     );
 }
 
@@ -68,36 +88,47 @@ fn main() -> officexml::Result<()> {
         }
     }
 
+    // Split positionals into optional leading .pptx and the rest as SVGs.
     let (out, svg_paths) = if let Some(o) = output {
         if positionals.is_empty() {
-            (o, vec!["/opt/wp/openxml/slide-1.svg".into()])
-        } else {
-            (o, positionals)
+            eprintln!("error: at least one input .svg is required");
+            print_usage();
+            std::process::exit(2);
         }
+        (o, positionals)
     } else if positionals.is_empty() {
-        (
-            "/opt/wp/openxml/slide-1.pptx".into(),
-            vec!["/opt/wp/openxml/slide-1.svg".into()],
-        )
+        eprintln!("error: at least one input .svg is required");
+        print_usage();
+        std::process::exit(2);
     } else if positionals[0].ends_with(".pptx") {
-        let o = positionals.remove(0);
-        if positionals.is_empty() {
-            (o, vec!["/opt/wp/openxml/slide-1.svg".into()])
-        } else {
-            (o, positionals)
+        if positionals.len() < 2 {
+            eprintln!("error: provide at least one .svg after the output .pptx");
+            print_usage();
+            std::process::exit(2);
         }
-    } else if positionals.len() == 1 && !positionals[0].ends_with(".svg") {
-        (
-            positionals[0].clone(),
-            vec!["/opt/wp/openxml/slide-1.svg".into()],
-        )
+        let o = positionals.remove(0);
+        (o, positionals)
     } else {
-        let stem = std::path::Path::new(&positionals[0])
+        // All SVGs (or first is SVG-like); derive output from first path stem.
+        let first = &positionals[0];
+        if !first.ends_with(".svg") && positionals.len() == 1 {
+            // legacy: single non-svg positional treated as output, default svg
+            eprintln!("error: expected .svg input(s); got {first}");
+            print_usage();
+            std::process::exit(2);
+        }
+        let stem = std::path::Path::new(first)
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or("slide-1");
+            .unwrap_or("out");
         (format!("{stem}.pptx"), positionals)
     };
+
+    if svg_paths.is_empty() {
+        eprintln!("error: at least one input .svg is required");
+        print_usage();
+        std::process::exit(2);
+    }
 
     let options = SvgShapesOnSlideOptions {
         editable_text: !font_shape,
@@ -118,6 +149,7 @@ fn main() -> officexml::Result<()> {
         }
     };
 
+    // Full-bleed 16:9 slide (EMUs)
     const SLIDE_CX: i64 = 12_192_000;
     const SLIDE_CY: i64 = 6_858_000;
 
@@ -125,12 +157,15 @@ fn main() -> officexml::Result<()> {
     let mut total_shapes = 0usize;
 
     for (i, svg_path) in svg_paths.iter().enumerate() {
-        let svg_bytes = std::fs::read(svg_path)?;
+        let svg_bytes = std::fs::read(svg_path).map_err(|e| {
+            officexml::Error::Xml(format!("failed to read SVG {svg_path}: {e}"))
+        })?;
         if svg_bytes.starts_with(b"PK") {
             return Err(officexml::Error::Xml(format!(
                 "input looks like a ZIP/PPTX, not SVG: {svg_path}"
             )));
         }
+
         ppt.add_blank_slide()?;
         let n = ppt.add_svg_shapes_on_slide_ex(
             i,
@@ -139,19 +174,18 @@ fn main() -> officexml::Result<()> {
             0,
             SLIDE_CX,
             SLIDE_CY,
-            options,
+            options.clone(),
         )?;
         total_shapes += n;
-        println!("  slide {}: {svg_path} → {n} shapes", i + 1);
+        println!(
+            "  slide {}: {} → {n} shapes",
+            i + 1,
+            svg_path
+        );
     }
 
-    ppt.set_title(&format!(
-        "slide ({mode_label}, {} slides)",
-        svg_paths.len()
-    ))?;
+    ppt.set_title(&format!("svg2pptx ({mode_label}, {} slides)", svg_paths.len()))?;
     ppt.set_creator("officexml")?;
-    ppt.set_created("2026-07-22T00:00:00Z")?;
-    ppt.set_modified("2026-07-22T00:00:00Z")?;
     ppt.set_application("Microsoft Office PowerPoint")?;
     ppt.set_application_version("16.0000")?;
     ppt.set_presentation_format("Widescreen")?;
@@ -162,10 +196,5 @@ fn main() -> officexml::Result<()> {
     println!("  mode: {mode_label}");
     println!("  slides: {}", svg_paths.len());
     println!("  native shapes: {total_shapes}");
-    println!(
-        "  masters={} layouts={}",
-        ppt.masters().len(),
-        ppt.layouts().len()
-    );
     Ok(())
 }

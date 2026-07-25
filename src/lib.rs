@@ -1,4 +1,4 @@
-//! # openxml
+//! # officexml
 //!
 //! Rust port of the [Open XML SDK](https://github.com/OfficeDev/Open-XML-SDK).
 //! Work with Microsoft Office Word (`.docx`), Excel (`.xlsx`), and PowerPoint
@@ -18,8 +18,8 @@
 //! ## Quick start — create a Word document
 //!
 //! ```no_run
-//! use openxml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
-//! use openxml::wordprocessing::{body, document, paragraph, run, text};
+//! use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+//! use officexml::wordprocessing::{body, document, paragraph, run, text};
 //!
 //! let mut doc = WordprocessingDocument::create(
 //!     "hello.docx",
@@ -36,7 +36,7 @@
 //! ## Quick start — read paragraphs
 //!
 //! ```no_run
-//! use openxml::packaging::WordprocessingDocument;
+//! use officexml::packaging::WordprocessingDocument;
 //!
 //! let mut doc = WordprocessingDocument::open("hello.docx", false).unwrap();
 //! for p in doc.paragraph_texts().unwrap() {

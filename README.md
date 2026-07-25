@@ -1,10 +1,37 @@
-# openxml
+# officexml
 
 Rust port of the [Open XML SDK](https://github.com/OfficeDev/Open-XML-SDK) — a library for creating and manipulating Microsoft Office Word (`.docx`), Excel (`.xlsx`), and PowerPoint (`.pptx`) packages.
 
-This crate lives at `/opt/wp/openxml` and is being ported from the C# implementation in `/opt/wp/Open-XML-SDK`.
+Library crate name: **`officexml`**. Source: https://github.com/WangTianYou537/openxml  
+**Not published to crates.io** — the full package (generated schemas + optional font assets) exceeds registry size limits without dropping functionality.
 
 **移植已完成**（见 [PORTING.md](PORTING.md)）。完整使用说明见 **[docs/USAGE.md](docs/USAGE.md)**。
+
+## Build / CLI
+
+```bash
+cargo build --release
+cargo run --release --bin svg2pptx -- -o deck.pptx a.svg b.svg c.svg
+```
+
+### `svg2pptx` — multi-slide
+
+Each input SVG becomes one full-bleed 16:9 slide:
+
+```bash
+svg2pptx -o deck.pptx slide1.svg slide2.svg slide3.svg
+svg2pptx --embed-font deck.pptx a.svg b.svg
+svg2pptx --font-shape a.svg b.svg          # writes a.pptx
+```
+
+| Flag | Behavior |
+|------|----------|
+| *(default)* | Editable text boxes; system fonts (Times New Roman / Microsoft YaHei when SVG omits `font-family`) |
+| `--font-shape` | Outline glyphs as shapes; no text boxes / font embed |
+| `--embed-font` | Editable text + on-demand subset EOT (`.fntdata`) embed |
+| `--embed-font-fully` | Editable text + full EOT embed of used faces |
+
+Optional embed fonts: place `NotoSansSC-Regular.ttf` / `NotoSansSC-Bold.ttf` under `assets/fonts/`. Subset mode needs Python + `fontTools` (`scripts/subset_ttf.py`).
 
 ## Status
 
@@ -494,8 +521,8 @@ The C# SDK generates thousands of strongly-typed classes from JSON schemas under
 ### Create a Word document
 
 ```rust
-use openxml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
-use openxml::wordprocessing::{body, document, paragraph, run, text};
+use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+use officexml::wordprocessing::{body, document, paragraph, run, text};
 
 let mut doc = WordprocessingDocument::create(
     "hello.docx",
@@ -512,7 +539,7 @@ doc.save()?;
 ### Read paragraphs
 
 ```rust
-use openxml::packaging::WordprocessingDocument;
+use officexml::packaging::WordprocessingDocument;
 
 let mut doc = WordprocessingDocument::open("hello.docx", false)?;
 for p in doc.paragraph_texts()? {
@@ -523,7 +550,7 @@ for p in doc.paragraph_texts()? {
 ### Create a spreadsheet
 
 ```rust
-use openxml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
+use officexml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
 
 let mut doc = SpreadsheetDocument::create("grid.xlsx", SpreadsheetDocumentType::Workbook)?;
 doc.write_sheet_strings("Sheet1", &[

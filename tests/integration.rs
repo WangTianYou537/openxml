@@ -1,13 +1,13 @@
 //! Integration tests for openxml.
 
-use openxml::element::{parse_element, write_element, OpenXmlElement};
-use openxml::namespace::{content_type, rel};
-use openxml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
-use openxml::packaging::{
+use officexml::element::{parse_element, write_element, OpenXmlElement};
+use officexml::namespace::{content_type, rel};
+use officexml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
+use officexml::packaging::{
     PresentationDocument, PresentationDocumentType, SpreadsheetDocument,
     SpreadsheetDocumentType, WordprocessingDocument, WordprocessingDocumentType,
 };
-use openxml::wordprocessing::{
+use officexml::wordprocessing::{
     body, document, paragraph, paragraph_with_text, run, simple_document, text,
 };
 
@@ -170,7 +170,7 @@ fn presentation_create_roundtrip() {
 
 #[test]
 fn package_properties_roundtrip() {
-    use openxml::opc::PackageProperties;
+    use officexml::opc::PackageProperties;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("props.docx");
@@ -195,8 +195,8 @@ fn package_properties_roundtrip() {
 
 #[test]
 fn word_styles_settings_and_image() {
-    use openxml::packaging::ImageFormat;
-    use openxml::opc::PackUri;
+    use officexml::packaging::ImageFormat;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("rich.docx");
@@ -238,7 +238,7 @@ fn word_styles_settings_and_image() {
 
 #[test]
 fn simple_attribute_helpers() {
-    use openxml::simple_types::OnOffValue;
+    use officexml::simple_types::OnOffValue;
 
     let mut bold = OpenXmlElement::w("b");
     bold.set_simple_attribute_qname("w:val", OnOffValue(true));
@@ -291,7 +291,7 @@ fn spreadsheet_shared_strings_and_multi_sheet() {
 
 #[test]
 fn word_header_footer_hyperlink() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("hdr.docx");
@@ -359,12 +359,12 @@ fn presentation_text_slide_roundtrip() {
 
 #[test]
 fn strict_to_transitional_rewrite() {
-    use openxml::namespace::rel;
-    use openxml::namespace_rewrite::{
+    use officexml::namespace::rel;
+    use officexml::namespace_rewrite::{
         rewrite_package_to_transitional, to_transitional_namespace,
     };
-    use openxml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
-    use openxml::namespace::content_type;
+    use officexml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
+    use officexml::namespace::content_type;
 
     assert_eq!(
         to_transitional_namespace("http://purl.oclc.org/ooxml/wordprocessingml/main"),
@@ -407,9 +407,9 @@ fn strict_to_transitional_rewrite() {
 
 #[test]
 fn file_format_versions_mc() {
-    use openxml::element::OpenXmlElement;
-    use openxml::file_format::{supported_prefixes, FileFormatVersions};
-    use openxml::markup_compatibility::{
+    use officexml::element::OpenXmlElement;
+    use officexml::file_format::{supported_prefixes, FileFormatVersions};
+    use officexml::markup_compatibility::{
         process_markup_compatibility_for_version, with_ignorable,
     };
 
@@ -447,7 +447,7 @@ fn file_format_versions_mc() {
 
 #[test]
 fn excel_pivot_table() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pivot.xlsx");
@@ -501,13 +501,13 @@ fn excel_pivot_table() {
         .opc()
         .get_part(&PackUri::new("/xl/workbook.xml"))
         .unwrap();
-    let root = openxml::element::parse_element(wb).unwrap();
+    let root = officexml::element::parse_element(wb).unwrap();
     assert!(root.child("pivotCaches").is_some());
 }
 
 #[test]
 fn excel_conditional_formatting() {
-    use openxml::element::parse_element;
+    use officexml::element::parse_element;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("cf.xlsx");
@@ -557,7 +557,7 @@ fn excel_conditional_formatting() {
     let styles = doc
         .package()
         .opc()
-        .get_part(&openxml::opc::PackUri::new("/xl/styles.xml"))
+        .get_part(&officexml::opc::PackUri::new("/xl/styles.xml"))
         .unwrap();
     let sroot = parse_element(styles).unwrap();
     assert!(sroot.child("dxfs").is_some());
@@ -591,7 +591,7 @@ fn excel_sheet_comments() {
 
 #[test]
 fn excel_image_on_sheet() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     // 1x1 PNG
     let png = [
@@ -639,8 +639,8 @@ fn excel_image_on_sheet() {
 
 #[test]
 fn generated_full_version_table() {
-    use openxml::file_format::{supported_prefixes, FileFormatVersions};
-    use openxml::generated::namespaces;
+    use officexml::file_format::{supported_prefixes, FileFormatVersions};
+    use officexml::generated::namespaces;
 
     // Full table from namespaces.json should be much larger than the bootstrap list
     assert!(namespaces::PREFIX_INTRODUCED_IN.len() > 100);
@@ -654,7 +654,7 @@ fn generated_full_version_table() {
 
 #[test]
 fn excel_chart_on_sheet() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("anchored.xlsx");
@@ -684,7 +684,7 @@ fn excel_chart_on_sheet() {
     // worksheet should reference drawing
     let sheet_uri = &doc.worksheets()[0].uri;
     let data = doc.package().opc().get_part(&sheet_uri).unwrap();
-    let root = openxml::element::parse_element(data).unwrap();
+    let root = officexml::element::parse_element(data).unwrap();
     assert!(root.child("drawing").is_some());
     // drawing should relate to chart
     let drawing_uri = PackUri::new("/xl/drawings/drawing1.xml");
@@ -698,9 +698,9 @@ fn excel_chart_on_sheet() {
 
 #[test]
 fn generated_particles() {
-    use openxml::generated::wordprocessingml_2006_main as wml;
-    use openxml::validation::validate_particle;
-    use openxml::wordprocessing::{body, document, paragraph_with_text};
+    use officexml::generated::wordprocessingml_2006_main as wml;
+    use officexml::validation::validate_particle;
+    use officexml::wordprocessing::{body, document, paragraph_with_text};
 
     assert_eq!(wml::PARTICLE_COUNT, 165);
     let p = wml::particle_for_class("Document").expect("Document particle");
@@ -717,9 +717,9 @@ fn generated_particles() {
 
 #[test]
 fn particle_validation_and_chart() {
-    use openxml::opc::PackUri;
-    use openxml::validation::validate_word_particles;
-    use openxml::wordprocessing::{body, document, paragraph_with_text, table_from_strings};
+    use officexml::opc::PackUri;
+    use officexml::validation::validate_word_particles;
+    use officexml::wordprocessing::{body, document, paragraph_with_text, table_from_strings};
 
     // Particle validation on a table document
     let doc = document(vec![body(vec![
@@ -753,7 +753,7 @@ fn particle_validation_and_chart() {
 
 #[test]
 fn word_footnotes_and_validation() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("notes.docx");
@@ -783,7 +783,7 @@ fn word_footnotes_and_validation() {
 
 #[test]
 fn presentation_notes_slide() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("notes.pptx");
@@ -809,8 +809,8 @@ fn presentation_notes_slide() {
 
 #[test]
 fn mc_ignorable_strip() {
-    use openxml::element::OpenXmlElement;
-    use openxml::markup_compatibility::{process_markup_compatibility, with_ignorable};
+    use officexml::element::OpenXmlElement;
+    use officexml::markup_compatibility::{process_markup_compatibility, with_ignorable};
 
     let mut root = with_ignorable(
         OpenXmlElement::w("document")
@@ -829,8 +829,8 @@ fn mc_ignorable_strip() {
 
 #[test]
 fn generated_attr_helpers_and_part_constraints() {
-    use openxml::generated::parts;
-    use openxml::generated::wordprocessingml_2006_main as wml;
+    use officexml::generated::parts;
+    use officexml::generated::wordprocessingml_2006_main as wml;
 
     // bold_val convenience constructor
     let b = wml::bold_val("1");
@@ -855,7 +855,7 @@ fn generated_attr_helpers_and_part_constraints() {
 
 #[test]
 fn presentation_master_layout() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("master.pptx");
@@ -866,7 +866,7 @@ fn presentation_master_layout() {
         let (master, layout) = doc.add_blank_master_with_layout().unwrap();
         assert!(master.uri.as_str().contains("slideMaster"));
         assert!(layout.uri.as_str().contains("slideLayout"));
-        doc.add_slide_with_layout(openxml::presentation::slide_with_text("On layout"))
+        doc.add_slide_with_layout(officexml::presentation::slide_with_text("On layout"))
             .unwrap();
         assert_eq!(doc.masters().len(), 1);
         // Full Office scaffold installs 11 layouts (title, obj, blank, …)
@@ -916,7 +916,7 @@ fn excel_formula_cell() {
 
 #[test]
 fn presentation_slide_size() {
-    use openxml::presentation::SLIDE_SIZE_16_9;
+    use officexml::presentation::SLIDE_SIZE_16_9;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("size.pptx");
@@ -938,8 +938,8 @@ fn presentation_slide_size() {
 
 #[test]
 fn markup_compatibility_resolve() {
-    use openxml::element::OpenXmlElement;
-    use openxml::markup_compatibility::{
+    use officexml::element::OpenXmlElement;
+    use officexml::markup_compatibility::{
         alternate_content_with, expand_alternate_content, resolve_alternate_content,
     };
 
@@ -960,7 +960,7 @@ fn markup_compatibility_resolve() {
 
 #[test]
 fn excel_merge_cells_and_styles() {
-    use openxml::opc::PackUri;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("merge.xlsx");
@@ -989,8 +989,8 @@ fn excel_merge_cells_and_styles() {
 
 #[test]
 fn word_alt_chunk() {
-    use openxml::opc::PackUri;
-    use openxml::packaging::AlternativeFormatImportType;
+    use officexml::opc::PackUri;
+    use officexml::packaging::AlternativeFormatImportType;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("alt.docx");
@@ -1018,7 +1018,7 @@ fn word_alt_chunk() {
         .part_uris().into_iter().any(|u| u.as_str().contains("afchunk"));
     assert!(has_af);
     // document should contain altChunk element
-    use openxml::element::parse_element;
+    use officexml::element::parse_element;
     let data = doc
         .package()
         .opc()
@@ -1030,8 +1030,8 @@ fn word_alt_chunk() {
 
 #[test]
 fn generated_enums() {
-    use openxml::generated::wordprocessingml_2006_main as wml;
-    use openxml::simple_types::OpenXmlSimpleType;
+    use officexml::generated::wordprocessingml_2006_main as wml;
+    use officexml::simple_types::OpenXmlSimpleType;
 
     assert!(wml::ENUM_COUNT > 50);
     // HighlightColorValues is a well-known Word enum
@@ -1040,13 +1040,13 @@ fn generated_enums() {
     assert_eq!(red.as_inner_text(), "red");
     assert!(wml::HighlightColorValues::from_str("nope").is_none());
 
-    use openxml::generated::spreadsheetml_2006_main as sml;
+    use officexml::generated::spreadsheetml_2006_main as sml;
     assert!(sml::ENUM_COUNT > 20);
 }
 
 #[test]
 fn word_table_and_flat_opc() {
-    use openxml::wordprocessing::{table_from_strings, table_to_strings};
+    use officexml::wordprocessing::{table_from_strings, table_to_strings};
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("table.docx");
@@ -1069,8 +1069,8 @@ fn word_table_and_flat_opc() {
 
     let mut doc = WordprocessingDocument::open(&path, false).unwrap();
     {
-        use openxml::element::parse_element;
-        use openxml::opc::PackUri;
+        use officexml::element::parse_element;
+        use officexml::opc::PackUri;
         let data = doc
             .package()
             .opc()
@@ -1095,8 +1095,8 @@ fn word_table_and_flat_opc() {
 
 #[test]
 fn word_numbering_theme_clone() {
-    use openxml::opc::PackUri;
-    use openxml::wordprocessing::numbered_paragraph;
+    use officexml::opc::PackUri;
+    use officexml::wordprocessing::numbered_paragraph;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("list.docx");
@@ -1131,8 +1131,8 @@ fn word_numbering_theme_clone() {
 
 #[test]
 fn excel_column_widths() {
-    use openxml::element::parse_element;
-    use openxml::opc::PackUri;
+    use officexml::element::parse_element;
+    use officexml::opc::PackUri;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("cols.xlsx");
@@ -1158,8 +1158,8 @@ fn excel_column_widths() {
 
 #[test]
 fn word_find_replace_and_comments() {
-    use openxml::opc::PackUri;
-    use openxml::wordprocessing::{comment, paragraph, run, text, with_comment};
+    use officexml::opc::PackUri;
+    use officexml::wordprocessing::{comment, paragraph, run, text, with_comment};
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("comments.docx");
@@ -1192,8 +1192,8 @@ fn word_find_replace_and_comments() {
 
 #[test]
 fn generated_wordprocessing_factories() {
-    use openxml::generated::parts;
-    use openxml::generated::wordprocessingml_2006_main as wml;
+    use officexml::generated::parts;
+    use officexml::generated::wordprocessingml_2006_main as wml;
 
     assert!(wml::ELEMENT_COUNT > 500);
     assert!(wml::TYPE_COUNT > 700);
@@ -1235,7 +1235,7 @@ fn generated_wordprocessing_factories() {
 
 #[test]
 fn extended_and_custom_properties_roundtrip() {
-    use openxml::{CustomProperties, ExtendedProperties, PackageProperties};
+    use officexml::{CustomProperties, ExtendedProperties, PackageProperties};
 
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
@@ -1316,7 +1316,7 @@ fn create_from_template_and_change_type() {
 
 #[test]
 fn package_validation_detects_missing_main() {
-    use openxml::validation::validate_package;
+    use officexml::validation::validate_package;
     let pkg = OpcPackage::create();
     let errs = validate_package(&pkg, true);
     assert!(!errs.is_empty());
@@ -1341,7 +1341,7 @@ fn line_and_pie_charts_and_fill_styles() {
 
 #[test]
 fn encrypted_ole_signature_detected() {
-    use openxml::opc::OpcPackage;
+    use officexml::opc::OpcPackage;
     // Minimal OLE CFB header (8-byte signature + padding)
     let mut fake = vec![0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
     fake.resize(64, 0);
@@ -1370,7 +1370,7 @@ fn excel_defined_names_roundtrip() {
 
 #[test]
 fn more_simple_types() {
-    use openxml::simple_types::{
+    use officexml::simple_types::{
         Base64BinaryValue, ByteValue, DateTimeValue, ListValue, OpenXmlSimpleType, SingleValue,
         TrueFalseBlankValue, TrueFalseValue,
     };
@@ -1456,7 +1456,7 @@ fn ppt_image_on_slide() {
 
 #[test]
 fn word_sdt_content_controls() {
-    use openxml::wordprocessing::{collect_sdt_tags, sdt_block};
+    use officexml::wordprocessing::{collect_sdt_tags, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let sdt = sdt_block(
@@ -1503,7 +1503,7 @@ fn excel_calc_chain() {
 
 #[test]
 fn element_equality() {
-    use openxml::element::{elements_equal, OpenXmlElement};
+    use officexml::element::{elements_equal, OpenXmlElement};
     let a = OpenXmlElement::w("p").with_child(OpenXmlElement::w("r").with_text("x"));
     let b = OpenXmlElement::w("p").with_child(OpenXmlElement::w("r").with_text("x"));
     let c = OpenXmlElement::w("p").with_child(OpenXmlElement::w("r").with_text("y"));
@@ -1513,8 +1513,8 @@ fn element_equality() {
 
 #[test]
 fn thumbnail_and_max_chars() {
-    use openxml::error::Error;
-    use openxml::packaging::OpenSettings;
+    use officexml::error::Error;
+    use officexml::packaging::OpenSettings;
 
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
@@ -1568,7 +1568,7 @@ fn excel_comments_include_vml() {
 
 #[test]
 fn word_track_changes_accept_reject() {
-    use openxml::wordprocessing::{
+    use officexml::wordprocessing::{
         deleted_text_run, inserted_text_run, paragraph, run, text,
     };
     let mut doc =
@@ -1629,12 +1629,12 @@ fn ppt_table_on_slide() {
 
 #[test]
 fn open_settings_mc_process() {
-    use openxml::file_format::FileFormatVersions;
-    use openxml::markup_compatibility::alternate_content_with;
-    use openxml::packaging::{
+    use officexml::file_format::FileFormatVersions;
+    use officexml::markup_compatibility::alternate_content_with;
+    use officexml::packaging::{
         MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
     };
-    use openxml::element::OpenXmlElement;
+    use officexml::element::OpenXmlElement;
 
     // Build a document body containing AlternateContent
     let ac = alternate_content_with(
@@ -1736,7 +1736,7 @@ fn word_embedded_package() {
 
 #[test]
 fn word_bookmarks() {
-    use openxml::wordprocessing::{bookmark_end, bookmark_start, collect_bookmarks, paragraph, run, text};
+    use officexml::wordprocessing::{bookmark_end, bookmark_start, collect_bookmarks, paragraph, run, text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let p = paragraph(vec![
@@ -1784,7 +1784,7 @@ fn ppt_handout_master() {
 
 #[test]
 fn word_page_setup_and_fields() {
-    use openxml::wordprocessing::{page_number_field, paragraph, run, section_properties_with_page};
+    use officexml::wordprocessing::{page_number_field, paragraph, run, section_properties_with_page};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -1820,7 +1820,7 @@ fn excel_page_setup() {
 
 #[test]
 fn stream_reader_paragraph_text() {
-    use openxml::element::OpenXmlStreamReader;
+    use officexml::element::OpenXmlStreamReader;
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part()
@@ -1840,7 +1840,7 @@ fn stream_reader_paragraph_text() {
 
 #[test]
 fn attribute_type_validation() {
-    use openxml::validation::{validate_attribute_value, AttributeType};
+    use officexml::validation::{validate_attribute_value, AttributeType};
     assert!(validate_attribute_value("/r", "val", "1", AttributeType::OnOff).is_none());
     assert!(validate_attribute_value("/r", "val", "maybe", AttributeType::OnOff).is_some());
     assert!(validate_attribute_value("/x", "id", "00AABBCC", AttributeType::HexBinary).is_none());
@@ -1906,12 +1906,12 @@ fn ppt_audio_media_part() {
         .add_audio_on_slide(0, b"ID3fakeaudio", "audio/mpeg", "mp3")
         .unwrap();
     assert!(ppt.package().opc().has_part(&info.uri));
-    assert_eq!(info.kind, openxml::MediaKind::Audio);
+    assert_eq!(info.kind, officexml::MediaKind::Audio);
 }
 
 #[test]
 fn word_anchor_hyperlink_and_recipients() {
-    use openxml::wordprocessing::{bookmark_end, bookmark_start, paragraph, run, text};
+    use officexml::wordprocessing::{bookmark_end, bookmark_start, paragraph, run, text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let link = doc.create_anchor_hyperlink("chap1", "Go to chapter");
@@ -1975,7 +1975,7 @@ fn word_page_number_footer() {
 
 #[test]
 fn word_doc_vars_and_toc() {
-    use openxml::wordprocessing::{paragraph, run, text, toc_field};
+    use officexml::wordprocessing::{paragraph, run, text, toc_field};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -2068,7 +2068,7 @@ fn excel_area_chart() {
 
 #[test]
 fn word_background_and_drop_cap() {
-    use openxml::wordprocessing::drop_cap_paragraph;
+    use officexml::wordprocessing::drop_cap_paragraph;
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part()
@@ -2226,7 +2226,7 @@ fn excel_row_outline() {
 
 #[test]
 fn word_even_odd_headers_caption_ruby() {
-    use openxml::wordprocessing::{caption_field, paragraph, ruby, run};
+    use officexml::wordprocessing::{caption_field, paragraph, ruby, run};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -2251,7 +2251,7 @@ fn word_even_odd_headers_caption_ruby() {
 
 #[test]
 fn word_omml_math() {
-    use openxml::wordprocessing::{math_paragraph, omml_fraction};
+    use officexml::wordprocessing::{math_paragraph, omml_fraction};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -2553,7 +2553,7 @@ fn excel_print_titles() {
 
 #[test]
 fn word_styles_and_web_extension() {
-    use openxml::wordprocessing::{paragraph, paragraph_properties, run, table_cell, table_row, table_with_style, text};
+    use officexml::wordprocessing::{paragraph, paragraph_properties, run, table_cell, table_row, table_with_style, text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let heading = paragraph(vec![
@@ -2690,7 +2690,7 @@ fn ppt_table_styles() {
 
 #[test]
 fn word_tabs_symbol_mirror() {
-    use openxml::wordprocessing::{paragraph_with_tabs, run, symbol, text};
+    use officexml::wordprocessing::{paragraph_with_tabs, run, symbol, text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let p = paragraph_with_tabs(
@@ -2785,7 +2785,7 @@ fn excel_hyperlink_sort_whole_dv() {
 
 #[test]
 fn word_spacing_shading() {
-    use openxml::wordprocessing::{paragraph_with_spacing, run_highlight, run, text};
+    use officexml::wordprocessing::{paragraph_with_spacing, run_highlight, run, text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let p = paragraph_with_spacing(Some(200), Some(200), Some(360), Some("FFFF00"), "Spaced");
@@ -2802,7 +2802,7 @@ fn word_spacing_shading() {
 
 #[test]
 fn word_page_break_and_indent() {
-    use openxml::wordprocessing::{
+    use officexml::wordprocessing::{
         page_break_run, paragraph, paragraph_indent, paragraph_properties, run, text,
     };
     let mut doc =
@@ -2857,7 +2857,7 @@ fn ppt_animation() {
 
 #[test]
 fn word_date_field_and_run_props() {
-    use openxml::wordprocessing::{
+    use officexml::wordprocessing::{
         author_field, date_field, paragraph, run, run_language, run_spacing, text, time_field,
     };
     let mut doc =
@@ -2919,7 +2919,7 @@ fn ppt_header_footer() {
 
 #[test]
 fn word_formatting_and_diagram() {
-    use openxml::wordprocessing::{
+    use officexml::wordprocessing::{
         caps, justification, paragraph, paragraph_borders, paragraph_properties, run, run_color,
         run_size, small_caps, strike, text, underline,
     };
@@ -3235,7 +3235,7 @@ fn semantic_unique_and_delete_part() {
         .set_document(simple_document(vec![paragraph_with_text("x")]));
     let img = doc
         .add_image(
-            openxml::packaging::ImageFormat::Png,
+            officexml::packaging::ImageFormat::Png,
             b"\x89PNG\r\n\x1a\n",
         )
         .unwrap();
@@ -3276,7 +3276,7 @@ fn semantic_unique_and_delete_part() {
 
 #[test]
 fn unique_attribute_validation_unit() {
-    use openxml::validation::{
+    use officexml::validation::{
         spreadsheet_unique_attribute_rules, validate_unique_attributes,
         word_unique_attribute_rules,
     };
@@ -3296,7 +3296,7 @@ fn unique_attribute_validation_unit() {
     assert!(errs.iter().any(|e| e.message.contains("duplicate")));
 
     // unique sheet names case-insensitive
-    let x = openxml::namespace::ns::SPREADSHEETML.uri;
+    let x = officexml::namespace::ns::SPREADSHEETML.uri;
     let wb = OpenXmlElement::new("x", x, "workbook").with_child(
         OpenXmlElement::new("x", x, "sheets")
             .with_child(
@@ -3373,7 +3373,7 @@ fn excel_border_style_and_cell_style() {
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
     wb.write_sheet_strings("S", &[vec!["a", "b"]]).unwrap();
     wb.add_styles_with_border().unwrap();
-    wb.set_cell_style("S", "A1", openxml::spreadsheet::STYLE_BORDER)
+    wb.set_cell_style("S", "A1", officexml::spreadsheet::STYLE_BORDER)
         .unwrap();
     let bytes = wb.to_bytes().unwrap();
     let opc = OpcPackage::open_bytes(&bytes).unwrap();
@@ -3436,7 +3436,7 @@ fn cell_value_and_paragraph_style() {
     wb.set_cell_value("S", "A1", "hello").unwrap();
     wb.set_cell_number("S", "B1", 42.5).unwrap();
     wb.add_styles_with_border().unwrap();
-    wb.set_cell_number_styled("S", "C1", 3.14, openxml::spreadsheet::STYLE_BORDER)
+    wb.set_cell_number_styled("S", "C1", 3.14, officexml::spreadsheet::STYLE_BORDER)
         .unwrap();
     let grid = wb.read_sheet_strings_by_name(Some("S")).unwrap();
     assert_eq!(grid[0][0], "hello");
@@ -3453,7 +3453,7 @@ fn cell_value_and_paragraph_style() {
     assert_eq!(c1.get_attribute("s"), Some("1"));
 
     // Word paragraph style helpers
-    use openxml::wordprocessing::{
+    use officexml::wordprocessing::{
         apply_paragraph_style, paragraph_with_style, paragraph_with_text,
     };
     let mut p = paragraph_with_text("x");
@@ -3581,7 +3581,7 @@ fn clear_range_and_formatted_run() {
         Some("keep")
     );
 
-    use openxml::wordprocessing::{paragraph_with_formatted_text, run_with_formatting};
+    use officexml::wordprocessing::{paragraph_with_formatted_text, run_with_formatting};
     let r = run_with_formatting("Hi", true, true, Some("FF0000"), Some(28), Some("single"), Some("yellow"));
     assert!(r.descendants().any(|e| e.local_name == "b"));
     assert!(r.descendants().any(|e| e.local_name == "i"));
@@ -3744,7 +3744,7 @@ fn move_sheet_and_bookmarks() {
     wb.move_sheet(2, 0).unwrap();
     assert_eq!(wb.sheet_names(), vec!["C", "A", "B"]);
 
-    use openxml::wordprocessing::{body, document, paragraph, with_bookmark};
+    use officexml::wordprocessing::{body, document, paragraph, with_bookmark};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let p = paragraph(with_bookmark("1", "Intro", vec![run(vec![text("x")])]));
@@ -4018,7 +4018,7 @@ fn list_headers_media_chart_counts() {
     assert_eq!(doc.list_headers().len(), 1);
     assert_eq!(doc.list_footers().len(), 1);
     let img = doc
-        .add_image(openxml::packaging::ImageFormat::Png, b"\x89PNG\r\n\x1a\n")
+        .add_image(officexml::packaging::ImageFormat::Png, b"\x89PNG\r\n\x1a\n")
         .unwrap();
     assert!(doc.package().opc().has_part(img.uri()));
     assert_eq!(doc.media_count(), 1);
@@ -4154,7 +4154,7 @@ fn tables_protection_hidden_sdt() {
     assert!(ppt.is_slide_hidden(1).unwrap());
     assert_eq!(ppt.hidden_slide_count().unwrap(), 1);
 
-    use openxml::wordprocessing::{body, document, paragraph_with_text, sdt_block};
+    use officexml::wordprocessing::{body, document, paragraph_with_text, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let sdt = sdt_block("tag1", "Alias", vec![paragraph_with_text("cc")]);
@@ -4443,7 +4443,7 @@ fn advanced_part_presence_flags() {
 
 #[test]
 fn list_clear_and_view_getters() {
-    use openxml::wordprocessing::comment;
+    use officexml::wordprocessing::comment;
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -4810,7 +4810,7 @@ fn clear_cf_sst_masters_custom_xml() {
 
 #[test]
 fn external_links_pivot_glossary_alt_charts() {
-    use openxml::packaging::AlternativeFormatImportType;
+    use officexml::packaging::AlternativeFormatImportType;
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -4852,7 +4852,7 @@ fn external_links_pivot_glossary_alt_charts() {
 
 #[test]
 fn sheet_format_bookmarks_tags_sync() {
-    use openxml::wordprocessing::{body, document, paragraph, run, text, with_bookmark};
+    use officexml::wordprocessing::{body, document, paragraph, run, text, with_bookmark};
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -5073,7 +5073,7 @@ fn clear_word_aux_excel_charts_pres_props() {
 
 #[test]
 fn clear_images_notes_charts() {
-    use openxml::packaging::ImageFormat;
+    use officexml::packaging::ImageFormat;
 
     let png = [
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
@@ -5111,7 +5111,7 @@ fn clear_images_notes_charts() {
 
 #[test]
 fn named_styles_alt_chunks_table_styles() {
-    use openxml::packaging::AlternativeFormatImportType;
+    use officexml::packaging::AlternativeFormatImportType;
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -5261,7 +5261,7 @@ fn defined_name_lookup_sheet_states_sections() {
 
 #[test]
 fn sheet_count_table_cols_hidden_slides_anchors() {
-    use openxml::wordprocessing::{body, document, paragraph, run, text};
+    use officexml::wordprocessing::{body, document, paragraph, run, text};
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -5494,7 +5494,7 @@ fn sheet_hidden_even_odd_clear_hf_indices() {
 
 #[test]
 fn hidden_rows_cols_merge_print_bookmarks_transitions() {
-    use openxml::wordprocessing::{bookmark_end, bookmark_start, paragraph, run, text};
+    use officexml::wordprocessing::{bookmark_end, bookmark_start, paragraph, run, text};
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -5720,7 +5720,7 @@ fn active_tab_zoom_dimension_mirror_size_flags() {
 
 #[test]
 fn title_creator_custom_property_helpers() {
-    use openxml::opc::CustomProperties;
+    use officexml::opc::CustomProperties;
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -6158,7 +6158,7 @@ fn metadata_modern_chart_shell_inventory() {
 
 #[test]
 fn schematron_subset_validation() {
-    use openxml::validation::{
+    use officexml::validation::{
         SCHEMATRON_EXTRACTED_REL_COUNT, SCHEMATRON_EXTRACTED_UNIQUE_COUNT,
         SCHEMATRON_NUMERIC_RANGE_COUNT, SCHEMATRON_PATTERN_COUNT,
         SCHEMATRON_STRING_LENGTH_COUNT, SCHEMATRON_TOTAL_SOURCE_RULES,
@@ -6200,8 +6200,8 @@ fn schematron_subset_validation() {
 
 #[test]
 fn schematron_attribute_constraints() {
-    use openxml::element::OpenXmlElement;
-    use openxml::validation::{
+    use officexml::element::OpenXmlElement;
+    use officexml::validation::{
         validate_schematron_constraints, validate_schematron_numeric_ranges,
         validate_schematron_patterns, validate_schematron_string_lengths,
     };
@@ -6746,7 +6746,7 @@ fn excel_ppt_web_extension_parity() {
 
 #[test]
 fn font_parts_inventory_all_docs() {
-    use openxml::namespace::content_type;
+    use officexml::namespace::content_type;
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part()
@@ -6811,7 +6811,7 @@ fn word_charts_and_diagram_inventory_parity() {
 
 #[test]
 fn excel_ppt_open_create_with_settings() {
-    use openxml::packaging::OpenSettings;
+    use officexml::packaging::OpenSettings;
     let dir = tempfile::tempdir().unwrap();
 
     let xlsx = dir.path().join("s.xlsx");
@@ -6953,7 +6953,7 @@ fn images_inventory_parity() {
         0xCF, 0xC0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xFE, 0xD4, 0xEF, 0x00, 0x00,
         0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
-    doc.add_image(openxml::ImageFormat::Png, png).unwrap();
+    doc.add_image(officexml::ImageFormat::Png, png).unwrap();
     assert!(doc.has_images());
     assert!(doc.image_count() >= 1);
     assert!(!doc.list_images().is_empty());
@@ -7208,7 +7208,7 @@ fn excel_ppt_add_chart_alias() {
 
 #[test]
 fn excel_ppt_add_image_media() {
-    use openxml::ImageFormat;
+    use officexml::ImageFormat;
     let png: &[u8] = &[
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
         0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
@@ -11147,7 +11147,7 @@ fn excel_chart_title_word_comments_ppt_transition_details() {
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part()
         .set_document(simple_document(vec![paragraph_with_text("c")]));
-    use openxml::wordprocessing::comment;
+    use officexml::wordprocessing::comment;
     doc.set_comments(vec![
         comment("0", "Alice", "A", "first"),
         comment("1", "Bob", "B", "second"),
@@ -11202,7 +11202,7 @@ fn excel_shared_formula_clear_word_sdt_ppt_anim_ids() {
 
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
-    use openxml::wordprocessing::{body, document, sdt_block};
+    use officexml::wordprocessing::{body, document, sdt_block};
     let sdt1 = sdt_block("t1", "Alias1", vec![paragraph_with_text("one")]);
     let sdt2 = sdt_block("t2", "Alias2", vec![paragraph_with_text("two")]);
     doc.add_main_document_part()
@@ -11239,7 +11239,7 @@ fn excel_array_clear_word_bookmark_rename_ppt_set_notes() {
 
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
-    use openxml::wordprocessing::{body, document, paragraph, with_bookmark};
+    use officexml::wordprocessing::{body, document, paragraph, with_bookmark};
     let p = paragraph(with_bookmark("1", "Intro", vec![run(vec![text("x")])]));
     doc.add_main_document_part()
         .set_document(document(vec![body(vec![p])]));
@@ -11844,7 +11844,7 @@ fn excel_remove_chart_word_biblio_ppt_comments_list() {
 
 #[test]
 fn excel_remove_drawing_link_word_altchunk() {
-    use openxml::packaging::AlternativeFormatImportType;
+    use officexml::packaging::AlternativeFormatImportType;
 
     // Excel: drawing via chart on sheet + external link remove
     let mut wb =
@@ -12098,7 +12098,7 @@ fn excel_remove_query_table_word_sdt_text() {
     assert!(wb.remove_query_table("QT1").unwrap());
     assert!(!wb.has_query_tables());
 
-    use openxml::wordprocessing::{body, document, sdt_block};
+    use officexml::wordprocessing::{body, document, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let sdt = sdt_block("mytag", "Alias", vec![paragraph_with_text("hello-cc")]);
@@ -12111,7 +12111,7 @@ fn excel_remove_query_table_word_sdt_text() {
 
 #[test]
 fn word_sdt_set_text_ppt_list_anim_effects() {
-    use openxml::wordprocessing::{body, document, sdt_block};
+    use officexml::wordprocessing::{body, document, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let sdt = sdt_block("t1", "A", vec![paragraph_with_text("old")]);
@@ -12277,7 +12277,7 @@ fn ppt_shape_hidden_word_bookmark_excel_views() {
     assert!(ppt.set_shape_hidden(0, sid, false).unwrap());
     assert!(!ppt.is_shape_hidden(0, sid).unwrap());
 
-    use openxml::wordprocessing::{bookmark_end, bookmark_start, paragraph, run, text};
+    use officexml::wordprocessing::{bookmark_end, bookmark_start, paragraph, run, text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(simple_document(vec![
@@ -13255,7 +13255,7 @@ fn excel_has_table_column_word_has_sdt() {
     assert!(wb.has_table_column("T1", "h1").unwrap());
     assert!(!wb.has_table_column("T1", "missing").unwrap());
 
-    use openxml::wordprocessing::{body, document, sdt_block};
+    use officexml::wordprocessing::{body, document, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     let sdt = sdt_block("tagX", "Alias", vec![paragraph_with_text("c")]);
@@ -13679,8 +13679,8 @@ fn rewrite_cleanups_sst_hyperlink_table_ref() {
 
 #[test]
 fn revision_inventory_and_has_companions() {
-    use openxml::element::OpenXmlElement;
-    use openxml::wordprocessing::{body, document, paragraph, run, text};
+    use officexml::element::OpenXmlElement;
+    use officexml::wordprocessing::{body, document, paragraph, run, text};
 
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
@@ -13817,7 +13817,7 @@ fn excel_remove_chart_rewrites_drawing_anchors() {
 
 #[test]
 fn word_content_control_alias_clear() {
-    use openxml::wordprocessing::{body, document, paragraph_with_text, sdt_block};
+    use officexml::wordprocessing::{body, document, paragraph_with_text, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -13894,7 +13894,7 @@ fn materialize_sst_named_styles_person() {
 
 #[test]
 fn word_content_control_kind_infos_ppt_clear_names() {
-    use openxml::wordprocessing::{body, document, paragraph_with_text, sdt_block_with_kind};
+    use officexml::wordprocessing::{body, document, paragraph_with_text, sdt_block_with_kind};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -14032,7 +14032,7 @@ fn excel_table_af_outlines_word_drawing() {
         .set_document(simple_document(vec![paragraph_with_text("d")]));
     // drawings may be empty
     assert_eq!(doc.drawing_count(), 0);
-    assert!(!doc.remove_drawing(&openxml::opc::PackUri::new("/word/drawings/drawing1.xml")).unwrap());
+    assert!(!doc.remove_drawing(&officexml::opc::PackUri::new("/word/drawings/drawing1.xml")).unwrap());
 }
 
 
@@ -14072,8 +14072,8 @@ fn remove_empty_sheets_and_embeddings() {
 
 #[test]
 fn complex_fields_and_hf_revisions() {
-    use openxml::element::OpenXmlElement;
-    use openxml::wordprocessing::{
+    use officexml::element::OpenXmlElement;
+    use officexml::wordprocessing::{
         body, complex_field_paragraph, document, paragraph, run, text,
     };
 
@@ -14106,7 +14106,7 @@ fn complex_fields_and_hf_revisions() {
 
 #[test]
 fn clear_complex_fields_ppt_empty_slides() {
-    use openxml::wordprocessing::{body, complex_field_paragraph, document};
+    use officexml::wordprocessing::{body, complex_field_paragraph, document};
 
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
@@ -14160,7 +14160,7 @@ fn excel_clear_all_cf_dv() {
 
 #[test]
 fn clear_all_merges_hl_fields() {
-    use openxml::wordprocessing::{body, complex_field_paragraph, document};
+    use officexml::wordprocessing::{body, complex_field_paragraph, document};
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -14186,7 +14186,7 @@ fn clear_all_merges_hl_fields() {
 
 #[test]
 fn clear_sparklines_freeze_bookmarks() {
-    use openxml::wordprocessing::{
+    use officexml::wordprocessing::{
         body, bookmark_end, bookmark_start, document, paragraph, run, text,
     };
 
@@ -14264,7 +14264,7 @@ fn rebuild_calc_unused_styles() {
 
 #[test]
 fn clear_all_tables_and_remove_media() {
-    use openxml::packaging::ImageFormat;
+    use officexml::packaging::ImageFormat;
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -14671,7 +14671,7 @@ fn people_and_odso_field_map_remove() {
 
 #[test]
 fn shared_formulas_and_complex_field_remove() {
-    use openxml::wordprocessing::{body, complex_field_paragraph, document};
+    use officexml::wordprocessing::{body, complex_field_paragraph, document};
 
     let mut wb =
         SpreadsheetDocument::create_in_memory(SpreadsheetDocumentType::Workbook).unwrap();
@@ -15033,7 +15033,7 @@ fn clear_companions_cf_style_alias_outline() {
     }
 
     // Word: content control alias set/clear
-    use openxml::wordprocessing::{body, document, paragraph_with_text, sdt_block};
+    use officexml::wordprocessing::{body, document, paragraph_with_text, sdt_block};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part().set_document(document(vec![body(vec![
@@ -15380,7 +15380,7 @@ fn dxf_para_style_use_timings() {
     let _ = wb.has_dxfs().unwrap();
     let _ = wb.list_dxfs().unwrap();
 
-    use openxml::wordprocessing::{body, document, paragraph_with_text};
+    use officexml::wordprocessing::{body, document, paragraph_with_text};
     let mut doc =
         WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
     doc.add_main_document_part()
@@ -17105,7 +17105,7 @@ fn residual_clear_aliases() {
     assert!(doc.clear_write_protection_ex().unwrap());
     doc.set_page_number_type_start(5).unwrap();
     assert!(doc.clear_page_number_start().unwrap());
-    use openxml::wordprocessing::comment;
+    use officexml::wordprocessing::comment;
     doc.set_comments(vec![comment("0", "Ann", "A", "hi")]).unwrap();
     assert!(doc
         .set_comment_attrs("0", Some("Bob"), Some("B"), Some("2020-01-01T00:00:00Z"))

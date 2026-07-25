@@ -1,12 +1,19 @@
 [package]
-name = "openxml"
+name = "officexml"
 version = "0.1.0"
 edition = "2021"
-description = "Rust port of the Open XML SDK — work with Word, Excel, and PowerPoint documents"
+description = "Rust Open XML SDK — create and edit Word, Excel, and PowerPoint documents; native SVG→PPTX shapes"
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/WangTianYou537/openxml"
+homepage = "https://github.com/WangTianYou537/openxml"
 keywords = ["openxml", "docx", "xlsx", "pptx", "office"]
-categories = ["encoding", "parser-implementations"]
+categories = ["encoding", "parser-implementations", "command-line-utilities"]
+publish = false
+
+[lib]
+name = "officexml"
+path = "src/lib.rs"
 
 [dependencies]
 zip = { version = "2", default-features = false, features = ["deflate"] }
@@ -27,8 +34,18 @@ ttf-parser = "0.25"
 tempfile = "3"
 
 [[bin]]
+name = "svg2pptx"
+path = "src/bin/svg2pptx.rs"
+
+[[bin]]
 name = "openxml-codegen"
 path = "src/bin/openxml-codegen.rs"
+required-features = ["codegen"]
+
+[features]
+default = []
+# Schema codegen binary (dev / contributors only).
+codegen = []
 
 [[example]]
 name = "create_word"
@@ -53,4 +70,3 @@ path = "examples/create_ppt_with_svg.rs"
 [[example]]
 name = "create_ppt_from_svg_shapes"
 path = "examples/create_ppt_from_svg_shapes.rs"
-

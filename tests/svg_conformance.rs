@@ -4,8 +4,8 @@
 //! converter's output is native `p:sp` geometry, so text and unsupported browser-only content
 //! must not leak a `p:txBody` or cause the conversion to panic.
 
-use openxml::element::{parse_element, write_element, OpenXmlElement};
-use openxml::presentation::svg_to_shapes::svg_to_shapes;
+use officexml::element::{parse_element, write_element, OpenXmlElement};
+use officexml::presentation::svg_to_shapes::svg_to_shapes;
 use std::fs;
 use std::path::{Path, PathBuf};
 

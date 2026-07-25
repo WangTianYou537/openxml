@@ -2,10 +2,10 @@ fn main() {
     // access via conversion
     let svg = std::fs::read("/tmp/noto-outline.svg").unwrap();
     let conv =
-        openxml::presentation::svg_to_shapes::svg_to_shapes(&svg, 6_000_000, 1_200_000, 2).unwrap();
+        officexml::presentation::svg_to_shapes::svg_to_shapes(&svg, 6_000_000, 1_200_000, 2).unwrap();
     println!("shapes {}", conv.shapes.len());
     for (i, sp) in conv.shapes.iter().enumerate() {
-        let xml = openxml::element::write_element(sp).unwrap();
+        let xml = officexml::element::write_element(sp).unwrap();
         let s = String::from_utf8_lossy(&xml);
         // extract off/ext
         let off_x = between(&s, "x=\"", "\"");

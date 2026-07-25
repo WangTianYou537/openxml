@@ -1,8 +1,8 @@
 //! Create a PowerPoint presentation with pure SVG (no PNG fallback), matching Office.
 
-use openxml::packaging::{PresentationDocument, PresentationDocumentType};
+use officexml::packaging::{PresentationDocument, PresentationDocumentType};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let out = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "/opt/wp/openxml/slide-1.pptx".into());

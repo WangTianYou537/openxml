@@ -1,9 +1,9 @@
 //! Create a simple Word document.
 
-use openxml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
-use openxml::wordprocessing::{body, document, paragraph, paragraph_with_bold_text, run, text};
+use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+use officexml::wordprocessing::{body, document, paragraph, paragraph_with_bold_text, run, text};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "hello.docx".into());

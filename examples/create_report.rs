@@ -1,11 +1,11 @@
 //! Create a Word document with a table, header, and hyperlink.
 
-use openxml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
-use openxml::wordprocessing::{
+use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+use officexml::wordprocessing::{
     body, document, paragraph, paragraph_with_text, run, table_from_strings, text,
 };
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "report.docx".into());

@@ -1,8 +1,8 @@
 //! Create a simple PowerPoint presentation with two slides.
 
-use openxml::packaging::{PresentationDocument, PresentationDocumentType};
+use officexml::packaging::{PresentationDocument, PresentationDocumentType};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "/tmp/hello.pptx".into());

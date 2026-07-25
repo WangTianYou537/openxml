@@ -96,10 +96,10 @@ generated/         由 openxml-codegen 从 C# data/*.json 生成（155 schema �
 ### 创建 Word 文档
 
 ```rust
-use openxml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
-use openxml::wordprocessing::{body, document, paragraph, run, text};
+use officexml::packaging::{WordprocessingDocument, WordprocessingDocumentType};
+use officexml::wordprocessing::{body, document, paragraph, run, text};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let mut doc = WordprocessingDocument::create(
         "hello.docx",
         WordprocessingDocumentType::Document,
@@ -118,9 +118,9 @@ fn main() -> openxml::Result<()> {
 ### 读取段落
 
 ```rust
-use openxml::packaging::WordprocessingDocument;
+use officexml::packaging::WordprocessingDocument;
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let mut doc = WordprocessingDocument::open("hello.docx", false)?;
     for p in doc.paragraph_texts()? {
         println!("{p}");
@@ -132,9 +132,9 @@ fn main() -> openxml::Result<()> {
 ### 创建 Excel 工作簿
 
 ```rust
-use openxml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
+use officexml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let mut wb = SpreadsheetDocument::create(
         "grid.xlsx",
         SpreadsheetDocumentType::Workbook,
@@ -151,9 +151,9 @@ fn main() -> openxml::Result<()> {
 ### 创建 PowerPoint
 
 ```rust
-use openxml::packaging::{PresentationDocument, PresentationDocumentType};
+use officexml::packaging::{PresentationDocument, PresentationDocumentType};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let mut ppt = PresentationDocument::create(
         "deck.pptx",
         PresentationDocumentType::Presentation,
@@ -197,7 +197,7 @@ PresentationDocument::create_simple("out.pptx", "Hello")?;
 ### 4.2 文档主体
 
 ```rust
-use openxml::wordprocessing::*;
+use officexml::wordprocessing::*;
 
 // 构建 DOM
 let doc_el = document(vec![body(vec![
@@ -222,7 +222,7 @@ doc.replace_text("普通", "正式")?;
 let texts = doc.paragraph_texts()?;
 ```
 
-常用构造函数（`openxml::wordprocessing`）：
+常用构造函数（`officexml::wordprocessing`）：
 
 - 结构：`document`, `body`, `paragraph`, `run`, `text`, `section_properties`
 - 样式：`bold`, `italic`, `run_properties`, `paragraph_properties`
@@ -235,7 +235,7 @@ let texts = doc.paragraph_texts()?;
 生成层还提供完整 WordprocessingML 元素工厂，例如：
 
 ```rust
-use openxml::generated::wordprocessingml_2006_main as wml;
+use officexml::generated::wordprocessingml_2006_main as wml;
 
 let b = wml::bold_val("1");
 let p = wml::paragraph_with_rsid_paragraph_addition(wml::paragraph(vec![]), "00AABBCC");
@@ -259,7 +259,7 @@ doc.set_display_horizontal_drawing_grid_every(2)?;
 doc.set_style_lock_qf_set(true)?;
 doc.set_save_forms_data(true)?;
 
-let img = doc.add_image(openxml::ImageFormat::Png, png_bytes)?;
+let img = doc.add_image(officexml::ImageFormat::Png, png_bytes)?;
 // img.relationship_id(), img.uri()
 
 let link = doc.create_hyperlink("https://example.com", "示例")?;
@@ -274,7 +274,7 @@ doc.add_endnote("1", "尾注正文")?;
 
 // 嵌入 HTML 片段
 doc.add_alt_chunk(
-    openxml::AlternativeFormatImportType::Html,
+    officexml::AlternativeFormatImportType::Html,
     b"<html><body><p>chunk</p></body></html>",
 )?;
 ```
@@ -332,7 +332,7 @@ assert!(doc.has_web_extensions());
 doc.clear_web_extensions()?;
 
 // 嵌入字体部件
-doc.add_font_part(font_bytes, openxml::namespace::content_type::FONT_TTF, "ttf")?;
+doc.add_font_part(font_bytes, officexml::namespace::content_type::FONT_TTF, "ttf")?;
 assert!(doc.has_font_parts());
 doc.clear_font_parts()?;
 
@@ -382,7 +382,7 @@ let ppt2 = PresentationDocument::from_flat_opc(xml.as_bytes())?;
 ### 5.1 打开 / 创建 / 保存
 
 ```rust
-use openxml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
+use officexml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
 
 let mut wb = SpreadsheetDocument::create("book.xlsx", SpreadsheetDocumentType::Workbook)?;
 // 或 create_in_memory / open / open_bytes
@@ -453,7 +453,7 @@ let (img_uri, drawing_uri) = wb.add_image_on_sheet(
 )?;
 ```
 
-底层锚点构造：`two_cell_anchor_chart`、`one_cell_anchor_picture`、`absolute_anchor_picture`、`two_cell_anchor_picture`（`openxml::spreadsheet`）。
+底层锚点构造：`two_cell_anchor_chart`、`one_cell_anchor_picture`、`absolute_anchor_picture`、`two_cell_anchor_picture`（`officexml::spreadsheet`）。
 
 ### 5.5 批注
 
@@ -571,8 +571,8 @@ assert!(ppt.clear_last_view()?);
 ## 6. PowerPoint（.pptx）
 
 ```rust
-use openxml::packaging::{PresentationDocument, PresentationDocumentType};
-use openxml::presentation::SLIDE_SIZE_16_9;
+use officexml::packaging::{PresentationDocument, PresentationDocumentType};
+use officexml::presentation::SLIDE_SIZE_16_9;
 
 let mut ppt = PresentationDocument::create(
     "deck.pptx",
@@ -586,7 +586,7 @@ ppt.add_blank_master_with_layout()?;
 ppt.add_slide_with_text("标题页")?;
 
 // 关联默认版式
-ppt.add_slide_with_layout(openxml::presentation::slide_with_text("内容页"))?;
+ppt.add_slide_with_layout(officexml::presentation::slide_with_text("内容页"))?;
 
 // 演讲者备注
 ppt.add_notes_to_slide(0, "讲稿…")?;
@@ -626,8 +626,8 @@ ppt.save()?;
 ### OpenXmlElement
 
 ```rust
-use openxml::element::{parse_element, write_element, OpenXmlElement};
-use openxml::simple_types::OnOffValue;
+use officexml::element::{parse_element, write_element, OpenXmlElement};
+use officexml::simple_types::OnOffValue;
 
 let mut el = OpenXmlElement::w("b"); // WordprocessingML 命名空间
 el.set_simple_attribute_qname("w:val", OnOffValue(true));
@@ -645,15 +645,15 @@ let again = parse_element(&xml)?;
 - 简单类型：`set_simple_attribute[_qname]`、`get_simple_attribute[_qname]`
 - 文本：`with_text`、`inner_text`、`text_value`
 
-### 简单类型（`openxml::simple_types`）
+### 简单类型（`officexml::simple_types`）
 
 `StringValue`、`OnOffValue`、`BooleanValue`、`Int32Value`、`UInt32Value`、`Int64Value`、`IntegerValue`、`HexBinaryValue`、`DoubleValue`，均实现 `OpenXmlSimpleType`。
 
 生成的 schema 枚举（如 `HighlightColorValues`）同样实现该 trait：
 
 ```rust
-use openxml::generated::wordprocessingml_2006_main::HighlightColorValues;
-use openxml::simple_types::OpenXmlSimpleType;
+use officexml::generated::wordprocessingml_2006_main::HighlightColorValues;
+use officexml::simple_types::OpenXmlSimpleType;
 
 let red = HighlightColorValues::from_str("red").unwrap();
 assert_eq!(red.as_str(), "red");
@@ -666,7 +666,7 @@ assert_eq!(red.as_str(), "red");
 ### 核心属性
 
 ```rust
-use openxml::opc::PackageProperties;
+use officexml::opc::PackageProperties;
 
 let mut props = PackageProperties::new();
 props.title = Some("报告".into());
@@ -678,7 +678,7 @@ let props = doc.package_properties()?;
 ### 低层 OPC
 
 ```rust
-use openxml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
+use officexml::opc::{OpcPackage, PackUri, RelationshipTargetMode};
 
 let mut pkg = OpcPackage::create();
 pkg.set_part("/word/document.xml", content_type, bytes);
@@ -689,7 +689,7 @@ let zip = pkg.to_bytes()?;
 ### Flat OPC
 
 ```rust
-use openxml::opc::{to_flat_opc, from_flat_opc, progid};
+use officexml::opc::{to_flat_opc, from_flat_opc, progid};
 
 let flat = to_flat_opc(doc.package().opc(), Some(progid::WORD))?;
 let pkg = from_flat_opc(&flat)?;
@@ -700,9 +700,9 @@ let pkg = from_flat_opc(&flat)?;
 ## 9. Markup Compatibility
 
 ```rust
-use openxml::markup_compatibility::*;
-use openxml::file_format::FileFormatVersions;
-use openxml::element::OpenXmlElement;
+use officexml::markup_compatibility::*;
+use officexml::file_format::FileFormatVersions;
+use officexml::element::OpenXmlElement;
 
 // AlternateContent
 let ac = alternate_content_with(
@@ -725,7 +725,7 @@ process_markup_compatibility_for_version(&mut root, FileFormatVersions::OFFICE20
 Strict → Transitional：
 
 ```rust
-use openxml::namespace_rewrite::{
+use officexml::namespace_rewrite::{
     rewrite_package_to_transitional,
     to_transitional_namespace,
     rewrite_element_to_transitional,
@@ -740,7 +740,7 @@ doc.rewrite_strict_to_transitional()?;
 ## 10. 校验
 
 ```rust
-use openxml::validation::{
+use officexml::validation::{
     validate_word_document,
     validate_word_document_full,
     validate_particle,
@@ -764,7 +764,7 @@ let errs = doc.validate_schematron()?;   // Schematron 可抽取子集（含属�
 // Excel / PPT 同样提供 validate_relationships / validate_schematron / validate_package
 
 // 手写 / 生成 particle
-let p = openxml::generated::wordprocessingml_2006_main::particle_for_class("Document")
+let p = officexml::generated::wordprocessingml_2006_main::particle_for_class("Document")
     .unwrap();
 let errs = validate_particle(&document_element, &p, "w:document");
 
@@ -794,7 +794,7 @@ Schematron 可抽取子集覆盖：
 部件约束（生成）：
 
 ```rust
-use openxml::generated::parts;
+use officexml::generated::parts;
 
 assert!(parts::is_allowed_child("MainDocumentPart", "HeaderPart"));
 assert!(parts::allows_multiple("MainDocumentPart", "HeaderPart"));
@@ -914,7 +914,7 @@ ppt.clear_shapes(0)?;
 ## 14. 错误处理
 
 ```rust
-use openxml::{Error, Result};
+use officexml::{Error, Result};
 
 fn demo() -> Result<()> {
     let doc = WordprocessingDocument::open("missing.docx", false);
@@ -1054,7 +1054,7 @@ ppt.clear_all_transitions()?;
 ### Lazy package open
 
 ```rust
-use openxml::opc::OpcPackage;
+use officexml::opc::OpcPackage;
 let pkg = OpcPackage::open_bytes_lazy(&bytes)?;
 // Parts decompress on first `get_part` / `load_part`
 assert!(pkg.has_lazy_parts() || !pkg.has_lazy_parts());
@@ -1063,10 +1063,10 @@ assert!(pkg.has_lazy_parts() || !pkg.has_lazy_parts());
 ### Linq-style element queries
 
 ```rust
-use openxml::element::OpenXmlElement;
+use officexml::element::OpenXmlElement;
 // after you have a document root element:
 // root.query().named("p").attr_eq("rsidR", "00AB").count();
-// openxml::element::descendants_of(&root, "t").count();
+// officexml::element::descendants_of(&root, "t").count();
 ```
 
 ### Schematron extractable subset
@@ -1080,7 +1080,7 @@ same-element attr comparisons, fixed booleans, and **cross-part** Index-of / cou
 ### Typed element views
 
 ```rust
-use openxml::element::{Document, Paragraph, Table, Worksheet, Cell, Slide, Style, Hyperlink, Comment, Header, Notes};
+use officexml::element::{Document, Paragraph, Table, Worksheet, Cell, Slide, Style, Hyperlink, Comment, Header, Notes};
 let doc = Document::with_paragraphs([Paragraph::with_text("hi")]);
 let table = Table::from_strings([["a", "b"], ["c", "d"]]);
 let mut ws = Worksheet::new();
@@ -1092,7 +1092,7 @@ slide.append_text_box("title");
 ### Features bag
 
 ```rust
-use openxml::{FeatureCollection, ParagraphIdGenerator};
+use officexml::{FeatureCollection, ParagraphIdGenerator};
 // On OpenXmlPackage:
 // doc.package_mut().features_mut().set(ParagraphIdGenerator::new());
 // let id = doc.package_mut().features_mut().get_mut::<ParagraphIdGenerator>().unwrap().next_id();
@@ -1101,7 +1101,7 @@ use openxml::{FeatureCollection, ParagraphIdGenerator};
 ### Digital signature structure + digests
 
 ```rust
-use openxml::validation::{validate_package, validate_digital_signatures, validate_signature_digests, build_signature_xml};
+use officexml::validation::{validate_package, validate_digital_signatures, validate_signature_digests, build_signature_xml};
 // validate_package runs structure + Reference digest checks.
 // build_signature_xml / build_signed_signature_xml (RSA-SHA256 SignatureValue over SignedInfo).
 // verify_signature_value(public_pem) checks SignatureValue.

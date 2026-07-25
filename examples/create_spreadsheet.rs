@@ -1,8 +1,8 @@
 //! Create a multi-sheet workbook with shared strings, merges, and a formula.
 
-use openxml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
+use officexml::packaging::{SpreadsheetDocument, SpreadsheetDocumentType};
 
-fn main() -> openxml::Result<()> {
+fn main() -> officexml::Result<()> {
     let path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "report.xlsx".into());
