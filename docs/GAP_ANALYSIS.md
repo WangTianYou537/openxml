@@ -65,7 +65,7 @@
 | 缺口 | C# 位置 | 说明 | 优先级 |
 |------|---------|------|--------|
 | **强类型元素类** | 生成 `Paragraph : OpenXmlCompositeElement` 等 | Rust 仅有 `paragraph()` 工厂返回通用 DOM，无 `struct Paragraph` 属性访问器 | 高（API 体验） |
-| **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | ✅ `OpenXmlMiscKind` + **`OpenXmlUnknownMarker` / `is_unknown`** | 🟡 Leaf 仍合并 |
+| **Leaf / Composite / Misc 节点分类** | `OpenXmlLeafElement`, `OpenXmlMiscNode`, `OpenXmlUnknownElement` | ✅ `OpenXmlMiscKind` + **`is_leaf_element` / `is_composite_element`** + Unknown marker | 🟡 非独立类型 |
 | **OpenXmlReader / OpenXmlWriter 流式** | `OpenXmlReader.cs`, `OpenXmlPartReader` | ✅ Stream/Part/Dom Reader + PartWriter | 🟡 |
 | **OpenXmlLoadMode** | Full / Lazy（默认缓存 OuterXml） | ✅ `OpenXmlLoadMode` + ElementContext | 🟡 |
 | **MaxCharactersInPart** | OpenSettings DoS 防护 | ✅ 有 DoS 防护 | ✅ |

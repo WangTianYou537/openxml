@@ -790,6 +790,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationError::{description,xml_path,with_id}` + `OpenXmlAttribute` Display + reader `attribute_count`
 - [x] `FileFormatVersions::{any,ensure_supported,office_year}` + `OpenXmlElement::child_elements`
 - [x] `OpenXmlElementContext` XmlnsUri/XmlnsPrefix/LazySteps + `OpenXmlSimpleType::{has_value,is_in_version}`
+- [x] `OpenXmlElement::{is_leaf_element,is_leaf_text_element,is_composite_element,xml_space,set_xml_space,preserves_space}`
 
 **Still intentionally deferred / partial:**
 

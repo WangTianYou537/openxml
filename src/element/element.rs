@@ -299,6 +299,41 @@ impl OpenXmlElement {
         self.misc_kind != OpenXmlMiscKind::None
     }
 
+    /// Leaf-like element: ordinary element with no element children
+    /// (C# `OpenXmlLeafElement` / `OpenXmlLeafTextElement` shell).
+    ///
+    /// Misc nodes are not leaves in this sense.
+    pub fn is_leaf_element(&self) -> bool {
+        !self.is_misc_node() && !self.children.iter().any(|c| !c.is_misc_node())
+    }
+
+    /// Leaf text element: leaf with text content (C# `OpenXmlLeafTextElement` shell).
+    pub fn is_leaf_text_element(&self) -> bool {
+        self.is_leaf_element() && self.text.is_some()
+    }
+
+    /// Composite element: has at least one element child (C# `OpenXmlCompositeElement` shell).
+    pub fn is_composite_element(&self) -> bool {
+        !self.is_misc_node() && self.children.iter().any(|c| !c.is_misc_node())
+    }
+
+    /// `xml:space` attribute value when present.
+    pub fn xml_space(&self) -> Option<&str> {
+        self.get_attribute_ns("space", "http://www.w3.org/XML/1998/namespace")
+            .or_else(|| self.get_attribute_qname("xml:space"))
+            .or_else(|| self.get_attribute("space"))
+    }
+
+    /// Set `xml:space` (typically `"preserve"` or `"default"`).
+    pub fn set_xml_space(&mut self, value: impl Into<String>) {
+        self.set_attribute_ns("xml", "http://www.w3.org/XML/1998/namespace", "space", value);
+    }
+
+    /// Whether `xml:space="preserve"` is set.
+    pub fn preserves_space(&self) -> bool {
+        self.xml_space() == Some("preserve")
+    }
+
     pub fn misc_kind(&self) -> OpenXmlMiscKind {
         self.misc_kind
     }
@@ -1505,6 +1540,20 @@ mod element_api_parity_tests {
         assert_eq!(a.to_string(), "w:val=\"1\"");
         assert!(a.matches("val", "http://schemas.openxmlformats.org/wordprocessingml/2006/main"));
         assert_eq!(a.xml_qualified_name().local_name, "val");
+    }
+
+    #[test]
+    fn leaf_composite_and_xml_space() {
+        let leaf = OpenXmlElement::w("t").with_text("hi");
+        assert!(leaf.is_leaf_element());
+        assert!(leaf.is_leaf_text_element());
+        assert!(!leaf.is_composite_element());
+        let mut p = OpenXmlElement::w("p").with_child(OpenXmlElement::w("r"));
+        assert!(p.is_composite_element());
+        assert!(!p.is_leaf_element());
+        p.set_xml_space("preserve");
+        assert!(p.preserves_space());
+        assert_eq!(p.xml_space(), Some("preserve"));
     }
 
     #[test]
