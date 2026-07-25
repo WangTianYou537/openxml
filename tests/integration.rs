@@ -3277,6 +3277,33 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn typed_part_add_styles() {
+    use officexml::element::OpenXmlElement;
+    use officexml::namespace::ns;
+    use officexml::packaging::{add_typed_part_element, find_typed_parts};
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    let main = doc.main_document_part().unwrap().uri().clone();
+    let styles = OpenXmlElement::new("w", ns::WORDPROCESSINGML.uri, "styles")
+        .with_ns_decl("w", ns::WORDPROCESSINGML.uri);
+    let part = add_typed_part_element(
+        doc.package_mut(),
+        &main,
+        Some("MainDocumentPart"),
+        "StyleDefinitionsPart",
+        &styles,
+    )
+    .unwrap();
+    assert!(doc.package().opc().has_part(&part.uri));
+    let found = find_typed_parts(doc.package(), Some(&main), "StyleDefinitionsPart").unwrap();
+    assert_eq!(found.len(), 1);
+}
+
 #[test]
 fn part_uri_helper_and_related_parts() {
     use officexml::namespace::{content_type, rel};

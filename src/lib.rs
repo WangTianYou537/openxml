@@ -74,10 +74,11 @@ pub use opc::{
     ExtendedProperties, MediaKind, MediaPartInfo, PackageProperties, PartUriHelper, RelatedPart,
 };
 pub use packaging::{
-    default_settings, default_styles, footer, footer_reference, header, header_reference,
-    hyperlink, AlternativeFormatImportType, DocumentSettingsPart, ImageFormat, ImagePart,
-    MainDocumentPart, MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings,
-    OpenSettings, OpenXmlPackage, PresentationDocument, PresentationDocumentType, SlideInfo,
-    SlideLayoutInfo, SlideMasterInfo, SpreadsheetDocument, SpreadsheetDocumentType,
-    StyleDefinitionsPart, WordprocessingDocument, WordprocessingDocumentType, WorksheetInfo,
+    add_typed_part, add_typed_part_element, default_settings, default_styles, find_typed_parts,
+    footer, footer_reference, header, header_reference, hyperlink, AlternativeFormatImportType,
+    DocumentSettingsPart, ImageFormat, ImagePart, MainDocumentPart,
+    MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
+    OpenXmlPackage, PresentationDocument, PresentationDocumentType, SlideInfo, SlideLayoutInfo,
+    SlideMasterInfo, SpreadsheetDocument, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart,
+    WordprocessingDocument, WordprocessingDocumentType, WorksheetInfo,
 };

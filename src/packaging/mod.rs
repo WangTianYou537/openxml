@@ -7,6 +7,7 @@ mod open_xml_part;
 mod parts;
 mod presentation_document;
 mod spreadsheet_document;
+mod typed_part;
 mod wordprocessing_document;
 
 pub use open_xml_package::{
@@ -25,5 +26,9 @@ pub use presentation_document::{
 };
 pub use spreadsheet_document::{
     SpreadsheetDocument, SpreadsheetDocumentType, WorksheetInfo,
+};
+pub use typed_part::{
+    add_typed_part, add_typed_part_element, delete_typed_part_by_id, find_typed_parts,
+    find_typed_parts_recursive, open_typed_part, part_info_for_relationship, TypedPart,
 };
 pub use wordprocessing_document::{WordprocessingDocument, WordprocessingDocumentType};
