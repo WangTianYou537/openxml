@@ -16,11 +16,22 @@ use crate::packaging::{
 };
 
 /// Settings / facade for package and element validation (C# `OpenXmlValidator`).
-#[derive(Debug, Clone)]
 pub struct OpenXmlValidator {
     file_format: FileFormatVersions,
     /// Maximum errors to return. `0` means no limit (C# default is 1000; `0` = unlimited).
     max_number_of_errors: usize,
+    /// Optional per-error callback (C# `ValidationErrorEventArgs` subscriber).
+    error_callback: Option<Box<dyn FnMut(&ValidationError) + Send>>,
+}
+
+impl std::fmt::Debug for OpenXmlValidator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenXmlValidator")
+            .field("file_format", &self.file_format)
+            .field("max_number_of_errors", &self.max_number_of_errors)
+            .field("has_error_callback", &self.error_callback.is_some())
+            .finish()
+    }
 }
 
 impl Default for OpenXmlValidator {
@@ -35,6 +46,7 @@ impl OpenXmlValidator {
         Self {
             file_format: FileFormatVersions::OFFICE2007,
             max_number_of_errors: 1000,
+            error_callback: None,
         }
     }
 
@@ -42,6 +54,7 @@ impl OpenXmlValidator {
         Self {
             file_format,
             max_number_of_errors: 1000,
+            error_callback: None,
         }
     }
 
@@ -53,7 +66,7 @@ impl OpenXmlValidator {
         self.max_number_of_errors
     }
 
-    /// Set max errors (`0` = unlimited). Panics if called with negative — use `usize`.
+    /// Set max errors (`0` = unlimited).
     pub fn set_max_number_of_errors(&mut self, value: usize) {
         self.max_number_of_errors = value;
     }
@@ -63,30 +76,51 @@ impl OpenXmlValidator {
         self
     }
 
-    fn cap(&self, mut errors: Vec<ValidationError>) -> Vec<ValidationError> {
+    /// Register a callback invoked for each validation error before the list is returned
+    /// (C# validation error event).
+    pub fn on_validation_error<F>(mut self, callback: F) -> Self
+    where
+        F: FnMut(&ValidationError) + Send + 'static,
+    {
+        self.error_callback = Some(Box::new(callback));
+        self
+    }
+
+    /// Clear any error callback.
+    pub fn clear_validation_error_callback(&mut self) {
+        self.error_callback = None;
+    }
+
+    fn cap(&mut self, mut errors: Vec<ValidationError>) -> Vec<ValidationError> {
         if self.max_number_of_errors > 0 && errors.len() > self.max_number_of_errors {
             errors.truncate(self.max_number_of_errors);
+        }
+        if let Some(cb) = self.error_callback.as_mut() {
+            for e in &errors {
+                cb(e);
+            }
         }
         errors
     }
 
+
     /// Validate OPC structure + part constraints (no full DOM schema pass).
-    pub fn validate_package(&self, package: &OpcPackage) -> Vec<ValidationError> {
-        let mut errors = validate_package(package, true);
+    pub fn validate_package(&mut self, package: &OpcPackage) -> Vec<ValidationError> {
+        let errors = validate_package(package, true);
         let _ = self.file_format;
         self.cap(errors)
     }
 
     /// Part-constraint walk only (C# `PackageValidator` subset).
     pub fn validate_package_constraints_only(
-        &self,
+        &mut self,
         package: &OpcPackage,
     ) -> Vec<ValidationError> {
         self.cap(validate_package_constraints(package))
     }
 
     /// Validate a WordprocessingML document element tree (rejects misc/unknown roots).
-    pub fn validate_element(&self, element: &OpenXmlElement) -> Result<Vec<ValidationError>> {
+    pub fn validate_element(&mut self, element: &OpenXmlElement) -> Result<Vec<ValidationError>> {
         if element.is_misc_node() {
             return Err(Error::Validation(
                 "OpenXmlValidator cannot validate OpenXmlMiscNode".into(),
@@ -118,7 +152,7 @@ impl OpenXmlValidator {
     }
 
     /// Validate a [`WordprocessingDocument`]: package + main DOM full rules.
-    pub fn validate_word(&self, doc: &mut WordprocessingDocument) -> Result<Vec<ValidationError>> {
+    pub fn validate_word(&mut self, doc: &mut WordprocessingDocument) -> Result<Vec<ValidationError>> {
         let mut errors = doc.validate_package()?;
         errors.extend(doc.validate_full()?);
         Ok(self.cap(errors))
@@ -126,7 +160,7 @@ impl OpenXmlValidator {
 
     /// Validate a [`SpreadsheetDocument`]: package structure (+ constraints).
     pub fn validate_spreadsheet(
-        &self,
+        &mut self,
         doc: &SpreadsheetDocument,
     ) -> Result<Vec<ValidationError>> {
         Ok(self.cap(doc.validate_package()?))
@@ -134,7 +168,7 @@ impl OpenXmlValidator {
 
     /// Validate a [`PresentationDocument`]: package structure (+ constraints).
     pub fn validate_presentation(
-        &self,
+        &mut self,
         doc: &PresentationDocument,
     ) -> Result<Vec<ValidationError>> {
         Ok(self.cap(doc.validate_package()?))
@@ -152,20 +186,20 @@ mod tests {
 
     #[test]
     fn rejects_unknown_element() {
-        let v = OpenXmlValidator::new();
+        let mut v = OpenXmlValidator::new();
         let el = OpenXmlElement::unknown("ex", "foo", "urn:x");
         assert!(v.validate_element(&el).is_err());
     }
 
     #[test]
     fn rejects_misc() {
-        let v = OpenXmlValidator::new();
+        let mut v = OpenXmlValidator::new();
         assert!(v.validate_element(&OpenXmlElement::comment("x")).is_err());
     }
 
     #[test]
     fn validates_word_document_ok() {
-        let v = OpenXmlValidator::new().with_max_number_of_errors(10);
+        let mut v = OpenXmlValidator::new().with_max_number_of_errors(10);
         let doc = document(vec![body(vec![paragraph(vec![run(vec![text("hi")])])])]);
         let errs = v.validate_element(&doc).unwrap();
         assert!(errs.is_empty(), "{errs:?}");
@@ -173,7 +207,7 @@ mod tests {
 
     #[test]
     fn caps_errors() {
-        let v = OpenXmlValidator::new().with_max_number_of_errors(1);
+        let mut v = OpenXmlValidator::new().with_max_number_of_errors(1);
         // Missing body → at least one error; dual body → more.
         let doc = document(vec![]);
         let errs = v.validate_element(&doc).unwrap();
@@ -194,8 +228,23 @@ mod tests {
             &uri,
             RelationshipTargetMode::Internal,
         );
-        let errs = OpenXmlValidator::new().validate_package(&pkg);
+        let errs = OpenXmlValidator::new().validate_package(&pkg); // new() is mut via temporary
         assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn validation_error_callback_fires() {
+        use std::sync::{Arc, Mutex};
+        let seen = Arc::new(Mutex::new(0usize));
+        let seen2 = Arc::clone(&seen);
+        let mut v = OpenXmlValidator::new()
+            .with_max_number_of_errors(10)
+            .on_validation_error(move |_e| {
+                *seen2.lock().unwrap() += 1;
+            });
+        let doc = document(vec![]);
+        let _ = v.validate_element(&doc).unwrap();
+        assert!(*seen.lock().unwrap() >= 1);
     }
 
     #[test]

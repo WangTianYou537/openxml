@@ -770,6 +770,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `validate_alternate_content` (C# AlternateContentValidator structure rules) + wired into OpenXmlValidator::validate_element
 - [x] `validate_mc_attributes` (C# CompatibilityRuleAttributesValidator: Ignorable/Preserve*/ProcessContent/MustUnderstand)
 - [x] `ValidationError::id` / `error_type` (C# ValidationErrorInfo.Id / ErrorType subset)
+- [x] `OpenXmlValidator::on_validation_error` (ValidationErrorEventArgs shell) + `OpenXmlElement::has_attributes`
 
 **Still intentionally deferred / partial:**
 

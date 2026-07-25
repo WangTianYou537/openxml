@@ -477,7 +477,12 @@ impl OpenXmlElement {
     }
 
     /// Remove an attribute by local name (any prefix).
-    pub fn remove_attribute(&mut self, local_name: &str) -> Option<OpenXmlAttribute> {
+    /// Whether this element has any attributes (C# `HasAttributes`).
+    pub fn has_attributes(&self) -> bool {
+        !self.attributes.is_empty()
+    }
+
+        pub fn remove_attribute(&mut self, local_name: &str) -> Option<OpenXmlAttribute> {
         if let Some(i) = self.attributes.iter().position(|a| a.local_name == local_name) {
             Some(self.attributes.remove(i))
         } else {
@@ -1280,5 +1285,9 @@ mod element_api_parity_tests {
         );
         assert!(el.remove_namespace_declaration("r"));
         assert!(!el.has_namespace_declaration("r"));
+
+        assert!(el.has_attributes());
+        el.clear_all_attributes();
+        assert!(!el.has_attributes());
     }
 }
