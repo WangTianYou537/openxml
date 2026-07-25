@@ -164,6 +164,40 @@ impl PartConstraintFeature {
             .map(|r| r.part_name)
             .collect()
     }
+
+    /// Rules that describe data-part reference relationships only.
+    pub fn data_part_reference_rules(&self) -> Vec<PartConstraintRule> {
+        self.rules()
+            .into_iter()
+            .filter(|r| r.is_data_part_reference)
+            .collect()
+    }
+
+    /// Non-data-part (ordinary part) child rules.
+    pub fn part_rules(&self) -> Vec<PartConstraintRule> {
+        self.rules()
+            .into_iter()
+            .filter(|r| !r.is_data_part_reference)
+            .collect()
+    }
+
+    /// Required relationship type URIs for this parent.
+    pub fn required_relationship_types(&self) -> Vec<&'static str> {
+        self.rules()
+            .into_iter()
+            .filter(|r| r.required())
+            .map(|r| r.relationship_type)
+            .collect()
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules().len()
+    }
+
+    /// Whether any child rule is a data-part reference.
+    pub fn has_data_part_references(&self) -> bool {
+        self.rules().into_iter().any(|r| r.is_data_part_reference)
+    }
 }
 
 /// Build a constraint feature from a [`PartInfo`] name.
@@ -202,5 +236,18 @@ mod tests {
         let f = PartConstraintFeature::for_name("MainDocumentPart");
         assert_eq!(f.parent_part_name(), "MainDocumentPart");
         assert!(f.parent_info().is_some());
+    }
+
+    #[test]
+    fn data_part_and_part_rule_splits() {
+        let f = PartConstraintFeature::new("SlidePart");
+        assert!(f.has_data_part_references());
+        assert!(!f.data_part_reference_rules().is_empty());
+        assert!(!f.part_rules().is_empty());
+        assert!(f.rule_count() > 0);
+        let main = PartConstraintFeature::new("MainDocumentPart");
+        // Main document may not require children in all generated tables; just ensure API works.
+        let _ = main.required_relationship_types();
+        assert!(main.rule_count() > 0);
     }
 }

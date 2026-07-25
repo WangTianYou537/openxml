@@ -35,7 +35,7 @@ pub use attributes::{
 };
 pub use package::validate_package;
 pub use package_validator::{
-    message_id as package_constraint_message_id, validate_package_constraints,
+    message_id as package_constraint_message_id, validate_package_constraints, validate_package_constraint_results,
     validate_part_constraints, OpenXmlPackageValidationResult,
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};

@@ -187,6 +187,18 @@ impl OpenXmlValidator {
         self.cap(validate_package_constraints(package))
     }
 
+    /// Typed package constraint results (C# `PackageValidator.Validate` results shell).
+    pub fn validate_package_constraint_results(
+        &mut self,
+        package: &OpcPackage,
+    ) -> Vec<super::OpenXmlPackageValidationResult> {
+        let errors = self.validate_package_constraints_only(package);
+        errors
+            .iter()
+            .map(super::OpenXmlPackageValidationResult::from_validation_error)
+            .collect()
+    }
+
     /// Validate a WordprocessingML document element tree (rejects misc/unknown roots).
     pub fn validate_element(&mut self, element: &OpenXmlElement) -> Result<Vec<ValidationError>> {
         if element.is_misc_node() {
@@ -246,6 +258,7 @@ impl OpenXmlValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::opc::OpcPackage;
     use crate::element::OpenXmlElement;
     use crate::namespace::content_type;
     use crate::namespace::rel;
@@ -354,5 +367,13 @@ mod tests {
         v.set_file_format(FileFormatVersions::OFFICE2010);
         assert_eq!(v.settings().file_format, FileFormatVersions::OFFICE2010);
         assert_eq!(v.cache().version(), FileFormatVersions::OFFICE2010);
+    }
+
+    #[test]
+    fn package_constraint_results_empty_package() {
+        let mut v = OpenXmlValidator::new();
+        let pkg = OpcPackage::create();
+        let results = v.validate_package_constraint_results(&pkg);
+        assert!(results.is_empty());
     }
 }

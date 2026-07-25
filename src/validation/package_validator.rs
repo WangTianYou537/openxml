@@ -144,6 +144,36 @@ impl OpenXmlPackageValidationResult {
         Self::data_part_reference_is_not_allowed(part_uri, relationship_type)
             .with_data_part_reference_id(relationship_id)
     }
+
+    /// Best-effort parse of a package constraint [`ValidationError`] back into a result shell.
+    pub fn from_validation_error(error: &ValidationError) -> Self {
+        let message_id = error.id().map(|s| s.to_string());
+        let mut r = Self {
+            message: error.message.clone(),
+            message_id,
+            relationship_type: None,
+            part_uri: if error.path.is_empty() {
+                None
+            } else {
+                Some(error.path.clone())
+            },
+            sub_part_uri: error.related_part_uri.clone(),
+            data_part_reference_id: None,
+        };
+        // Detail after `Id: ` often is the relationship type for package constraints.
+        if let Some(id) = error.id() {
+            let detail = error.description();
+            if !detail.is_empty()
+                && (id == message_id::PART_IS_NOT_ALLOWED
+                    || id == message_id::REQUIRED_PART_DO_NOT_EXIST
+                    || id == message_id::ONLY_ONE_PART_ALLOWED
+                    || id == message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED)
+            {
+                r.relationship_type = Some(detail.to_string());
+            }
+        }
+        r
+    }
 }
 
 /// Message ids mirroring C# `OpenXmlPackageValidationResult.MessageId`.
@@ -218,6 +248,17 @@ fn is_known_data_part_rel(relationship_type: &str) -> bool {
 ///
 /// Does **not** re-check missing relationship targets (see [`super::validate_package`]);
 /// focuses on PartConstraintFeature rules walked from the main part.
+/// Run package constraint validation and return typed results
+/// (C# `PackageValidator.Validate` yield of `OpenXmlPackageValidationResult`).
+pub fn validate_package_constraint_results(
+    package: &OpcPackage,
+) -> Vec<OpenXmlPackageValidationResult> {
+    validate_package_constraints(package)
+        .iter()
+        .map(OpenXmlPackageValidationResult::from_validation_error)
+        .collect()
+}
+
 pub fn validate_package_constraints(package: &OpcPackage) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     let mut processed: HashSet<String> = HashSet::new();
@@ -433,6 +474,7 @@ fn resolve_pkg_target(target: &str) -> std::result::Result<PackUri, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::opc::OpcPackage;
     #[test]
     fn open_xml_package_validation_result_shell() {
         let r = super::OpenXmlPackageValidationResult::new(
@@ -665,5 +707,19 @@ mod tests {
             dpr.message_id_str(),
             Some(message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED)
         );
+        let back = OpenXmlPackageValidationResult::from_validation_error(
+            &dpr.clone().into_validation_error(),
+        );
+        assert_eq!(
+            back.message_id_str(),
+            Some(message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED)
+        );
+    }
+
+    #[test]
+    fn validate_package_constraint_results_roundtrip_empty() {
+        let pkg = OpcPackage::create();
+        let results = validate_package_constraint_results(&pkg);
+        assert!(results.is_empty());
     }
 }

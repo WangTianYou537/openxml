@@ -922,6 +922,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
+- [x] `PartConstraintFeature` data/part rule splits + required_relationship_types
+- [x] `validate_package_constraint_results` + `OpenXmlPackageValidationResult::from_validation_error`
+- [x] `OpenXmlValidator::validate_package_constraint_results`
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
