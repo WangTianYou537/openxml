@@ -755,6 +755,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Package `delete_data_part` (C# DeletePart(DataPart)) on OpenXmlPackage + Word/Excel/PPT
 - [x] EqualityOptions/hash/ElementComparer expanded; OpenXmlPartWriter SAX writer shell
 - [x] OpenXmlPartReader cursor (Read/GetText/LoadCurrentElement/ElementState)
+- [x] OpenXmlElementContext / LoadMode / element mutation events feature
 
 **Still intentionally deferred / partial:**
 

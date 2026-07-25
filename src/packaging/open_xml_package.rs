@@ -211,6 +211,33 @@ impl OpenXmlPackage {
 
 
     /// Ensure a [`crate::features::PackageEvents`] feature exists.
+    /// Ensure an [`OpenXmlElementContext`](crate::element::OpenXmlElementContext) feature exists.
+    pub fn element_context(&mut self) -> &crate::element::OpenXmlElementContext {
+        if !self
+            .features()
+            .contains::<crate::element::OpenXmlElementContext>()
+        {
+            self.features_mut()
+                .set(crate::element::OpenXmlElementContext::new());
+        }
+        self.features()
+            .get::<crate::element::OpenXmlElementContext>()
+            .expect("element context just set")
+    }
+
+    pub fn element_context_mut(&mut self) -> &mut crate::element::OpenXmlElementContext {
+        if !self
+            .features()
+            .contains::<crate::element::OpenXmlElementContext>()
+        {
+            self.features_mut()
+                .set(crate::element::OpenXmlElementContext::new());
+        }
+        self.features_mut()
+            .get_mut::<crate::element::OpenXmlElementContext>()
+            .expect("element context just set")
+    }
+
     pub fn package_events(&mut self) -> &crate::features::PackageEvents {
         if !self.features.contains::<crate::features::PackageEvents>() {
             self.features.set(crate::features::PackageEvents::new());
