@@ -10215,10 +10215,39 @@ impl WordprocessingDocument {
     }
 
     /// Clone this document into a new in-memory package (deep copy of all parts).
+    ///
+    /// C# `CloneableExtensions.Clone()` (MemoryStream, editable).
     pub fn clone_document(&mut self) -> Result<Self> {
         self.flush_parts()?;
         let bytes = self.package.to_bytes()?;
         Self::open_bytes(bytes)
+    }
+
+    /// Clone to a new file path (C# `Clone(string path)` / `Clone(path, isEditable, settings)`).
+    pub fn clone_to_path(&mut self, path: impl AsRef<std::path::Path>) -> Result<Self> {
+        self.flush_parts()?;
+        let path = path.as_ref();
+        let bytes = self.package.to_bytes()?;
+        let mut cloned = Self::open_bytes(bytes)?;
+        *cloned.settings_mut() = self.settings().clone();
+        cloned.save_as(path)?;
+        // Re-open from path so the clone is path-backed like C# File-based Clone.
+        let settings = cloned.settings().clone();
+        drop(cloned);
+        Self::open_with_settings(path, true, settings)
+    }
+
+    /// Clone into raw package bytes (caller may open with [`open_bytes`](Self::open_bytes)).
+    pub fn clone_to_bytes(&mut self) -> Result<Vec<u8>> {
+        self.flush_parts()?;
+        self.package.to_bytes()
+    }
+
+    /// Clone and write ZIP bytes to a writer (C# `Clone(Stream)` shell).
+    pub fn clone_to_writer<W: std::io::Write>(&mut self, mut writer: W) -> Result<()> {
+        let bytes = self.clone_to_bytes()?;
+        writer.write_all(&bytes)?;
+        Ok(())
     }
 
     /// Embed an alternative format chunk (HTML, plain text, RTF, …) and append

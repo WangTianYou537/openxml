@@ -766,6 +766,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Fluent package builders (`WordprocessingDocumentBuilder` / spreadsheet / presentation + middleware/properties shell; C# experimental `IPackageBuilder` subset)
 - [x] `PartEvents` (IPartEventsFeature) distinct from PackageEvents/PartRootEvents; raise on OpenXmlPackage set_part/delete_part
 - [x] `delete_parts_recursively_of_relationship_type` (C# DeletePartsRecursivelyOfType stand-in by rel URI) on OpcPackage + OpenXmlPackage + Word/Excel/PPT
+- [x] CloneableExtensions subset: `clone_to_path` / `clone_to_bytes` / `clone_to_writer` on Word/Excel/PPT (plus existing `clone_document`)
 
 **Still intentionally deferred / partial:**
 

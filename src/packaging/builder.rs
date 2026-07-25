@@ -360,4 +360,16 @@ mod tests {
             .iter()
             .any(|t| t.contains("Title A")));
     }
+
+    #[test]
+    fn word_clone_to_path_and_bytes() {
+        let dir = std::env::temp_dir().join(format!("officexml-clone-{}.docx", std::process::id()));
+        let mut doc = word().paragraph("clone-me").auto_save(false).build().unwrap();
+        let bytes = doc.clone_to_bytes().unwrap();
+        assert!(!bytes.is_empty());
+        let mut cloned = doc.clone_to_path(&dir).unwrap();
+        assert_eq!(cloned.paragraph_texts().unwrap(), vec!["clone-me".to_string()]);
+        let _ = std::fs::remove_file(&dir);
+    }
 }
+

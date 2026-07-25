@@ -118,7 +118,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | **ChangeDocumentType** | 有 | ✅ Word `change_document_type` | ✅ |
 | **Package 加密检测** | `IsEncryptedOfficeFile` | ✅ `is_encrypted_office_*` + `Error::EncryptedPackage` | ✅ |
 | **数字签名部件高层** | `AddDigitalSignatureOriginPart` | 仅 JSON 元数据 | 低–中 |
-| **Clone 到 Stream/Path/Package** | `CloneableExtensions` 多目标 | 仅 `clone_document` 内存深拷贝 | 低 |
+| **Clone 到 Stream/Path/Package** | `CloneableExtensions` 多目标 | ✅ `clone_document` + `clone_to_path` / `clone_to_bytes` / `clone_to_writer`（Word/Excel/PPT） | 🟡 无直接 Clone 到已有 `Package` 句柄 |
 | **Extended / Custom file properties** | 完整属性 API | ✅ core/app/custom + 便捷 getter/setter/CRUD | ✅ |
 | **Thumbnail / Ribbon / WebEx / LabelInfo** | 文档级 Add*Part | ✅ thumbnail/customUI/web extension/label shells + clear | ✅ |
 | **IFeatureCollection** | 贯穿包/部件生命周期 | 设计上不做 | — |

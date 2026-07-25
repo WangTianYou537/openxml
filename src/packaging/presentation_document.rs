@@ -3275,9 +3275,35 @@ impl PresentationDocument {
     }
 
     /// Clone this presentation into a new in-memory package (deep copy of all parts).
+    ///
+    /// C# `CloneableExtensions.Clone()` (MemoryStream).
     pub fn clone_document(&self) -> Result<Self> {
         let bytes = self.to_bytes()?;
         Self::open_bytes(bytes)
+    }
+
+    /// Clone to a new file path (C# `Clone(string path)`).
+    pub fn clone_to_path(&self, path: impl AsRef<std::path::Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let bytes = self.to_bytes()?;
+        let mut cloned = Self::open_bytes(bytes)?;
+        *cloned.settings_mut() = self.settings().clone();
+        cloned.save_as(path)?;
+        let settings = cloned.settings().clone();
+        drop(cloned);
+        Self::open_with_settings(path, true, settings)
+    }
+
+    /// Clone package ZIP bytes.
+    pub fn clone_to_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes()
+    }
+
+    /// Clone and write ZIP bytes to a writer.
+    pub fn clone_to_writer<W: std::io::Write>(&self, mut writer: W) -> Result<()> {
+        let bytes = self.clone_to_bytes()?;
+        writer.write_all(&bytes)?;
+        Ok(())
     }
 
     /// Add an arbitrary extended part related from the presentation.
