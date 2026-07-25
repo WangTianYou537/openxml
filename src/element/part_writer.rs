@@ -10,6 +10,8 @@ pub struct OpenXmlPartWriter<W: Write> {
     stack: Vec<String>,
     wrote_decl: bool,
     write_declaration: bool,
+    /// When true, a start tag is open (`<name` written, `>` deferred) so attributes can still be written.
+    open_start: bool,
 }
 
 impl<W: Write> OpenXmlPartWriter<W> {
@@ -19,6 +21,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
             stack: Vec::new(),
             wrote_decl: false,
             write_declaration: true,
+            open_start: false,
         }
     }
 
@@ -37,8 +40,18 @@ impl<W: Write> OpenXmlPartWriter<W> {
         Ok(())
     }
 
+    /// Close a deferred start tag (`>`) if one is open.
+    fn finish_open_start(&mut self) -> Result<()> {
+        if self.open_start {
+            self.writer.write_all(b">").map_err(Error::Io)?;
+            self.open_start = false;
+        }
+        Ok(())
+    }
+
     /// Write a full element tree (start through end), nested under any open elements.
     pub fn write_element(&mut self, element: &OpenXmlElement) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         write_element_to(&mut self.writer, element)
     }
@@ -46,6 +59,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
     /// Write a start tag (C# `WriteStartElement`). Attributes are taken from `element`
     /// but children are not written — call [`write_element`] / [`write_string`] / [`write_end_element`].
     pub fn write_start_element(&mut self, element: &OpenXmlElement) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         let qname = element.qualified_name();
         self.writer.write_all(b"<").map_err(Error::Io)?;
@@ -63,7 +77,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
         for attr in &element.attributes {
             write_attr(&mut self.writer, attr)?;
         }
-        self.writer.write_all(b">").map_err(Error::Io)?;
+        self.open_start = true;
         self.stack.push(qname);
         Ok(())
     }
@@ -76,6 +90,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
         attributes: &[OpenXmlAttribute],
         namespace_declarations: &[(String, String)],
     ) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         let qname = element.qualified_name();
         self.writer.write_all(b"<").map_err(Error::Io)?;
@@ -98,7 +113,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
         for attr in attributes {
             write_attr(&mut self.writer, attr)?;
         }
-        self.writer.write_all(b">").map_err(Error::Io)?;
+        self.open_start = true;
         self.stack.push(qname);
         Ok(())
     }
@@ -170,6 +185,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
         local_name: &str,
         attributes: &[OpenXmlAttribute],
     ) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         let qname = match prefix {
             Some(p) if !p.is_empty() => format!("{p}:{local_name}"),
@@ -180,12 +196,13 @@ impl<W: Write> OpenXmlPartWriter<W> {
         for attr in attributes {
             write_attr(&mut self.writer, attr)?;
         }
-        self.writer.write_all(b">").map_err(Error::Io)?;
+        self.open_start = true;
         self.stack.push(qname);
         Ok(())
     }
 
     pub fn write_end_element(&mut self) -> Result<()> {
+        self.finish_open_start()?;
         let qname = self
             .stack
             .pop()
@@ -196,8 +213,63 @@ impl<W: Write> OpenXmlPartWriter<W> {
         Ok(())
     }
 
+    /// Write an attribute on the currently open start tag (C# `WriteAttribute` / `WriteAttributeString`).
+    ///
+    /// Must be called after a start-element method and before any content or end tag.
+    pub fn write_attribute(&mut self, attr: &OpenXmlAttribute) -> Result<()> {
+        if !self.open_start {
+            return Err(Error::Xml(
+                "WriteAttribute requires an open start element".into(),
+            ));
+        }
+        write_attr(&mut self.writer, attr)
+    }
+
+    /// Write `prefix:local="value"` on the open start tag (C# `WriteAttributeString`).
+    pub fn write_attribute_string(
+        &mut self,
+        prefix: Option<&str>,
+        local_name: &str,
+        namespace_uri: Option<&str>,
+        value: &str,
+    ) -> Result<()> {
+        let attr = match (prefix, namespace_uri) {
+            (Some(p), Some(ns)) if !p.is_empty() => {
+                OpenXmlAttribute::with_ns(p, ns, local_name, value)
+            }
+            (Some(p), _) if !p.is_empty() => OpenXmlAttribute {
+                prefix: Some(p.to_string()),
+                namespace_uri: None,
+                local_name: local_name.to_string(),
+                value: value.to_string(),
+            },
+            _ => OpenXmlAttribute::new(local_name, value),
+        };
+        self.write_attribute(&attr)
+    }
+
+    /// Write an `xmlns` / `xmlns:prefix` declaration on the open start tag
+    /// (C# `WriteNamespaceDeclaration` shell).
+    pub fn write_namespace_declaration(&mut self, prefix: &str, uri: &str) -> Result<()> {
+        if !self.open_start {
+            return Err(Error::Xml(
+                "WriteNamespaceDeclaration requires an open start element".into(),
+            ));
+        }
+        self.writer.write_all(b" xmlns").map_err(Error::Io)?;
+        if !prefix.is_empty() {
+            self.writer.write_all(b":").map_err(Error::Io)?;
+            self.writer.write_all(prefix.as_bytes()).map_err(Error::Io)?;
+        }
+        self.writer.write_all(b"=\"").map_err(Error::Io)?;
+        write_escaped_attr(&mut self.writer, uri)?;
+        self.writer.write_all(b"\"").map_err(Error::Io)?;
+        Ok(())
+    }
+
     /// Write character data (escaped).
     pub fn write_string(&mut self, text: &str) -> Result<()> {
+        self.finish_open_start()?;
         write_escaped_text(&mut self.writer, text)
     }
 
@@ -209,6 +281,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     /// Write a CDATA section (C# `WriteCData`).
     pub fn write_cdata(&mut self, text: &str) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         self.writer.write_all(b"<![CDATA[").map_err(Error::Io)?;
         // Split `]]>` so the section stays well-formed.
@@ -226,6 +299,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     /// Write an XML comment (C# `WriteComment`).
     pub fn write_comment(&mut self, text: &str) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         self.writer.write_all(b"<!--").map_err(Error::Io)?;
         self.writer.write_all(text.as_bytes()).map_err(Error::Io)?;
@@ -235,6 +309,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     /// Write a processing instruction (C# `WriteProcessingInstruction`).
     pub fn write_processing_instruction(&mut self, target: &str, data: Option<&str>) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         self.writer.write_all(b"<?").map_err(Error::Io)?;
         self.writer.write_all(target.as_bytes()).map_err(Error::Io)?;
@@ -250,6 +325,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     /// Write a character entity reference (C# `WriteCharEntity`), e.g. `&#xA0;`.
     pub fn write_char_entity(&mut self, ch: char) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         write!(self.writer, "&#x{:X};", ch as u32).map_err(Error::Io)?;
         Ok(())
@@ -257,6 +333,7 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     /// Write a named entity reference (C# `WriteEntityRef`), e.g. `&nbsp;`.
     pub fn write_entity_ref(&mut self, name: &str) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         self.writer.write_all(b"&").map_err(Error::Io)?;
         self.writer.write_all(name.as_bytes()).map_err(Error::Io)?;
@@ -266,12 +343,14 @@ impl<W: Write> OpenXmlPartWriter<W> {
 
     /// Write raw XML without escaping (C# `WriteRaw`).
     pub fn write_raw(&mut self, xml: &str) -> Result<()> {
+        self.finish_open_start()?;
         self.ensure_decl()?;
         self.writer.write_all(xml.as_bytes()).map_err(Error::Io)?;
         Ok(())
     }
 
     pub fn flush(&mut self) -> Result<()> {
+        self.finish_open_start()?;
         self.writer.flush().map_err(Error::Io)
     }
 
@@ -503,5 +582,27 @@ mod tests {
         assert!(s.contains("x&amp;y"), "{s}");
         assert!(s.contains("&#xA0;"), "{s}");
         assert!(s.contains("&amp;"), "{s}");
+    }
+
+    #[test]
+    fn write_attribute_on_open_start() {
+        let mut buf = Vec::new();
+        {
+            let mut w = OpenXmlPartWriter::new(&mut buf).without_declaration();
+            w.write_start(Some("w"), "p", &[]).unwrap();
+            w.write_attribute_string(Some("w"), "rsidR", None, "00AB").unwrap();
+            w.write_namespace_declaration(
+                "r",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            )
+            .unwrap();
+            w.write_string("x").unwrap();
+            w.write_end_element().unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("rsidR=\"00AB\""), "{s}");
+        assert!(s.contains("xmlns:r="), "{s}");
+        assert!(s.contains(">x</"), "{s}");
     }
 }

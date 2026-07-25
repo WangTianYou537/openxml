@@ -46,6 +46,20 @@ impl OpenXmlAttribute {
             _ => self.local_name.clone(),
         }
     }
+
+    /// Fully qualified name (namespace URI + local name) (C# `OpenXmlAttribute.QName`).
+    pub fn xml_qualified_name(&self) -> OpenXmlQualifiedName {
+        OpenXmlQualifiedName::new(
+            self.namespace_uri.clone().unwrap_or_default(),
+            self.local_name.clone(),
+        )
+    }
+
+    /// Whether this attribute matches `local_name` + `namespace_uri`.
+    pub fn matches(&self, local_name: &str, namespace_uri: &str) -> bool {
+        self.local_name == local_name
+            && self.namespace_uri.as_deref().unwrap_or("") == namespace_uri
+    }
 }
 
 /// Kind of non-element DOM node (mirrors C# `OpenXmlMiscNode` / `XmlNodeType`).

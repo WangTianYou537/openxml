@@ -424,6 +424,51 @@ impl<R: BufRead> OpenXmlPartReader<R> {
             })
             .collect()
     }
+
+    /// Namespace declarations on the current start element (C# `NamespaceDeclarations`).
+    ///
+    /// Returns `(prefix, uri)` pairs; the default namespace uses an empty prefix.
+    pub fn namespace_declarations(&self) -> Vec<(String, String)> {
+        self.attributes
+            .iter()
+            .filter_map(|(k, v)| {
+                if k == "xmlns" {
+                    Some((String::new(), v.clone()))
+                } else {
+                    k.strip_prefix("xmlns:")
+                        .map(|p| (p.to_string(), v.clone()))
+                }
+            })
+            .collect()
+    }
+
+    /// Attribute value by local name (optional prefix match via `prefix:local` key).
+    pub fn get_attribute(&self, local_name: &str) -> Option<&str> {
+        self.attributes
+            .iter()
+            .find(|(k, _)| {
+                if k.starts_with("xmlns") {
+                    return false;
+                }
+                k == local_name
+                    || k.rsplit_once(':')
+                        .map(|(_, l)| l == local_name)
+                        .unwrap_or(false)
+            })
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Close the reader (C# `Close` shell — marks EOF).
+    pub fn close(&mut self) {
+        self.eof = true;
+        self.state = ElementState::EOF;
+        self.local_name.clear();
+        self.prefix = None;
+        self.attributes.clear();
+        self.text.clear();
+        self.open_stack.clear();
+        self.depth = 0;
+    }
 }
 
 #[cfg(test)]
@@ -472,5 +517,23 @@ mod tests {
         assert_eq!(r.local_name(), "p");
         assert!(!r.read_next_sibling().unwrap());
         assert!(r.element_state() == ElementState::End || r.local_name() == "body");
+    }
+
+    #[test]
+    fn part_reader_namespace_declarations_and_get_attr() {
+        let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" w:rsidR="1"/>"#;
+        let mut r = OpenXmlPartReader::from_bytes(xml);
+        assert!(r.read().unwrap());
+        let decls = r.namespace_declarations();
+        assert!(
+            decls.iter().any(|(p, u)| p == "w"
+                && u == "http://schemas.openxmlformats.org/wordprocessingml/2006/main"),
+            "{decls:?}"
+        );
+        assert!(decls.iter().any(|(p, _)| p == "r"), "{decls:?}");
+        assert_eq!(r.get_attribute("rsidR"), Some("1"));
+        assert!(r.has_attributes());
+        r.close();
+        assert!(r.is_eof());
     }
 }

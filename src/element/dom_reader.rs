@@ -326,6 +326,26 @@ impl<'a> OpenXmlDomReader<'a> {
         self.skip();
         Some(cloned)
     }
+
+    /// Namespace declarations on the current element (C# `NamespaceDeclarations`).
+    pub fn namespace_declarations(&self) -> &[(String, String)] {
+        self.current
+            .map(|e| e.namespace_declarations())
+            .unwrap_or(&[])
+    }
+
+    /// Attribute value by local name on the current element.
+    pub fn get_attribute(&self, local_name: &str) -> Option<&str> {
+        self.current.and_then(|e| e.get_attribute(local_name))
+    }
+
+    /// Close the reader (C# `Close` shell).
+    pub fn close(&mut self) {
+        self.eof = true;
+        self.state = ElementState::EOF;
+        self.current = None;
+        self.stack.clear();
+    }
 }
 
 #[cfg(test)]
@@ -410,5 +430,21 @@ mod tests {
         assert_eq!(loaded.children.len(), 1);
         // cursor should be past the element (on end consumed by skip)
         assert!(r.is_end_element() || r.is_eof());
+    }
+
+    #[test]
+    fn namespace_declarations_and_get_attribute() {
+        let root = OpenXmlElement::w("p")
+            .with_attribute("rsidR", "Z")
+            .with_ns_decl("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main");
+        let mut r = OpenXmlDomReader::new(&root);
+        assert!(r.read());
+        assert_eq!(r.get_attribute("rsidR"), Some("Z"));
+        assert!(r
+            .namespace_declarations()
+            .iter()
+            .any(|(p, _)| p == "w"));
+        r.close();
+        assert!(r.is_eof());
     }
 }
