@@ -835,6 +835,137 @@ impl OpcPackage {
         removed
     }
 
+    /// Resolve the part targeted by relationship `id` on `source` (C# `GetPartById` /
+    /// `TryGetPartById`). Returns `None` for missing ids or external targets.
+    pub fn get_part_by_id(
+        &self,
+        source: Option<&PackUri>,
+        id: &str,
+    ) -> Option<PackUri> {
+        let rel = match source {
+            Some(s) => self.part_relationships(s)?.get(id)?,
+            None => self.package_rels.get(id)?,
+        };
+        if rel.target_mode == RelationshipTargetMode::External {
+            return None;
+        }
+        self.resolve_relationship(source, rel).ok()
+    }
+
+    /// Relationship id of the first internal relationship from `source` whose target
+    /// resolves to `part_uri` (C# `GetIdOfPart`).
+    pub fn get_id_of_part(
+        &self,
+        source: Option<&PackUri>,
+        part_uri: &PackUri,
+    ) -> Option<String> {
+        let rels: Box<dyn Iterator<Item = &Relationship> + '_> = match source {
+            Some(s) => Box::new(self.part_relationships(s)?.iter()),
+            None => Box::new(self.package_rels.iter()),
+        };
+        for rel in rels {
+            if rel.target_mode != RelationshipTargetMode::Internal {
+                continue;
+            }
+            if let Ok(u) = self.resolve_relationship(source, rel) {
+                if &u == part_uri {
+                    return Some(rel.id.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Change the relationship id of an existing relationship from `source` to
+    /// `part_uri` (C# `ChangeIdOfPart`). Returns the previous id.
+    pub fn change_id_of_part(
+        &mut self,
+        source: Option<&PackUri>,
+        part_uri: &PackUri,
+        new_id: &str,
+    ) -> Result<String> {
+        if new_id.is_empty() {
+            return Err(Error::Package(
+                "relationship id must be non-empty".into(),
+            ));
+        }
+        // Conflict check + find old id.
+        let existing = match source {
+            Some(s) => self.part_relationships(s).and_then(|r| r.get(new_id)).is_some(),
+            None => self.package_rels.get(new_id).is_some(),
+        };
+        if existing {
+            return Err(Error::Package(format!(
+                "relationship id `{new_id}` already in use"
+            )));
+        }
+        let old_id = self
+            .get_id_of_part(source, part_uri)
+            .ok_or_else(|| {
+                Error::Package(format!(
+                    "part `{}` is not related from the given source",
+                    part_uri.as_str()
+                ))
+            })?;
+        if old_id == new_id {
+            return Ok(old_id);
+        }
+        let removed = match source {
+            Some(s) => self.part_relationships_mut(s).remove(&old_id),
+            None => self.package_rels.remove(&old_id),
+        }
+        .ok_or_else(|| Error::Package(format!("relationship `{old_id}` vanished")))?;
+        match source {
+            Some(s) => {
+                self.part_relationships_mut(s).add_with_id(
+                    new_id,
+                    removed.relationship_type,
+                    removed.target,
+                    removed.target_mode,
+                );
+            }
+            None => {
+                self.package_rels.add_with_id(
+                    new_id,
+                    removed.relationship_type,
+                    removed.target,
+                    removed.target_mode,
+                );
+            }
+        }
+        self.dirty = true;
+        Ok(old_id)
+    }
+
+    /// Create a relationship from `source` to an existing internal part (C#
+    /// `CreateRelationshipToPart`).
+    pub fn create_relationship_to_part(
+        &mut self,
+        source: &PackUri,
+        target: &PackUri,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> String {
+        if let Some(id) = id {
+            self.part_relationships_mut(source)
+                .add_with_id(
+                    id,
+                    relationship_type,
+                    super::uri::relativize(source, target),
+                    RelationshipTargetMode::Internal,
+                )
+                .id
+                .clone()
+        } else {
+            self.add_part_relationship(
+                source,
+                relationship_type,
+                target,
+                RelationshipTargetMode::Internal,
+            )
+        }
+    }
+
     pub fn part_relationships(&self, part: &PackUri) -> Option<&Relationships> {
         self.part_rels.get(part)
     }
@@ -1209,6 +1340,29 @@ mod tests {
         assert!(pkg.delete_relationship(Some(&doc), &id).is_some());
         assert!(pkg.external_relationships(Some(&doc)).is_empty());
     }
+
+    #[test]
+    fn change_id_of_part_roundtrip() {
+        let mut pkg = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        pkg.set_part(styles.clone(), content_type::WORD_STYLES, b"<w:styles/>".to_vec());
+        let old = pkg.add_part_relationship(
+            &doc,
+            rel::STYLES,
+            &styles,
+            RelationshipTargetMode::Internal,
+        );
+        assert_eq!(pkg.get_id_of_part(Some(&doc), &styles).as_deref(), Some(old.as_str()));
+        assert_eq!(pkg.get_part_by_id(Some(&doc), &old), Some(styles.clone()));
+        let prev = pkg.change_id_of_part(Some(&doc), &styles, "rIdStyles").unwrap();
+        assert_eq!(prev, old);
+        assert_eq!(pkg.get_id_of_part(Some(&doc), &styles).as_deref(), Some("rIdStyles"));
+        assert!(pkg.get_part_by_id(Some(&doc), &old).is_none());
+        assert_eq!(pkg.get_part_by_id(Some(&doc), "rIdStyles"), Some(styles));
+    }
+
 
     #[test]
     fn lazy_open_defers_parts() {

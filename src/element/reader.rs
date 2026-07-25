@@ -146,6 +146,7 @@ fn element_from_start(e: &quick_xml::events::BytesStart<'_>, _empty: bool) -> Re
         text: None,
         raw_outer_xml: None,
         misc_kind: OpenXmlMiscKind::None,
+        annotations: Vec::new(),
     };
 
     for a in e.attributes().with_checks(false) {

@@ -66,7 +66,8 @@ pub mod wordprocessing;
 pub use element::{OpenXmlAttribute, OpenXmlElement, OpenXmlMiscKind};
 pub use error::{Error, Result};
 pub use features::{
-    FeatureCollection, PackageEvent, PackageEventType, PackageEvents, ParagraphIdGenerator,
+    AnnotationsFeature, FeatureCollection, PackageEvent, PackageEventType, PackageEvents,
+    ParagraphIdGenerator,
 };
 pub use file_format::FileFormatVersions;
 pub use opc::{

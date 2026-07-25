@@ -1,5 +1,6 @@
 //! OpenXmlElement DOM node.
 
+use std::any::{Any, TypeId};
 use std::fmt;
 use std::sync::Arc;
 
@@ -72,7 +73,6 @@ pub enum OpenXmlMiscKind {
 ///
 /// Non-element nodes (comments, PIs, CDATA) use [`OpenXmlMiscKind`] and
 /// well-known `local_name` values (`#comment`, `#pi`, `#cdata-section`).
-#[derive(Clone)]
 pub struct OpenXmlElement {
     /// Namespace prefix (e.g. `"w"`).
     pub prefix: String,
@@ -93,6 +93,67 @@ pub struct OpenXmlElement {
     pub raw_outer_xml: Option<Arc<str>>,
     /// Non-element node kind (comment / PI / CDATA). Default: ordinary element.
     pub misc_kind: OpenXmlMiscKind,
+    /// User annotations (C# `AnnotationsFeature`). Not compared / not serialized.
+    /// Prefer [`add_annotation`](Self::add_annotation); field is public so struct
+    /// literals in the parser keep working (`..Default::default()` not required).
+    pub annotations: Vec<AnnoEntry>,
+}
+
+/// Type-erased annotation entry (C# annotation list item).
+pub struct AnnoEntry {
+    type_id: TypeId,
+    value: Box<dyn Any + Send + Sync>,
+}
+
+impl Default for AnnoEntry {
+    fn default() -> Self {
+        // Never constructed via Default in practice; placeholder for derive hygiene.
+        Self {
+            type_id: TypeId::of::<()>(),
+            value: Box::new(()),
+        }
+    }
+}
+
+impl fmt::Debug for AnnoEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AnnoEntry").finish_non_exhaustive()
+    }
+}
+
+impl Default for OpenXmlElement {
+    fn default() -> Self {
+        Self {
+            prefix: String::new(),
+            namespace_uri: String::new(),
+            local_name: String::new(),
+            attributes: Vec::new(),
+            namespace_declarations: Vec::new(),
+            children: Vec::new(),
+            text: None,
+            raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::None,
+            annotations: Vec::new(),
+        }
+    }
+}
+
+/// Clone copies the DOM tree but **not** annotations (C# `Clone` / `CloneNode` behavior).
+impl Clone for OpenXmlElement {
+    fn clone(&self) -> Self {
+        Self {
+            prefix: self.prefix.clone(),
+            namespace_uri: self.namespace_uri.clone(),
+            local_name: self.local_name.clone(),
+            attributes: self.attributes.clone(),
+            namespace_declarations: self.namespace_declarations.clone(),
+            children: self.children.clone(),
+            text: self.text.clone(),
+            raw_outer_xml: self.raw_outer_xml.clone(),
+            misc_kind: self.misc_kind,
+            annotations: Vec::new(),
+        }
+    }
 }
 
 impl fmt::Debug for OpenXmlElement {
@@ -122,6 +183,7 @@ impl OpenXmlElement {
             text: None,
             raw_outer_xml: None,
             misc_kind: OpenXmlMiscKind::None,
+            annotations: Vec::new(),
         }
     }
 
@@ -137,6 +199,7 @@ impl OpenXmlElement {
             text: Some(text.into()),
             raw_outer_xml: None,
             misc_kind: OpenXmlMiscKind::Comment,
+            annotations: Vec::new(),
         }
     }
 
@@ -154,6 +217,7 @@ impl OpenXmlElement {
             text: Some(data),
             raw_outer_xml: None,
             misc_kind: OpenXmlMiscKind::ProcessingInstruction,
+            annotations: Vec::new(),
         }
     }
 
@@ -169,6 +233,7 @@ impl OpenXmlElement {
             text: Some(text.into()),
             raw_outer_xml: None,
             misc_kind: OpenXmlMiscKind::CData,
+            annotations: Vec::new(),
         }
     }
 
@@ -190,6 +255,54 @@ impl OpenXmlElement {
             .iter()
             .find(|a| a.local_name == "target")
             .map(|a| a.value.as_str())
+    }
+
+    /// Add an annotation (C# `OpenXmlElement.AddAnnotation`). Multiple values of the
+    /// same type are kept in insertion order.
+    pub fn add_annotation<T: Any + Send + Sync>(&mut self, value: T) {
+        self.annotations.push(AnnoEntry {
+            type_id: TypeId::of::<T>(),
+            value: Box::new(value),
+        });
+    }
+
+    /// First annotation of type `T`, if any.
+    pub fn annotation<T: Any + Send + Sync>(&self) -> Option<&T> {
+        self.annotations
+            .iter()
+            .find(|a| a.type_id == TypeId::of::<T>())
+            .and_then(|a| a.value.downcast_ref::<T>())
+    }
+
+    /// Mutable first annotation of type `T`, if any.
+    pub fn annotation_mut<T: Any + Send + Sync>(&mut self) -> Option<&mut T> {
+        let tid = TypeId::of::<T>();
+        self.annotations
+            .iter_mut()
+            .find(|a| a.type_id == tid)
+            .and_then(|a| a.value.downcast_mut::<T>())
+    }
+
+    /// All annotations of type `T`.
+    pub fn annotations<T: Any + Send + Sync>(&self) -> Vec<&T> {
+        self.annotations
+            .iter()
+            .filter(|a| a.type_id == TypeId::of::<T>())
+            .filter_map(|a| a.value.downcast_ref::<T>())
+            .collect()
+    }
+
+    /// Remove every annotation of type `T`.
+    pub fn remove_annotations<T: Any + Send + Sync>(&mut self) {
+        let tid = TypeId::of::<T>();
+        self.annotations.retain(|a| a.type_id != tid);
+    }
+
+    /// Whether any annotation of type `T` is present.
+    pub fn has_annotation<T: Any + Send + Sync>(&self) -> bool {
+        self.annotations
+            .iter()
+            .any(|a| a.type_id == TypeId::of::<T>())
     }
 
     /// Create an element in the WordprocessingML namespace.
@@ -516,3 +629,28 @@ impl PartialEq for OpenXmlElement {
 }
 
 impl Eq for OpenXmlElement {}
+
+#[cfg(test)]
+mod annotation_tests {
+    use super::*;
+
+    #[test]
+    fn annotation_roundtrip_and_clone_drops() {
+        let mut el = OpenXmlElement::w("p");
+        el.add_annotation(42u32);
+        el.add_annotation("meta".to_string());
+        assert_eq!(el.annotation::<u32>(), Some(&42));
+        assert_eq!(el.annotation::<String>().map(|s| s.as_str()), Some("meta"));
+        el.add_annotation(7u32);
+        assert_eq!(el.annotations::<u32>(), vec![&42, &7]);
+        el.remove_annotations::<u32>();
+        assert!(!el.has_annotation::<u32>());
+        assert!(el.has_annotation::<String>());
+
+        let cloned = el.clone();
+        assert!(!cloned.has_annotation::<String>());
+        // Structural equality ignores annotations
+        el.add_annotation(1u8);
+        assert_eq!(el, cloned);
+    }
+}

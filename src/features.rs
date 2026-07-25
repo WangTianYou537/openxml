@@ -192,6 +192,67 @@ impl PackageEvents {
     }
 }
 
+
+/// Package / part container annotations (C# `AnnotationsFeature` on `OpenXmlPartContainer`).
+///
+/// Stored in [`FeatureCollection`]; also available per-element on [`crate::element::OpenXmlElement`].
+#[derive(Default)]
+pub struct AnnotationsFeature {
+    entries: Vec<AnnoSlot>,
+}
+
+struct AnnoSlot {
+    type_id: std::any::TypeId,
+    value: Box<dyn std::any::Any + Send + Sync>,
+}
+
+impl std::fmt::Debug for AnnotationsFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AnnotationsFeature")
+            .field("len", &self.entries.len())
+            .finish()
+    }
+}
+
+impl AnnotationsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add<T: std::any::Any + Send + Sync>(&mut self, value: T) {
+        self.entries.push(AnnoSlot {
+            type_id: std::any::TypeId::of::<T>(),
+            value: Box::new(value),
+        });
+    }
+
+    pub fn get<T: std::any::Any + Send + Sync>(&self) -> Option<&T> {
+        self.entries
+            .iter()
+            .find(|e| e.type_id == std::any::TypeId::of::<T>())
+            .and_then(|e| e.value.downcast_ref::<T>())
+    }
+
+    pub fn get_all<T: std::any::Any + Send + Sync>(&self) -> Vec<&T> {
+        self.entries
+            .iter()
+            .filter(|e| e.type_id == std::any::TypeId::of::<T>())
+            .filter_map(|e| e.value.downcast_ref::<T>())
+            .collect()
+    }
+
+    pub fn remove<T: std::any::Any + Send + Sync>(&mut self) {
+        let tid = std::any::TypeId::of::<T>();
+        self.entries.retain(|e| e.type_id != tid);
+    }
+
+    pub fn contains<T: std::any::Any + Send + Sync>(&self) -> bool {
+        self.entries
+            .iter()
+            .any(|e| e.type_id == std::any::TypeId::of::<T>())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

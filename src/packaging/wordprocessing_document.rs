@@ -13105,6 +13105,34 @@ impl WordprocessingDocument {
             .hyperlink_relationships(Some(main.uri()))
     }
 
+    /// Relationship id of a part under the main document (C# `GetIdOfPart`).
+    pub fn get_id_of_part(&self, part_uri: &PackUri) -> Option<String> {
+        let main = self.main_document_part.as_ref()?;
+        self.package
+            .opc()
+            .get_id_of_part(Some(main.uri()), part_uri)
+    }
+
+    /// Part URI for relationship id on the main document (C# `GetPartById`).
+    pub fn get_part_by_id(&self, id: &str) -> Option<PackUri> {
+        let main = self.main_document_part.as_ref()?;
+        self.package.opc().get_part_by_id(Some(main.uri()), id)
+    }
+
+    /// Change the relationship id of a child part (C# `ChangeIdOfPart`).
+    pub fn change_id_of_part(&mut self, part_uri: &PackUri, new_id: &str) -> Result<String> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?
+            .uri()
+            .clone();
+        self.package
+            .opc_mut()
+            .change_id_of_part(Some(&main), part_uri, new_id)
+    }
+
+
 
     /// Add an arbitrary extended part related from the main document.
     ///

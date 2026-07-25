@@ -3279,6 +3279,39 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn annotations_and_change_id() {
+    use officexml::namespace::rel;
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    doc.add_default_styles().unwrap();
+    let styles = doc
+        .related_parts(Some(rel::STYLES))
+        .into_iter()
+        .next()
+        .expect("styles")
+        .uri;
+    let old = doc.get_id_of_part(&styles).expect("id");
+    let prev = doc.change_id_of_part(&styles, "rIdStylesCustom").unwrap();
+    assert_eq!(prev, old);
+    assert_eq!(doc.get_part_by_id("rIdStylesCustom"), Some(styles.clone()));
+
+    doc.package_mut().add_annotation("pkg-meta".to_string());
+    assert_eq!(
+        doc.package().annotation::<String>().map(|s| s.as_str()),
+        Some("pkg-meta")
+    );
+
+    let mut root = simple_document(vec![paragraph_with_text("y")]);
+    root.add_annotation(99u16);
+    assert_eq!(root.annotation::<u16>(), Some(&99));
+    assert!(root.clone().annotation::<u16>().is_none());
+}
+
 #[test]
 fn hyperlink_relationship_typed() {
     use officexml::namespace::rel;

@@ -741,6 +741,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartUriHelper` + `RelatedPart` / `related_parts` / `parts_of_relationship_type` (C# PartUriHelper + GetPartsOfType shell)
 - [x] `TypedPart` runtime handle over generated `PartInfo` (add/find/save/children; constraint-checked)
 - [x] `ReferenceRelationship` / `HyperlinkRelationship` / audio·video·media reference types
+- [x] Element + package `Annotations` (C# AnnotationsFeature); `ChangeIdOfPart` / `GetPartById` / `GetIdOfPart`
 
 **Still intentionally deferred / partial:**
 

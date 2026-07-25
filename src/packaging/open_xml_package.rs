@@ -142,6 +142,36 @@ impl OpenXmlPackage {
         }
     }
 
+    /// Ensure [`AnnotationsFeature`](crate::features::AnnotationsFeature) exists.
+    fn annotations_feature_mut(&mut self) -> &mut crate::features::AnnotationsFeature {
+        if !self.features.contains::<crate::features::AnnotationsFeature>() {
+            self.features
+                .set(crate::features::AnnotationsFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::AnnotationsFeature>()
+            .expect("AnnotationsFeature just set")
+    }
+
+    /// Add a package-level annotation (C# `OpenXmlPackage.AddAnnotation`).
+    pub fn add_annotation<T: std::any::Any + Send + Sync>(&mut self, value: T) {
+        self.annotations_feature_mut().add(value);
+    }
+
+    /// First package-level annotation of type `T`.
+    pub fn annotation<T: std::any::Any + Send + Sync>(&self) -> Option<&T> {
+        self.features
+            .get::<crate::features::AnnotationsFeature>()
+            .and_then(|a| a.get::<T>())
+    }
+
+    /// Remove package-level annotations of type `T`.
+    pub fn remove_annotations<T: std::any::Any + Send + Sync>(&mut self) {
+        if let Some(a) = self.features.get_mut::<crate::features::AnnotationsFeature>() {
+            a.remove::<T>();
+        }
+    }
+
     pub fn path(&self) -> Option<&Path> {
         self.opc.path()
     }
