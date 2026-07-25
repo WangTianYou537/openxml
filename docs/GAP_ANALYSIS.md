@@ -74,7 +74,7 @@
 | **Equality** | `Equality/OpenXmlElementEqualityComparer` | ✅ `elements_equal` / `EqualityOptions` | ✅ |
 | **Annotations** | `AnnotationsFeature` | ✅ 元素 + package AnnotationsFeature | ✅ |
 | **XmlPath / XmlLineInfo** | 校验错误定位 | ✅ `XmlPath`（索引路径；无父指针） | 🟡 无行号 |
-| **Builder 模式** | `Builder/`, package builders | 无对等 fluent builder 框架 | 低 |
+| **Builder 模式** | `Builder/`, package builders | ✅ `WordprocessingDocumentBuilder` / Excel / PPT + middleware shell (`packaging::builder`) | 🟡 非完整 IPackageFactory 管道 |
 
 ### 2.3 简单类型缺口
 

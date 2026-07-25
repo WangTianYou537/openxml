@@ -82,7 +82,10 @@ pub use packaging::{
     footer, footer_reference, header, header_reference, hyperlink, AlternativeFormatImportType,
     DocumentSettingsPart, ExtendedPart, ImageFormat, ImagePart, MainDocumentPart,
     MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
-    OpenXmlPackage, PresentationDocument, PresentationDocumentType, SlideInfo, SlideLayoutInfo,
-    SlideMasterInfo, SpreadsheetDocument, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart, PartConstraintFeature, PartConstraintRule, constraints_for,
-    WordprocessingDocument, WordprocessingDocumentType, WorksheetInfo,
+    OpenXmlPackage, PackageMiddleware, PresentationDocument, PresentationDocumentBuilder,
+    PresentationDocumentType, SlideInfo, SlideLayoutInfo, SlideMasterInfo, SpreadsheetDocument,
+    SpreadsheetDocumentBuilder, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart,
+    PartConstraintFeature, PartConstraintRule, WordprocessingDocumentBuilder, constraints_for,
+    presentation_builder, spreadsheet_builder, word_builder, WordprocessingDocument,
+    WordprocessingDocumentType, WorksheetInfo,
 };

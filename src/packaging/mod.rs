@@ -2,6 +2,7 @@
 //!
 //! Mirrors `DocumentFormat.OpenXml.Packaging`.
 
+mod builder;
 mod open_xml_package;
 mod open_xml_part;
 mod parts;
@@ -11,6 +12,11 @@ mod part_constraints;
 mod typed_part;
 mod wordprocessing_document;
 
+pub use builder::{
+    presentation as presentation_builder, spreadsheet as spreadsheet_builder, word as word_builder,
+    PackageMiddleware, PresentationDocumentBuilder, SpreadsheetDocumentBuilder,
+    WordprocessingDocumentBuilder,
+};
 pub use open_xml_package::{
     MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
     OpenXmlPackage,

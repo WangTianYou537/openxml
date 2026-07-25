@@ -763,6 +763,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] PackageValidator-style `validate_package_constraints` (PartIsNotAllowed / RequiredPart / OnlyOne / InvalidContentType / DataPartRef) wired into `validate_package` + Word/Excel/PPT
 - [x] `XmlPath` + path-from-indices (owned-DOM); `OpenXmlUnknownElement` marker; `OpenXmlValidator` facade (max errors / file format / package+element)
 - [x] `PartRootEvents` (IPartRootEventsFeature) + raise on load/reload/save/unload
+- [x] Fluent package builders (`WordprocessingDocumentBuilder` / spreadsheet / presentation + middleware/properties shell; C# experimental `IPackageBuilder` subset)
 
 **Still intentionally deferred / partial:**
 
