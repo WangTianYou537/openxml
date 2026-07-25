@@ -1,7 +1,69 @@
 //! Validation run context (C# `ValidationContext` shell).
 
 use super::{ValidationCache, ValidationError, ValidationSettings};
+use crate::element::OpenXmlElement;
 use crate::file_format::FileFormatVersions;
+use crate::markup_compatibility::{
+    selected_alternate_content_branch, ElementAction, MarkupCompatibilityAttributes, McContext,
+};
+
+/// A logical validation child paired with its inherited MC context.
+#[derive(Debug, Clone)]
+pub struct ValidationChild<'a> {
+    pub element: &'a OpenXmlElement,
+    pub mc_context: McContext,
+}
+
+fn namespace_key(element: &OpenXmlElement) -> &str {
+    if element.prefix.is_empty() {
+        element.namespace_uri.as_str()
+    } else {
+        element.prefix.as_str()
+    }
+}
+
+fn append_validation_children<'a>(
+    parent: &'a OpenXmlElement,
+    inherited_context: &McContext,
+    supported_prefixes: &[&str],
+    output: &mut Vec<ValidationChild<'a>>,
+) {
+    let mut context = inherited_context.clone();
+    let attributes = MarkupCompatibilityAttributes::from_element(parent);
+    context.push_mc_attributes_for_validation(&attributes, None);
+
+    for child in &parent.children {
+        if child.is_misc_node() {
+            continue;
+        }
+        if child.local_name == "AlternateContent" {
+            if let Some(branch) = selected_alternate_content_branch(child, supported_prefixes) {
+                append_validation_children(branch, &context, supported_prefixes, output);
+            }
+            continue;
+        }
+
+        let known_in_version = child.prefix.is_empty()
+            || supported_prefixes.contains(&child.prefix.as_str());
+        match context.get_element_action(
+            &child.local_name,
+            namespace_key(child),
+            known_in_version,
+            false,
+        ) {
+            ElementAction::Ignore => {}
+            ElementAction::ProcessContent => {
+                append_validation_children(child, &context, supported_prefixes, output);
+            }
+            ElementAction::Normal => output.push(ValidationChild {
+                element: child,
+                mc_context: context.clone(),
+            }),
+            ElementAction::AcBlock => unreachable!("AlternateContent handled above"),
+        }
+    }
+}
+
 
 /// Mutable state for a validation pass (C# `ValidationContext` subset).
 #[derive(Debug)]
@@ -72,6 +134,31 @@ impl ValidationContext {
 
     pub fn state_mut(&mut self) -> &mut super::StateManager {
         &mut self.state
+    }
+
+    /// Return direct logical children after MC branch selection and content promotion.
+    pub fn validation_children<'a>(
+        &self,
+        parent: &'a OpenXmlElement,
+    ) -> Vec<ValidationChild<'a>> {
+        let context = self.mc_context.clone().unwrap_or_default();
+        self.validation_children_with_context(parent, &context)
+    }
+
+    pub(crate) fn validation_children_with_context<'a>(
+        &self,
+        parent: &'a OpenXmlElement,
+        inherited_context: &McContext,
+    ) -> Vec<ValidationChild<'a>> {
+        let supported_prefixes = crate::file_format::supported_prefixes(self.file_format());
+        let mut children = Vec::new();
+        append_validation_children(
+            parent,
+            inherited_context,
+            &supported_prefixes,
+            &mut children,
+        );
+        children
     }
 
     pub fn set_current_path(&mut self, path: impl Into<String>) {
@@ -194,6 +281,66 @@ mod tests {
         assert!(ctx.check_max_errors());
         ctx.clear();
         assert!(ctx.valid());
+    }
+
+    #[test]
+    fn logical_children_select_versioned_alternate_content() {
+        use crate::markup_compatibility::alternate_content_with;
+        use crate::namespace::ns;
+        use crate::wordprocessing::body;
+
+        let mut document = OpenXmlElement::w("document").with_children(vec![
+            OpenXmlElement::comment("before"),
+            alternate_content_with(
+                "w14",
+                vec![OpenXmlElement::w("choiceBody")],
+                vec![body(vec![])],
+            ),
+        ]);
+        document.add_namespace_declaration("mc", ns::MARKUP_COMPATIBILITY.uri);
+
+        let office_2007 = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        let children = office_2007.validation_children(&document);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].element.local_name, "body");
+
+        let office_2010 = ValidationContext::with_file_format(FileFormatVersions::OFFICE2010);
+        let children = office_2010.validation_children(&document);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].element.local_name, "choiceBody");
+    }
+
+    #[test]
+    fn logical_children_promote_process_content_and_ignore_unsupported() {
+        use crate::namespace::ns;
+        use crate::wordprocessing::body;
+
+        let mut document = OpenXmlElement::w("document");
+        document.set_attribute_ns("mc", ns::MARKUP_COMPATIBILITY.uri, "Ignorable", "w14 w15");
+        document.set_attribute_ns(
+            "mc",
+            ns::MARKUP_COMPATIBILITY.uri,
+            "ProcessContent",
+            "w14:wrapper",
+        );
+        document.append_child(
+            OpenXmlElement::new("w15", "urn:w15", "ignored")
+                .with_children(vec![OpenXmlElement::w("ignoredChild")]),
+        );
+        document.append_child(
+            OpenXmlElement::new("w14", "urn:w14", "wrapper")
+                .with_children(vec![body(vec![])]),
+        );
+
+        let office_2007 = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        let children = office_2007.validation_children(&document);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].element.local_name, "body");
+
+        let office_2010 = ValidationContext::with_file_format(FileFormatVersions::OFFICE2010);
+        let children = office_2010.validation_children(&document);
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].element.local_name, "wrapper");
     }
 
     #[test]

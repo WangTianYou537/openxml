@@ -5,7 +5,11 @@
 //! owned [`Particle`] tree so codegen can emit them freely.
 
 use crate::element::OpenXmlElement;
-use crate::validation::ValidationError;
+use crate::file_format::FileFormatVersions;
+use crate::markup_compatibility::McContext;
+use crate::validation::{
+    ValidationContext, ValidationError, ValidationSettings,
+};
 use std::fmt;
 
 /// Occurrence constraints for a particle.
@@ -159,10 +163,36 @@ pub fn validate_particle(
     particle: &Particle,
     path: &str,
 ) -> Vec<ValidationError> {
-    let children: Vec<&OpenXmlElement> = element
-        .children
+    validate_particle_for_version(
+        element,
+        particle,
+        path,
+        FileFormatVersions::OFFICE2007,
+    )
+}
+
+/// Version-aware particle validation over logical MC children.
+pub fn validate_particle_for_version(
+    element: &OpenXmlElement,
+    particle: &Particle,
+    path: &str,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
+    let context = ValidationContext::new(ValidationSettings::new(version));
+    validate_particle_with_context(element, particle, path, &context, &McContext::new())
+}
+
+fn validate_particle_with_context(
+    element: &OpenXmlElement,
+    particle: &Particle,
+    path: &str,
+    context: &ValidationContext,
+    mc_context: &McContext,
+) -> Vec<ValidationError> {
+    let validation_children = context.validation_children_with_context(element, mc_context);
+    let children: Vec<&OpenXmlElement> = validation_children
         .iter()
-        .filter(|c| c.local_name != "AlternateContent")
+        .map(|child| child.element)
         .collect();
 
     let result = match_particle(particle, &children, 0);
@@ -472,30 +502,114 @@ pub mod word {
 
 /// Recursively validate a Word document using ordered particles.
 pub fn validate_word_particles(root: &OpenXmlElement) -> Vec<ValidationError> {
+    validate_word_particles_for_version(root, FileFormatVersions::OFFICE2007)
+}
+
+/// Recursively validate Word particles against target-version logical MC children.
+pub fn validate_word_particles_for_version(
+    root: &OpenXmlElement,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
+    let context = ValidationContext::new(ValidationSettings::new(version));
+    let root_mc_context = McContext::new();
     let mut errors = Vec::new();
     if root.local_name != "document" {
         return errors;
     }
-    errors.extend(validate_particle(root, &word::document(), "w:document"));
-    if let Some(body) = root.child("body") {
-        errors.extend(validate_particle(body, &word::body(), "w:document/w:body"));
-        for (i, p) in body.children_by_name("p").enumerate() {
+    errors.extend(validate_particle_with_context(
+        root,
+        &word::document(),
+        "w:document",
+        &context,
+        &root_mc_context,
+    ));
+    let root_children = context.validation_children_with_context(root, &root_mc_context);
+    if let Some(body) = root_children
+        .iter()
+        .find(|child| child.element.local_name == "body")
+    {
+        errors.extend(validate_particle_with_context(
+            body.element,
+            &word::body(),
+            "w:document/w:body",
+            &context,
+            &body.mc_context,
+        ));
+        let body_children =
+            context.validation_children_with_context(body.element, &body.mc_context);
+        for (i, paragraph) in body_children
+            .iter()
+            .filter(|child| child.element.local_name == "p")
+            .enumerate()
+        {
             let path = format!("w:document/w:body/w:p[{i}]");
-            errors.extend(validate_particle(p, &word::paragraph(), &path));
-            for (j, r) in p.children_by_name("r").enumerate() {
-                let rpath = format!("{path}/w:r[{j}]");
-                errors.extend(validate_particle(r, &word::run(), &rpath));
+            errors.extend(validate_particle_with_context(
+                paragraph.element,
+                &word::paragraph(),
+                &path,
+                &context,
+                &paragraph.mc_context,
+            ));
+            let paragraph_children = context
+                .validation_children_with_context(paragraph.element, &paragraph.mc_context);
+            for (j, run) in paragraph_children
+                .iter()
+                .filter(|child| child.element.local_name == "r")
+                .enumerate()
+            {
+                let run_path = format!("{path}/w:r[{j}]");
+                errors.extend(validate_particle_with_context(
+                    run.element,
+                    &word::run(),
+                    &run_path,
+                    &context,
+                    &run.mc_context,
+                ));
             }
         }
-        for (i, tbl) in body.children_by_name("tbl").enumerate() {
+        for (i, table) in body_children
+            .iter()
+            .filter(|child| child.element.local_name == "tbl")
+            .enumerate()
+        {
             let path = format!("w:document/w:body/w:tbl[{i}]");
-            errors.extend(validate_particle(tbl, &word::table(), &path));
-            for (ri, tr) in tbl.children_by_name("tr").enumerate() {
-                let tr_path = format!("{path}/w:tr[{ri}]");
-                errors.extend(validate_particle(tr, &word::table_row(), &tr_path));
-                for (ci, tc) in tr.children_by_name("tc").enumerate() {
-                    let tc_path = format!("{tr_path}/w:tc[{ci}]");
-                    errors.extend(validate_particle(tc, &word::table_cell(), &tc_path));
+            errors.extend(validate_particle_with_context(
+                table.element,
+                &word::table(),
+                &path,
+                &context,
+                &table.mc_context,
+            ));
+            let table_children =
+                context.validation_children_with_context(table.element, &table.mc_context);
+            for (row_index, row) in table_children
+                .iter()
+                .filter(|child| child.element.local_name == "tr")
+                .enumerate()
+            {
+                let row_path = format!("{path}/w:tr[{row_index}]");
+                errors.extend(validate_particle_with_context(
+                    row.element,
+                    &word::table_row(),
+                    &row_path,
+                    &context,
+                    &row.mc_context,
+                ));
+                let row_children =
+                    context.validation_children_with_context(row.element, &row.mc_context);
+                for (cell_index, cell) in row_children
+                    .iter()
+                    .filter(|child| child.element.local_name == "tc")
+                    .enumerate()
+                {
+                    let cell_path = format!("{row_path}/w:tc[{cell_index}]");
+                    errors.extend(validate_particle_with_context(
+                        cell.element,
+                        &word::table_cell(),
+                        &cell_path,
+                        &context,
+                        &cell.mc_context,
+                    ));
                 }
             }
         }
@@ -565,6 +679,81 @@ mod tests {
         ]);
         let errs = validate_particle(&p, &word::paragraph(), "w:p");
         assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn alternate_content_supplies_required_body_for_version() {
+        use crate::markup_compatibility::alternate_content_with;
+        use crate::wordprocessing::body;
+
+        let document = crate::wordprocessing::document(vec![alternate_content_with(
+            "w14",
+            vec![body(vec![])],
+            vec![body(vec![])],
+        )]);
+        let office_2007 = validate_particle_for_version(
+            &document,
+            &word::document(),
+            "w:document",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(office_2007.is_empty(), "{office_2007:?}");
+        let office_2010 = validate_particle_for_version(
+            &document,
+            &word::document(),
+            "w:document",
+            FileFormatVersions::OFFICE2010,
+        );
+        assert!(office_2010.is_empty(), "{office_2010:?}");
+    }
+
+    #[test]
+    fn process_content_supplies_required_body() {
+        use crate::namespace::ns;
+        use crate::wordprocessing::body;
+
+        let mut document = crate::wordprocessing::document(vec![]);
+        document.set_attribute_ns("mc", ns::MARKUP_COMPATIBILITY.uri, "Ignorable", "w14");
+        document.set_attribute_ns(
+            "mc",
+            ns::MARKUP_COMPATIBILITY.uri,
+            "ProcessContent",
+            "w14:wrapper",
+        );
+        document.append_child(
+            OpenXmlElement::new("w14", "urn:w14", "wrapper")
+                .with_children(vec![body(vec![])]),
+        );
+        let errors = validate_particle_for_version(
+            &document,
+            &word::document(),
+            "w:document",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
+    fn inherited_process_content_applies_inside_body() {
+        use crate::namespace::ns;
+        use crate::wordprocessing::{body, paragraph_with_text};
+
+        let wrapper = OpenXmlElement::new("w14", "urn:w14", "wrapper")
+            .with_children(vec![paragraph_with_text("promoted")]);
+        let mut document = crate::wordprocessing::document(vec![body(vec![wrapper])]);
+        document.set_attribute_ns("mc", ns::MARKUP_COMPATIBILITY.uri, "Ignorable", "w14");
+        document.set_attribute_ns(
+            "mc",
+            ns::MARKUP_COMPATIBILITY.uri,
+            "ProcessContent",
+            "w14:wrapper",
+        );
+
+        let errors = validate_word_particles_for_version(
+            &document,
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errors.is_empty(), "{errors:?}");
     }
 
     #[test]

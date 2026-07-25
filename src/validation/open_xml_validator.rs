@@ -5,8 +5,8 @@
 
 use super::{
     validate_alternate_content, validate_mc_attributes, validate_package, validate_package_constraints,
-    validate_word_document, validate_word_document_full, ValidationCache, ValidationError,
-    ValidationErrorEventArgs,
+    validate_word_document_for_version, validate_word_document_full_for_version, ValidationCache,
+    ValidationError, ValidationErrorEventArgs,
 };
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
@@ -242,13 +242,12 @@ impl OpenXmlValidator {
         }
 
         let mut errors = if element.local_name == "document" {
-            validate_word_document_full(element)
+            validate_word_document_full_for_version(element, self.settings.file_format)
         } else {
-            validate_word_document(element)
+            validate_word_document_for_version(element, self.settings.file_format)
         };
         errors.extend(validate_alternate_content(element));
         errors.extend(validate_mc_attributes(element));
-        let _ = self.settings.file_format;
         Ok(self.cap(errors))
     }
 
@@ -332,6 +331,31 @@ mod tests {
         );
         let errs = OpenXmlValidator::new().validate_package(&pkg); // new() is mut via temporary
         assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn validator_uses_target_version_for_alternate_content() {
+        use crate::markup_compatibility::alternate_content_with;
+
+        let alternate = alternate_content_with(
+            "w14",
+            vec![OpenXmlElement::w("notBody")],
+            vec![body(vec![paragraph(vec![run(vec![text("fallback")])])])],
+        )
+        .with_ns_decl("w14", "http://schemas.microsoft.com/office/word/2010/wordml");
+        let document = document(vec![alternate]);
+        let office_2007 = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2007)
+            .validate_element(&document)
+            .unwrap();
+        assert!(office_2007.is_empty(), "{office_2007:?}");
+
+        let office_2010 = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2010)
+            .validate_element(&document)
+            .unwrap();
+        assert!(!office_2010.is_empty());
+        assert!(office_2010.iter().any(|error| {
+            error.message.contains("notBody") || error.message.contains("required particle")
+        }));
     }
 
     #[test]

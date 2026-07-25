@@ -944,6 +944,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlValidator::on_validation_error_event` mutable replacement callback
 - [x] Package constraint errors carry explicit `ValidationErrorType::Package`
 
+- [x] Borrowed target-version MC validation children (Choice/Fallback, ProcessContent, ignored/misc nodes)
+- [x] Version-aware lightweight child and ordered particle validation entry points
+- [x] `OpenXmlValidator` threads configured `FileFormatVersions` through Word validation
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

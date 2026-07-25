@@ -40,9 +40,12 @@ pub use package_validator::{
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
 pub use validation_cache::ValidationCache;
-pub use validation_context::ValidationContext;
+pub use validation_context::{ValidationChild, ValidationContext};
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationStack};
-pub use particle::{validate_particle, validate_word_particles, Occurs, Particle};
+pub use particle::{
+    validate_particle, validate_particle_for_version, validate_word_particles,
+    validate_word_particles_for_version, Occurs, Particle,
+};
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,
     schematron_both_present_rules, schematron_conditional_attr_rules,
@@ -325,14 +328,45 @@ pub fn validate_children(
     rules: &[ChildRule],
     path: &str,
 ) -> Vec<ValidationError> {
+    validate_children_for_version(
+        element,
+        rules,
+        path,
+        crate::file_format::FileFormatVersions::OFFICE2007,
+    )
+}
+
+/// Version-aware child validation over logical MC children.
+pub fn validate_children_for_version(
+    element: &OpenXmlElement,
+    rules: &[ChildRule],
+    path: &str,
+    version: crate::file_format::FileFormatVersions,
+) -> Vec<ValidationError> {
+    let context = ValidationContext::new(ValidationSettings::new(version));
+    validate_children_with_context(
+        element,
+        rules,
+        path,
+        &context,
+        &crate::markup_compatibility::McContext::new(),
+    )
+}
+
+fn validate_children_with_context(
+    element: &OpenXmlElement,
+    rules: &[ChildRule],
+    path: &str,
+    context: &ValidationContext,
+    mc_context: &crate::markup_compatibility::McContext,
+) -> Vec<ValidationError> {
+    let children = context.validation_children_with_context(element, mc_context);
     let mut errors = Vec::new();
     let allowed: HashMap<&str, &ChildRule> = rules.iter().map(|r| (r.local_name, r)).collect();
 
     let mut counts: HashMap<&str, usize> = HashMap::new();
-    for child in &element.children {
-        if child.local_name == "AlternateContent" {
-            continue;
-        }
+    for validation_child in &children {
+        let child = validation_child.element;
         *counts.entry(child.local_name.as_str()).or_insert(0) += 1;
         if !allowed.is_empty() && !allowed.contains_key(child.local_name.as_str()) {
             errors.push(ValidationError {
@@ -542,17 +576,67 @@ pub mod word {
 
 /// Recursively validate a Word document tree using lightweight rules.
 pub fn validate_word_document(root: &OpenXmlElement) -> Vec<ValidationError> {
+    validate_word_document_for_version(root, crate::file_format::FileFormatVersions::OFFICE2007)
+}
+
+/// Recursively validate Word child rules against target-version logical MC children.
+pub fn validate_word_document_for_version(
+    root: &OpenXmlElement,
+    version: crate::file_format::FileFormatVersions,
+) -> Vec<ValidationError> {
+    let context = ValidationContext::new(ValidationSettings::new(version));
+    let root_mc_context = crate::markup_compatibility::McContext::new();
     let mut errors = Vec::new();
     if root.local_name == "document" {
-        errors.extend(validate_children(root, word::DOCUMENT, "w:document"));
-        if let Some(body) = root.child("body") {
-            errors.extend(validate_children(body, word::BODY, "w:document/w:body"));
-            for (i, p) in body.children_by_name("p").enumerate() {
+        errors.extend(validate_children_with_context(
+            root,
+            word::DOCUMENT,
+            "w:document",
+            &context,
+            &root_mc_context,
+        ));
+        let root_children = context.validation_children_with_context(root, &root_mc_context);
+        if let Some(body) = root_children
+            .iter()
+            .find(|child| child.element.local_name == "body")
+        {
+            errors.extend(validate_children_with_context(
+                body.element,
+                word::BODY,
+                "w:document/w:body",
+                &context,
+                &body.mc_context,
+            ));
+            let body_children =
+                context.validation_children_with_context(body.element, &body.mc_context);
+            for (i, paragraph) in body_children
+                .iter()
+                .filter(|child| child.element.local_name == "p")
+                .enumerate()
+            {
                 let path = format!("w:document/w:body/w:p[{i}]");
-                errors.extend(validate_children(p, word::PARAGRAPH, &path));
-                for (j, r) in p.children_by_name("r").enumerate() {
-                    let rpath = format!("{path}/w:r[{j}]");
-                    errors.extend(validate_children(r, word::RUN, &rpath));
+                errors.extend(validate_children_with_context(
+                    paragraph.element,
+                    word::PARAGRAPH,
+                    &path,
+                    &context,
+                    &paragraph.mc_context,
+                ));
+                let paragraph_children = context
+                    .validation_children_with_context(paragraph.element, &paragraph.mc_context);
+                for (j, run) in paragraph_children
+                    .iter()
+                    .filter(|child| child.element.local_name == "r")
+                    .enumerate()
+                {
+                    let run_path = format!("{path}/w:r[{j}]");
+                    errors.extend(validate_children_with_context(
+                        run.element,
+                        word::RUN,
+                        &run_path,
+                        &context,
+                        &run.mc_context,
+                    ));
                 }
             }
         }
@@ -562,8 +646,18 @@ pub fn validate_word_document(root: &OpenXmlElement) -> Vec<ValidationError> {
 
 /// Full Word validation: lightweight rules + ordered particles.
 pub fn validate_word_document_full(root: &OpenXmlElement) -> Vec<ValidationError> {
-    let mut errors = validate_word_document(root);
-    errors.extend(validate_word_particles(root));
+    validate_word_document_full_for_version(
+        root,
+        crate::file_format::FileFormatVersions::OFFICE2007,
+    )
+}
+
+pub fn validate_word_document_full_for_version(
+    root: &OpenXmlElement,
+    version: crate::file_format::FileFormatVersions,
+) -> Vec<ValidationError> {
+    let mut errors = validate_word_document_for_version(root, version);
+    errors.extend(validate_word_particles_for_version(root, version));
     errors.sort_by(|a, b| (&a.path, &a.message).cmp(&(&b.path, &b.message)));
     errors.dedup();
     errors

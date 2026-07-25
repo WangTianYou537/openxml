@@ -101,6 +101,28 @@ pub fn alternate_content_with(
     ])
 }
 
+/// Select the applicable `mc:Choice` or `mc:Fallback` branch without cloning it.
+pub fn selected_alternate_content_branch<'a>(
+    elem: &'a OpenXmlElement,
+    supported_prefixes: &[&str],
+) -> Option<&'a OpenXmlElement> {
+    if elem.local_name != "AlternateContent" {
+        return None;
+    }
+
+    elem.children
+        .iter()
+        .find(|child| {
+            child.local_name == "Choice"
+                && child
+                    .get_attribute("Requires")
+                    .unwrap_or("")
+                    .split_whitespace()
+                    .all(|prefix| supported_prefixes.contains(&prefix))
+        })
+        .or_else(|| elem.children.iter().find(|child| child.local_name == "Fallback"))
+}
+
 /// Select content from an `mc:AlternateContent` element.
 pub fn resolve_alternate_content(
     elem: &OpenXmlElement,
@@ -110,23 +132,9 @@ pub fn resolve_alternate_content(
         return elem.children.clone();
     }
 
-    for child in &elem.children {
-        if child.local_name == "Choice" {
-            let requires = child.get_attribute("Requires").unwrap_or("");
-            let ok = requires
-                .split_whitespace()
-                .all(|p| supported_prefixes.contains(&p));
-            if ok {
-                return child.children.clone();
-            }
-        }
-    }
-    for child in &elem.children {
-        if child.local_name == "Fallback" {
-            return child.children.clone();
-        }
-    }
-    Vec::new()
+    selected_alternate_content_branch(elem, supported_prefixes)
+        .map(|branch| branch.children.clone())
+        .unwrap_or_default()
 }
 
 /// Recursively expand AlternateContent nodes in a tree.
