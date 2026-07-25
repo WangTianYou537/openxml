@@ -769,6 +769,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] CloneableExtensions subset: `clone_to_path` / `clone_to_bytes` / `clone_to_writer` on Word/Excel/PPT (plus existing `clone_document`)
 - [x] `validate_alternate_content` (C# AlternateContentValidator structure rules) + wired into OpenXmlValidator::validate_element
 - [x] `validate_mc_attributes` (C# CompatibilityRuleAttributesValidator: Ignorable/Preserve*/ProcessContent/MustUnderstand)
+- [x] `ValidationError::id` / `error_type` (C# ValidationErrorInfo.Id / ErrorType subset)
 
 **Still intentionally deferred / partial:**
 

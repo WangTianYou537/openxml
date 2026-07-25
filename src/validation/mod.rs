@@ -100,16 +100,102 @@ use crate::element::OpenXmlElement;
 use std::collections::HashMap;
 use std::fmt;
 
-/// A single validation diagnostic.
+/// Classification of a validation diagnostic (C# `ValidationErrorType`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ValidationErrorType {
+    /// Schema / particle / attribute type error.
+    Schema,
+    /// Semantic / Schematron-style rule.
+    Semantic,
+    /// Package structure / part constraint.
+    Package,
+    /// Markup Compatibility rule.
+    MarkupCompatibility,
+}
+
+/// A single validation diagnostic (C# `ValidationErrorInfo` subset).
+///
+/// `id` and `error_type` are derived from the conventional `MessageId: detail`
+/// prefix used throughout this crate (mirrors C# resource ids).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationError {
     pub path: String,
     pub message: String,
 }
 
+impl ValidationError {
+    pub fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            message: message.into(),
+        }
+    }
+
+    /// Stable error identifier when `message` begins with `Token:` (C# `ValidationErrorInfo.Id`).
+    pub fn id(&self) -> Option<&str> {
+        let head = self.message.split_once(':').map(|(h, _)| h.trim())?;
+        if head.is_empty() {
+            return None;
+        }
+        if !head
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return None;
+        }
+        // Prefer known SDK-style prefixes; also accept CamelCase ids without underscore
+        // used by package constraints (PartIsNotAllowed, …).
+        let ok = head.contains('_')
+            || head.starts_with("Sch")
+            || head.starts_with("MC")
+            || head.starts_with("Sem")
+            || head.starts_with("Part")
+            || head.starts_with("Only")
+            || head.starts_with("Required")
+            || head.starts_with("Invalid")
+            || head.starts_with("Data");
+        ok.then_some(head)
+    }
+
+    /// Infer error category from [`Self::id`] / message (C# `ValidationErrorInfo.ErrorType`).
+    pub fn error_type(&self) -> ValidationErrorType {
+        let id = self.id().unwrap_or("");
+        if id.starts_with("MC_") || id.starts_with("MC") {
+            ValidationErrorType::MarkupCompatibility
+        } else if id.starts_with("Sem_")
+            || id.starts_with("Sem")
+            || self.message.contains("relationship id")
+            || self.message.contains("duplicate ")
+        {
+            ValidationErrorType::Semantic
+        } else if id.starts_with("Part")
+            || id.starts_with("Only")
+            || id.starts_with("Required")
+            || id.starts_with("InvalidContent")
+            || id.starts_with("DataPart")
+            || self.path.starts_with("/_rels")
+            || self.path.contains("#")
+                && (self.message.contains("part") || self.message.contains("relationship"))
+        {
+            ValidationErrorType::Package
+        } else {
+            ValidationErrorType::Schema
+        }
+    }
+}
+
 impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.path, self.message)
+        match self.id() {
+            Some(id) => write!(
+                f,
+                "[{:?}/{id}] {}: {}",
+                self.error_type(),
+                self.path,
+                self.message
+            ),
+            None => write!(f, "{}: {}", self.path, self.message),
+        }
     }
 }
 
@@ -415,5 +501,15 @@ mod tests {
         let doc = document(vec![body(vec![paragraph(vec![run(vec![text("hi")])])])]);
         let errs = validate_word_document_full(&doc);
         assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn error_id_from_mc_message() {
+        let e = ValidationError {
+            path: "x".into(),
+            message: "MC_InvalidIgnorableAttribute: bad prefix".into(),
+        };
+        assert_eq!(e.id(), Some("MC_InvalidIgnorableAttribute"));
+        assert_eq!(e.error_type(), ValidationErrorType::MarkupCompatibility);
     }
 }

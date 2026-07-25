@@ -197,4 +197,24 @@ mod tests {
         let errs = OpenXmlValidator::new().validate_package(&pkg);
         assert!(errs.is_empty(), "{errs:?}");
     }
+
+    #[test]
+    fn error_id_and_type_from_message() {
+        let e = ValidationError {
+            path: "root".into(),
+            message: "MC_ShallContainChoice: missing Choice".into(),
+        };
+        assert_eq!(e.id(), Some("MC_ShallContainChoice"));
+        assert_eq!(
+            e.error_type(),
+            crate::validation::ValidationErrorType::MarkupCompatibility
+        );
+
+        let e = ValidationError {
+            path: "/word".into(),
+            message: "PartIsNotAllowed: foo".into(),
+        };
+        assert_eq!(e.id(), Some("PartIsNotAllowed"));
+        assert_eq!(e.error_type(), crate::validation::ValidationErrorType::Package);
+    }
 }
