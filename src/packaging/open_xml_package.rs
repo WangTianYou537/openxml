@@ -499,6 +499,58 @@ impl OpenXmlPackage {
         c
     }
 
+    /// Application host type when registered (C# `IApplicationTypeFeature`).
+    pub fn application_type(&self) -> crate::features::ApplicationType {
+        self.features
+            .get::<crate::features::ApplicationType>()
+            .copied()
+            .unwrap_or(crate::features::ApplicationType::NONE)
+    }
+
+    /// Set application host type on the feature bag.
+    pub fn set_application_type(&mut self, app: crate::features::ApplicationType) {
+        self.features.set(app);
+    }
+
+    /// Main part feature metadata when registered (C# `IMainPartFeature`).
+    pub fn main_part_feature(&self) -> Option<&crate::features::MainPartFeature> {
+        self.features.get::<crate::features::MainPartFeature>()
+    }
+
+    /// Register / replace main part feature metadata.
+    pub fn set_main_part_feature(&mut self, feature: crate::features::MainPartFeature) {
+        self.features.set(feature);
+    }
+
+    /// Document type feature when registered (C# `IDocumentTypeFeature` shell).
+    pub fn document_type_feature(&self) -> Option<&crate::features::DocumentTypeFeature> {
+        self.features.get::<crate::features::DocumentTypeFeature>()
+    }
+
+    /// Register document type feature.
+    pub fn set_document_type_feature(&mut self, feature: crate::features::DocumentTypeFeature) {
+        self.features.set(feature);
+    }
+
+    /// Ensure a disposable feature exists (C# `IDisposableFeature`).
+    pub fn disposable_feature(&mut self) -> &mut crate::features::DisposableFeature {
+        if !self.features.contains::<crate::features::DisposableFeature>() {
+            self.features
+                .set(crate::features::DisposableFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::DisposableFeature>()
+            .expect("just inserted")
+    }
+
+    /// Register a dispose callback run on [`close`](Self::close) (C# `IDisposableFeature.Register`).
+    pub fn register_dispose<F>(&mut self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.disposable_feature().register(f);
+    }
+
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
     pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()
@@ -518,6 +570,9 @@ impl OpenXmlPackage {
         }
         // C# DeleteUnusedDataPartOnClose
         self.opc.delete_unused_data_parts();
+        if let Some(d) = self.features.get_mut::<crate::features::DisposableFeature>() {
+            d.dispose_all();
+        }
         self.mark_closed();
         Ok(())
     }
@@ -641,5 +696,33 @@ mod part_events_tests {
         assert!(!CompatibilityLevel::Version2_20.at_least(CompatibilityLevel::Version3_0));
         let s = OpenSettings::default();
         assert_eq!(s.compatibility_level, CompatibilityLevel::Default);
+    }
+
+    #[test]
+    fn application_type_and_dispose_on_close() {
+        use crate::features::ApplicationType;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        assert_eq!(pkg.application_type(), ApplicationType::NONE);
+        pkg.set_application_type(ApplicationType::WORD);
+        assert_eq!(pkg.application_type(), ApplicationType::WORD);
+        pkg.set_main_part_feature(crate::features::MainPartFeature::new(
+            "rel",
+            "ct",
+            Some("/word/document.xml".into()),
+        ));
+        assert_eq!(
+            pkg.main_part_feature().and_then(|m| m.part_uri.clone()).as_deref(),
+            Some("/word/document.xml")
+        );
+
+        let fired = Arc::new(AtomicBool::new(false));
+        let f = fired.clone();
+        pkg.register_dispose(move || f.store(true, Ordering::SeqCst));
+        pkg.close(false).unwrap();
+        assert!(fired.load(Ordering::SeqCst));
     }
 }

@@ -417,6 +417,145 @@ impl std::ops::BitOrAssign for PackageCapabilities {
     }
 }
 
+/// Application host type flags (C# `ApplicationType`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ApplicationType {
+    bits: u8,
+}
+
+impl ApplicationType {
+    pub const NONE: Self = Self { bits: 0 };
+    pub const WORD: Self = Self { bits: 1 };
+    pub const EXCEL: Self = Self { bits: 1 << 1 };
+    pub const POWERPOINT: Self = Self { bits: 1 << 2 };
+    pub const ALL: Self = Self {
+        bits: Self::WORD.bits | Self::EXCEL.bits | Self::POWERPOINT.bits,
+    };
+
+    pub const fn empty() -> Self {
+        Self::NONE
+    }
+
+    pub const fn union(self, other: Self) -> Self {
+        Self {
+            bits: self.bits | other.bits,
+        }
+    }
+
+    pub const fn contains(self, other: Self) -> bool {
+        (self.bits & other.bits) == other.bits
+    }
+
+    pub const fn intersects(self, other: Self) -> bool {
+        (self.bits & other.bits) != 0
+    }
+
+    pub fn insert(&mut self, other: Self) {
+        self.bits |= other.bits;
+    }
+}
+
+impl std::ops::BitOr for ApplicationType {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        self.union(rhs)
+    }
+}
+
+impl std::ops::BitOrAssign for ApplicationType {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.insert(rhs);
+    }
+}
+
+/// Tracks dispose callbacks for package/part close (C# `IDisposableFeature` shell).
+#[derive(Default)]
+pub struct DisposableFeature {
+    callbacks: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+}
+
+impl std::fmt::Debug for DisposableFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.callbacks.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("DisposableFeature")
+            .field("pending", &n)
+            .finish()
+    }
+}
+
+impl DisposableFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a callback invoked by [`dispose_all`](Self::dispose_all) (C# `Register`).
+    pub fn register<F>(&mut self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.callbacks
+            .lock()
+            .expect("disposable feature lock")
+            .push(Box::new(f));
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.callbacks.lock().map(|g| g.len()).unwrap_or(0)
+    }
+
+    /// Run and clear all registered dispose callbacks (LIFO).
+    pub fn dispose_all(&mut self) {
+        let mut guard = self.callbacks.lock().expect("disposable feature lock");
+        while let Some(cb) = guard.pop() {
+            // Drop the lock while running so re-entrant register is safe.
+            drop(guard);
+            cb();
+            guard = self.callbacks.lock().expect("disposable feature lock");
+        }
+    }
+}
+
+/// Main package part metadata (C# `IMainPartFeature` shell).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MainPartFeature {
+    pub relationship_type: String,
+    pub content_type: String,
+    pub part_uri: Option<String>,
+}
+
+impl MainPartFeature {
+    pub fn new(
+        relationship_type: impl Into<String>,
+        content_type: impl Into<String>,
+        part_uri: Option<String>,
+    ) -> Self {
+        Self {
+            relationship_type: relationship_type.into(),
+            content_type: content_type.into(),
+            part_uri,
+        }
+    }
+
+    pub fn with_uri(mut self, uri: impl Into<String>) -> Self {
+        self.part_uri = Some(uri.into());
+        self
+    }
+}
+
+/// Document type tag for package builders (C# `IDocumentTypeFeature` shell).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DocumentTypeFeature {
+    pub document_type: String,
+}
+
+impl DocumentTypeFeature {
+    pub fn new(document_type: impl Into<String>) -> Self {
+        Self {
+            document_type: document_type.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -512,5 +651,30 @@ mod tests {
         c |= PackageCapabilities::RELOAD;
         assert!(c.contains(PackageCapabilities::RELOAD));
         assert!(c.intersects(PackageCapabilities::SAVE | PackageCapabilities::MALFORMED_URI));
+    }
+
+    #[test]
+    fn application_type_and_disposable() {
+        let t = ApplicationType::WORD | ApplicationType::EXCEL;
+        assert!(t.contains(ApplicationType::WORD));
+        assert!(t.intersects(ApplicationType::EXCEL));
+        assert!(!t.contains(ApplicationType::POWERPOINT));
+        assert!(ApplicationType::ALL.contains(ApplicationType::POWERPOINT));
+
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut d = DisposableFeature::new();
+        let c2 = count.clone();
+        d.register(move || {
+            c2.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(d.pending_count(), 1);
+        d.dispose_all();
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(d.pending_count(), 0);
+
+        let main = MainPartFeature::new("rel", "ct", None).with_uri("/word/document.xml");
+        assert_eq!(main.part_uri.as_deref(), Some("/word/document.xml"));
+        let doc = DocumentTypeFeature::new("WordprocessingDocument");
+        assert_eq!(doc.document_type, "WordprocessingDocument");
     }
 }

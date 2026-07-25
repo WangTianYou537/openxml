@@ -110,8 +110,13 @@ impl WordprocessingDocument {
         settings: OpenSettings,
     ) -> Result<Self> {
         let opc = OpcPackage::create_file(path.as_ref());
+        let mut package = OpenXmlPackage::from_opc(opc, settings);
+        package.set_application_type(crate::features::ApplicationType::WORD);
+        package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
+            "WordprocessingDocument",
+        ));
         Ok(Self {
-            package: OpenXmlPackage::from_opc(opc, settings),
+            package,
             document_type,
             main_document_part: None,
         })
@@ -120,8 +125,13 @@ impl WordprocessingDocument {
     /// Create an in-memory Word document (save with [`save_as`](Self::save_as) or [`to_bytes`](Self::to_bytes)).
     pub fn create_in_memory(document_type: WordprocessingDocumentType) -> Result<Self> {
         let opc = OpcPackage::create();
+        let mut package = OpenXmlPackage::from_opc(opc, OpenSettings::default());
+        package.set_application_type(crate::features::ApplicationType::WORD);
+        package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
+            "WordprocessingDocument",
+        ));
         Ok(Self {
-            package: OpenXmlPackage::from_opc(opc, OpenSettings::default()),
+            package,
             document_type,
             main_document_part: None,
         })
@@ -221,7 +231,11 @@ impl WordprocessingDocument {
 
 
     fn from_opc(opc: OpcPackage, settings: OpenSettings) -> Result<Self> {
-        let package = OpenXmlPackage::from_opc(opc, settings);
+        let mut package = OpenXmlPackage::from_opc(opc, settings);
+        package.set_application_type(crate::features::ApplicationType::WORD);
+        package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
+            "WordprocessingDocument",
+        ));
         let main_uri = package.opc().main_part_uri(rel::OFFICE_DOCUMENT).ok();
         let (document_type, main_document_part) = if let Some(uri) = main_uri {
             let ct = package
@@ -232,6 +246,11 @@ impl WordprocessingDocument {
                 .to_string();
             let doc_type =
                 WordprocessingDocumentType::from_content_type(&ct).unwrap_or_default();
+            package.set_main_part_feature(crate::features::MainPartFeature::new(
+                rel::OFFICE_DOCUMENT,
+                ct.clone(),
+                Some(uri.as_str().to_string()),
+            ));
             let mut part = MainDocumentPart::new(ct);
             // Ensure URI matches actual package part
             if uri.as_str() != MainDocumentPart::URI {

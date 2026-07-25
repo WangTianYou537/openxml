@@ -164,8 +164,13 @@ impl PresentationDocument {
         settings: OpenSettings,
     ) -> Result<Self> {
         let opc = OpcPackage::create_file(path.as_ref());
+        let mut package = OpenXmlPackage::from_opc(opc, settings);
+        package.set_application_type(crate::features::ApplicationType::POWERPOINT);
+        package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
+            "PresentationDocument",
+        ));
         Ok(Self {
-            package: OpenXmlPackage::from_opc(opc, settings),
+            package,
             document_type,
             slides: Vec::new(),
             masters: Vec::new(),
@@ -181,8 +186,13 @@ impl PresentationDocument {
 
     pub fn create_in_memory(document_type: PresentationDocumentType) -> Result<Self> {
         let opc = OpcPackage::create();
+        let mut package = OpenXmlPackage::from_opc(opc, OpenSettings::default());
+        package.set_application_type(crate::features::ApplicationType::POWERPOINT);
+        package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
+            "PresentationDocument",
+        ));
         Ok(Self {
-            package: OpenXmlPackage::from_opc(opc, OpenSettings::default()),
+            package,
             document_type,
             slides: Vec::new(),
             masters: Vec::new(),
@@ -274,7 +284,24 @@ impl PresentationDocument {
 
 
     fn from_opc(opc: OpcPackage, settings: OpenSettings) -> Result<Self> {
-        let package = OpenXmlPackage::from_opc(opc, settings);
+        let mut package = OpenXmlPackage::from_opc(opc, settings);
+        package.set_application_type(crate::features::ApplicationType::POWERPOINT);
+        package.set_document_type_feature(crate::features::DocumentTypeFeature::new(
+            "PresentationDocument",
+        ));
+        if let Ok(uri) = package.opc().main_part_uri(rel::OFFICE_DOCUMENT) {
+            let ct = package
+                .opc()
+                .content_types()
+                .content_type_for(uri.as_str())
+                .unwrap_or("")
+                .to_string();
+            package.set_main_part_feature(crate::features::MainPartFeature::new(
+                rel::OFFICE_DOCUMENT,
+                ct,
+                Some(uri.as_str().to_string()),
+            ));
+        }
         let mut doc = Self {
             package,
             document_type: PresentationDocumentType::Presentation,
