@@ -8,6 +8,7 @@
 mod cfb;
 mod content_types;
 mod custom_properties;
+mod data_part;
 mod extended_properties;
 mod flat_opc;
 mod media;
@@ -20,6 +21,7 @@ mod uri;
 
 pub use cfb::{inspect_vba_project, CfbEntry, CfbFile, CfbObjectType};
 pub use content_types::{ContentTypeOverride, ContentTypes};
+pub use data_part::{DataPart, DataPartReferenceRelationship, IdPartPair};
 pub use custom_properties::{
     CustomProperties, CustomProperty, CustomPropertyValue, CUSTOM_PROP_FMTID,
 };

@@ -742,6 +742,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `TypedPart` runtime handle over generated `PartInfo` (add/find/save/children; constraint-checked)
 - [x] `ReferenceRelationship` / `HyperlinkRelationship` / audio·video·media reference types
 - [x] Element + package `Annotations` (C# AnnotationsFeature); `ChangeIdOfPart` / `GetPartById` / `GetIdOfPart`
+- [x] `DataPart` / `DataPartReferenceRelationship` / `IdPartPair`; `CreateMediaDataPart`, `DeleteUnusedDataParts`, `DeleteReferenceRelationship`
 
 **Still intentionally deferred / partial:**
 

@@ -69,6 +69,8 @@ pub struct OpcPackage {
     dirty: bool,
     /// Compression for non-media/non-font parts when serializing.
     compression: CompressionOption,
+    /// Package-level data/media parts (C# `IDataPartsFeature` / `DataParts`).
+    pub(crate) data_parts: Vec<super::data_part::DataPart>,
 }
 
 impl OpcPackage {
@@ -84,6 +86,7 @@ impl OpcPackage {
             part_rels: IndexMap::new(),
             dirty: true,
             compression: CompressionOption::Normal,
+            data_parts: Vec::new(),
         }
     }
 
@@ -232,7 +235,7 @@ impl OpcPackage {
             }
         }
 
-        Ok(Self {
+        let mut pkg = Self {
             mode: PackageMode::Read,
             path: None,
             parts: RefCell::new(parts),
@@ -242,7 +245,56 @@ impl OpcPackage {
             part_rels,
             dirty: false,
             compression: CompressionOption::Normal,
-        })
+            data_parts: Vec::new(),
+        };
+        // Seed data-part registry from audio/video/media relationships present in the package.
+        pkg.discover_data_parts();
+        Ok(pkg)
+    }
+
+    /// Scan relationships and register targets of data-part reference types.
+    pub fn discover_data_parts(&mut self) {
+        use super::data_part::DataPartReferenceRelationship;
+        let mut uris = Vec::new();
+        for rel in self.package_rels.iter() {
+            if DataPartReferenceRelationship::is_data_part_relationship_type(&rel.relationship_type)
+                && rel.target_mode == RelationshipTargetMode::Internal
+            {
+                if let Ok(u) = self.resolve_relationship(None, rel) {
+                    uris.push(u);
+                }
+            }
+        }
+        let sources: Vec<PackUri> = self.part_rels.keys().cloned().collect();
+        for src in sources {
+            if let Some(rels) = self.part_rels.get(&src) {
+                for rel in rels.iter() {
+                    if DataPartReferenceRelationship::is_data_part_relationship_type(
+                        &rel.relationship_type,
+                    ) && rel.target_mode == RelationshipTargetMode::Internal
+                    {
+                        if let Ok(u) = self.resolve_relationship(Some(&src), rel) {
+                            uris.push(u);
+                        }
+                    }
+                }
+            }
+        }
+        for uri in uris {
+            if !self.has_part(&uri) {
+                continue;
+            }
+            if self.data_parts.iter().any(|p| p.uri == uri) {
+                continue;
+            }
+            let ct = self
+                .content_types
+                .content_type_for(uri.as_str())
+                .unwrap_or("application/octet-stream")
+                .to_string();
+            self.data_parts
+                .push(super::data_part::DataPart::new(uri, ct));
+        }
     }
 
     /// Materialize a part into `Loaded` and return a clone of its bytes.
@@ -480,6 +532,7 @@ impl OpcPackage {
         self.remove_inbound_relationships(uri);
         self.content_types.overrides.shift_remove(uri.as_str());
         self.part_rels.shift_remove(uri);
+        self.data_parts.retain(|p| &p.uri != uri);
         self.dirty = true;
         match self.parts.borrow_mut().shift_remove(uri) {
             Some(PartData::Loaded(d)) => Some(d),
@@ -489,6 +542,11 @@ impl OpcPackage {
             }
             None => None,
         }
+    }
+
+    /// URIs that currently own a relationships part (for whole-package scans).
+    pub fn part_relationship_sources(&self) -> Vec<PackUri> {
+        self.part_rels.keys().cloned().collect()
     }
 
     /// Remove every relationship (package or part) whose resolved internal target is `uri`.

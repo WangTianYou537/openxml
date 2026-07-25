@@ -172,6 +172,36 @@ impl OpenXmlPackage {
         }
     }
 
+    /// Create an empty media data part (C# `CreateMediaDataPart`).
+    pub fn create_media_data_part(
+        &mut self,
+        content_type: &str,
+        extension: Option<&str>,
+    ) -> crate::error::Result<crate::opc::DataPart> {
+        self.opc_mut().create_media_data_part(content_type, extension)
+    }
+
+    /// Create a media data part pre-filled with bytes.
+    pub fn create_media_data_part_with_data(
+        &mut self,
+        content_type: &str,
+        extension: Option<&str>,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::error::Result<crate::opc::DataPart> {
+        self.opc_mut()
+            .create_media_data_part_with_data(content_type, extension, data)
+    }
+
+    /// Registered data parts (C# `DataParts`).
+    pub fn data_parts(&self) -> &[crate::opc::DataPart] {
+        self.opc().data_parts()
+    }
+
+    /// Delete unused (unreferenced) data parts.
+    pub fn delete_unused_data_parts(&mut self) -> usize {
+        self.opc_mut().delete_unused_data_parts()
+    }
+
     pub fn path(&self) -> Option<&Path> {
         self.opc.path()
     }

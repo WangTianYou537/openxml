@@ -13132,6 +13132,75 @@ impl WordprocessingDocument {
             .change_id_of_part(Some(&main), part_uri, new_id)
     }
 
+    /// Child parts as IdPartPair under the main document (C# `Parts`).
+    pub fn id_part_pairs(&self) -> Vec<crate::opc::IdPartPair> {
+        let Some(main) = self.main_document_part.as_ref() else {
+            return Vec::new();
+        };
+        self.package.opc().id_part_pairs(Some(main.uri()))
+    }
+
+    /// Create a media data part in the package (C# `CreateMediaDataPart`).
+    pub fn create_media_data_part(
+        &mut self,
+        content_type: &str,
+        extension: Option<&str>,
+    ) -> Result<crate::opc::DataPart> {
+        self.package
+            .opc_mut()
+            .create_media_data_part(content_type, extension)
+    }
+
+    /// Add a data-part reference from the main document (C# `AddDataPartReferenceRelationship`).
+    pub fn add_data_part_reference_relationship(
+        &mut self,
+        data_part: &crate::opc::DataPart,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> Result<crate::opc::DataPartReferenceRelationship> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?
+            .uri()
+            .clone();
+        self.package.opc_mut().add_data_part_reference_relationship(
+            &main,
+            data_part,
+            relationship_type,
+            id,
+        )
+    }
+
+    /// Data-part references on the main document.
+    pub fn data_part_reference_relationships(
+        &self,
+    ) -> Vec<crate::opc::DataPartReferenceRelationship> {
+        let Some(main) = self.main_document_part.as_ref() else {
+            return Vec::new();
+        };
+        self.package
+            .opc()
+            .data_part_reference_relationships(Some(main.uri()))
+    }
+
+    /// Delete a reference relationship by id on the main document
+    /// (C# `DeleteReferenceRelationship`).
+    pub fn delete_reference_relationship(&mut self, id: &str) -> Option<crate::opc::Relationship> {
+        let main = self.main_document_part.as_ref()?.uri().clone();
+        self.package
+            .opc_mut()
+            .delete_reference_relationship(Some(&main), id)
+    }
+
+    /// Get a reference relationship by id on the main document.
+    pub fn get_reference_relationship(&self, id: &str) -> Option<crate::opc::ReferenceRelationship> {
+        let main = self.main_document_part.as_ref()?.uri();
+        self.package
+            .opc()
+            .get_reference_relationship(Some(main), id)
+    }
+
 
 
     /// Add an arbitrary extended part related from the main document.

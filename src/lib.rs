@@ -72,7 +72,8 @@ pub use features::{
 pub use file_format::FileFormatVersions;
 pub use opc::{
     add_media_part, AudioReferenceRelationship, CompressionOption, CustomProperties,
-    CustomProperty, CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind,
+    DataPart, DataPartReferenceRelationship, IdPartPair,
+    CustomProperty, CustomPropertyValue, ExtendedProperties, HyperlinkRelationship, MediaKind, media_rel,
     MediaPartInfo, MediaReferenceRelationship, PackageProperties, PartUriHelper,
     ReferenceRelationship, RelatedPart, VideoReferenceRelationship,
 };

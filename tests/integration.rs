@@ -3280,6 +3280,54 @@ fn semantic_unique_and_delete_part() {
 
 
 
+
+#[test]
+fn data_part_and_id_part_pair() {
+    use officexml::{DataPart, IdPartPair, MediaKind};
+
+    let mut doc =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    doc.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("x")]));
+    doc.add_default_styles().unwrap();
+
+    let pairs = doc.id_part_pairs();
+    assert!(!pairs.is_empty());
+    assert!(pairs.iter().any(|p: &IdPartPair| p.part_uri.as_str().contains("styles")));
+
+    let part: DataPart = doc
+        .create_media_data_part("audio/mpeg", Some("mp3"))
+        .unwrap();
+    doc.package_mut()
+        .opc_mut()
+        .feed_data_part(&part.uri, b"ID3data")
+        .unwrap();
+    let dpr = doc
+        .add_data_part_reference_relationship(
+            &part,
+            MediaKind::Audio.relationship_type(),
+            Some("rIdAudio1"),
+        )
+        .unwrap();
+    assert_eq!(dpr.id(), "rIdAudio1");
+    assert!(dpr.is_audio());
+    assert_eq!(doc.data_part_reference_relationships().len(), 1);
+    assert!(doc.get_reference_relationship("rIdAudio1").is_some());
+
+    // still referenced
+    assert!(doc
+        .package_mut()
+        .opc_mut()
+        .delete_data_part(&part.uri)
+        .is_err());
+    assert!(doc.delete_reference_relationship("rIdAudio1").is_some());
+    assert!(doc
+        .package_mut()
+        .opc_mut()
+        .delete_data_part(&part.uri)
+        .unwrap());
+}
+
 #[test]
 fn annotations_and_change_id() {
     use officexml::namespace::rel;

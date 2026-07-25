@@ -108,7 +108,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 |------|-----|------|--------|
 | **流式/可写流包** | `StreamPackageFeature`, `IPackageStreamFeature` | ✅ `open_stream`/`write_to` + lazy ZIP；非完全流式写入 | 🟡 |
 | **OpenSettings** | AutoSave, MaxCharactersInPart, MC process mode, CompatibilityLevel | Rust 仅部分 AutoSave 语义 | 中 |
-| **DataPart / MediaDataPart** | 音视频等媒体数据部件 | ✅ media data parts + PPT attach helpers | ✅ |
+| **DataPart / MediaDataPart** | 音视频等媒体数据部件 | ✅ DataPart registry + CreateMediaDataPart / FeedData / refs | ✅ |
 | **ExternalRelationship 专用类型** | Hyperlink/Audio/Video reference types | 超链接有；音视频引用无 | 中 |
 | **ExtendedPart** 任意扩展部件 | 有 | 可用底层 `set_part`，无类型包装 | 低 |
 | **DeletePartsRecursivelyOfType** | 有 | 无递归按类型删除 | 低 |
