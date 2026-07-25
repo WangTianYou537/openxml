@@ -1252,6 +1252,18 @@ impl PartUriFeature {
         self.helper.is_reserved(uri)
     }
 
+    pub fn reserved_uris(&self) -> Vec<crate::opc::PackUri> {
+        self.helper.reserved_uris()
+    }
+
+    pub fn unreserve(&mut self, uri: &crate::opc::PackUri) -> bool {
+        self.helper.unreserve(uri)
+    }
+
+    pub fn sequence_number(&self, content_type: &str) -> u32 {
+        self.helper.sequence_number(content_type)
+    }
+
     /// Allocate a unique part URI (C# `IPartUriFeature.CreatePartUri`).
     pub fn create_part_uri(
         &mut self,

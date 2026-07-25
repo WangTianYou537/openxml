@@ -99,6 +99,28 @@ impl PartUriHelper {
         self.sequence_numbers.clear();
     }
 
+    pub fn reserved_uris(&self) -> Vec<PackUri> {
+        let mut uris = self
+            .reserved
+            .iter()
+            .map(|uri| PackUri::new(uri.as_str()))
+            .collect::<Vec<_>>();
+        uris.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+        uris
+    }
+
+    pub fn unreserve(&mut self, uri: &PackUri) -> bool {
+        self.reserved.remove(&normalize(uri.as_str()))
+    }
+
+    pub fn sequence_number(&self, content_type: &str) -> u32 {
+        self.sequence_numbers.get(content_type).copied().unwrap_or(0)
+    }
+
+    pub fn is_numbered_content_type(content_type: &str) -> bool {
+        numbered_content_types().contains(content_type)
+    }
+
     /// Create a unique part URI under `parent`.
     ///
     /// `target_path` is relative to the parent part (e.g. `"media"`, `"../charts"`, `"."`).
@@ -571,6 +593,12 @@ mod reserve_uri_tests {
         h.reserve_uri("image/png", &u);
         assert!(h.is_reserved(&u));
         assert_eq!(h.reserved_count(), 1);
+        assert_eq!(h.reserved_uris(), vec![u.clone()]);
+        assert_eq!(h.sequence_number("image/png"), 1);
+        assert!(!PartUriHelper::is_numbered_content_type("image/png"));
+        assert!(PartUriHelper::is_numbered_content_type(
+            "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
+        ));
         let parent = PackUri::new("/word/document.xml");
         let next = h
             .create_part_uri("image/png", &parent, "media", "image", ".png", true)
@@ -578,8 +606,12 @@ mod reserve_uri_tests {
         // sequence advanced once by reserve_uri, so next unique should not collide
         assert!(h.is_reserved(&next));
         assert_ne!(next.as_str(), u.as_str());
+        assert!(h.unreserve(&u));
+        assert!(!h.is_reserved(&u));
+        assert!(!h.unreserve(&u));
         h.clear();
         assert_eq!(h.reserved_count(), 0);
+        assert_eq!(h.sequence_number("image/png"), 0);
         let _ = OpcPackage::create();
     }
 

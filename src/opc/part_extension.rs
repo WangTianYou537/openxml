@@ -61,6 +61,33 @@ impl PartExtensionProvider {
         self.map.is_empty()
     }
 
+    pub fn remove(&mut self, content_type: &str) -> Option<String> {
+        self.map.remove(content_type)
+    }
+
+    pub fn clear(&mut self) {
+        self.map.clear();
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.map
+            .iter()
+            .map(|(content_type, extension)| (content_type.as_str(), extension.as_str()))
+    }
+
+    pub fn content_types(&self) -> Vec<&str> {
+        let mut values = self.map.keys().map(|s| s.as_str()).collect::<Vec<_>>();
+        values.sort();
+        values
+    }
+
+    pub fn extensions(&self) -> Vec<&str> {
+        let mut values = self.map.values().map(|s| s.as_str()).collect::<Vec<_>>();
+        values.sort();
+        values.dedup();
+        values
+    }
+
     fn add_known(&mut self) {
         const KNOWN: &[(&str, &str)] = &[
             ("image/unknown", ".bin"),
@@ -119,5 +146,12 @@ mod tests {
         assert_eq!(p.extension_or_bin("application/x-custom"), ".bin");
         p.register("application/x-custom", "xyz");
         assert_eq!(p.try_get_extension("application/x-custom"), Some(".xyz"));
+        assert!(p.content_types().contains(&"application/x-custom"));
+        assert!(p.extensions().contains(&".xyz"));
+        assert!(p.iter().any(|(ct, ext)| ct == "application/x-custom" && ext == ".xyz"));
+        assert_eq!(p.remove("application/x-custom").as_deref(), Some(".xyz"));
+        assert!(!p.contains("application/x-custom"));
+        p.clear();
+        assert!(p.is_empty());
     }
 }

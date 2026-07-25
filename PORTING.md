@@ -936,6 +936,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ElementMetadataFactoryFeature` remove/clear/type_names/is_empty
 - [x] `OpenXmlNamespaceResolverFeature` extended namespace enumerate/remove/clear helpers
 
+- [x] `PartExtensionProvider` enumerate/remove/clear helpers + package register/remove wrappers
+- [x] `PartUriHelper` reserved URI enumerate/unreserve/sequence inspection
+- [x] `PartUriFeature` + `OpenXmlPackage` ensure-unique/unreserve/query wrappers
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

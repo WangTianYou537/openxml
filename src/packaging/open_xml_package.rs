@@ -392,6 +392,23 @@ impl OpenXmlPackage {
             .to_string()
     }
 
+    pub fn register_part_extension(
+        &mut self,
+        content_type: impl Into<String>,
+        extension: impl AsRef<str>,
+    ) {
+        self.part_extension_provider()
+            .register(content_type, extension);
+    }
+
+    pub fn remove_part_extension(&mut self, content_type: &str) -> Option<String> {
+        self.part_extension_provider().remove(content_type)
+    }
+
+    pub fn has_part_extension(&mut self, content_type: &str) -> bool {
+        self.part_extension_provider().contains(content_type)
+    }
+
     /// Register a content-type default by extension (C# content types map default entry).
     pub fn set_content_type_default(
         &mut self,
@@ -2378,6 +2395,28 @@ impl OpenXmlPackage {
         self.part_uri_feature().is_reserved(uri)
     }
 
+    pub fn reserved_part_uris(&mut self) -> Vec<crate::opc::PackUri> {
+        self.part_uri_feature().reserved_uris()
+    }
+
+    pub fn unreserve_part_uri(&mut self, uri: &crate::opc::PackUri) -> bool {
+        self.part_uri_feature().unreserve(uri)
+    }
+
+    pub fn part_uri_sequence_number(&mut self, content_type: &str) -> u32 {
+        self.part_uri_feature().sequence_number(content_type)
+    }
+
+    pub fn ensure_unique_part_uri(
+        &mut self,
+        content_type: &str,
+        parent: &crate::opc::PackUri,
+        target: &str,
+    ) -> crate::error::Result<crate::opc::PackUri> {
+        self.part_uri_feature()
+            .ensure_unique_part_uri(content_type, parent, target)
+    }
+
     /// Create an empty part using [`PartTypeInfo`] (C# part create with content type + extension).
     pub fn create_part_from_type_info(
         &mut self,
@@ -3769,6 +3808,24 @@ mod part_events_tests {
             .unwrap();
         assert!(uri.as_str().contains("/word/media/image"));
         assert!(pkg.part_uri_feature().is_reserved(&uri));
+        assert!(pkg.is_part_uri_reserved(&uri));
+        assert!(pkg.reserved_part_uris().contains(&uri));
+        assert!(pkg.part_uri_sequence_number("image/png") >= 1);
+        let unique = pkg
+            .ensure_unique_part_uri("image/png", &parent, "media/image.png")
+            .unwrap();
+        assert_ne!(unique, uri);
+        assert!(pkg.unreserve_part_uri(&uri));
+        assert!(!pkg.is_part_uri_reserved(&uri));
+
+        pkg.register_part_extension("application/x-test", "tst");
+        assert!(pkg.has_part_extension("application/x-test"));
+        assert_eq!(pkg.extension_for_content_type("application/x-test"), ".tst");
+        assert_eq!(
+            pkg.remove_part_extension("application/x-test").as_deref(),
+            Some(".tst")
+        );
+        assert!(!pkg.has_part_extension("application/x-test"));
     }
 
     #[test]
