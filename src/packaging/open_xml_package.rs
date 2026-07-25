@@ -656,12 +656,27 @@ impl OpenXmlPackage {
     }
 
     /// Create an empty media data part (C# `CreateMediaDataPart`).
+    ///
+    /// When `extension` is `None`, the package [`PartExtensionProvider`] is consulted
+    /// (C# `IPartExtensionFeature`).
     pub fn create_media_data_part(
         &mut self,
         content_type: &str,
         extension: Option<&str>,
     ) -> crate::error::Result<crate::opc::DataPart> {
-        let part = self.opc_mut().create_media_data_part(content_type, extension)?;
+        let owned_ext;
+        let ext = match extension {
+            Some(e) => Some(e),
+            None => {
+                owned_ext = self
+                    .part_extension_provider()
+                    .extension_or_bin(content_type)
+                    .trim_start_matches('.')
+                    .to_string();
+                Some(owned_ext.as_str())
+            }
+        };
+        let part = self.opc_mut().create_media_data_part(content_type, ext)?;
         self.data_parts_feature_mut().add(part.uri.as_str());
         Ok(part)
     }
@@ -673,9 +688,21 @@ impl OpenXmlPackage {
         extension: Option<&str>,
         data: impl Into<Vec<u8>>,
     ) -> crate::error::Result<crate::opc::DataPart> {
+        let owned_ext;
+        let ext = match extension {
+            Some(e) => Some(e),
+            None => {
+                owned_ext = self
+                    .part_extension_provider()
+                    .extension_or_bin(content_type)
+                    .trim_start_matches('.')
+                    .to_string();
+                Some(owned_ext.as_str())
+            }
+        };
         let part = self
             .opc_mut()
-            .create_media_data_part_with_data(content_type, extension, data)?;
+            .create_media_data_part_with_data(content_type, ext, data)?;
         self.data_parts_feature_mut().add(part.uri.as_str());
         Ok(part)
     }
@@ -2349,5 +2376,18 @@ mod part_events_tests {
             .expect("ref");
         assert_eq!(got.target, "https://example.com/new");
         assert!(got.is_external);
+    }
+
+    #[test]
+    fn media_create_uses_part_extension_provider() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        pkg.part_extension_provider()
+            .register("application/x-custom-media", "cmx");
+        let part = pkg
+            .create_media_data_part("application/x-custom-media", None)
+            .expect("media");
+        assert!(part.uri.as_str().ends_with(".cmx"));
+        assert!(pkg.data_parts_feature().contains(part.uri.as_str()));
     }
 }

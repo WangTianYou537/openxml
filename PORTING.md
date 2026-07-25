@@ -846,6 +846,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Word/Excel/PPT route orphan/content-type delete paths through package APIs
 - [x] `OpenXmlPackage::{add_external_relationship_with_id,set_external_relationship_target}` keep ref feature bags
 - [x] Word `set_hyperlink_target` / `remove_hyperlink_by_id` / attachedTemplate set/clear route through package APIs
+- [x] `FeatureEventArgs` / `FeatureEventHub` (C# `FeatureEventArgs` / `IFeatureEvent` / `IRaiseFeatureEvent` shell)
+- [x] Media data-part create consults package `PartExtensionProvider` when extension is omitted
 
 **Still intentionally deferred / partial:**
 

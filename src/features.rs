@@ -1641,6 +1641,80 @@ impl PackageInitializerFeature {
     }
 }
 
+/// Generic feature event args (C# `FeatureEventArgs<TArg>`).
+#[derive(Debug, Clone)]
+pub struct FeatureEventArgs<TArg> {
+    pub event_type: PackageEventType,
+    pub argument: TArg,
+}
+
+impl<TArg> FeatureEventArgs<TArg> {
+    pub fn new(event_type: PackageEventType, argument: TArg) -> Self {
+        Self {
+            event_type,
+            argument,
+        }
+    }
+}
+
+/// Generic feature event hub (C# `IFeatureEvent<TArg>` + `IRaiseFeatureEvent<TArg>` shell).
+#[derive(Clone, Default)]
+pub struct FeatureEventHub<TArg: Clone + Send + Sync + 'static> {
+    listeners: Arc<Mutex<Vec<Arc<dyn Fn(&FeatureEventArgs<TArg>) + Send + Sync>>>>,
+    _marker: std::marker::PhantomData<TArg>,
+}
+
+impl<TArg: Clone + Send + Sync + 'static> std::fmt::Debug for FeatureEventHub<TArg> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.listeners.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("FeatureEventHub")
+            .field("listeners", &n)
+            .finish()
+    }
+}
+
+impl<TArg: Clone + Send + Sync + 'static> FeatureEventHub<TArg> {
+    pub fn new() -> Self {
+        Self {
+            listeners: Arc::new(Mutex::new(Vec::new())),
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn subscribe<F>(&self, f: F) -> usize
+    where
+        F: Fn(&FeatureEventArgs<TArg>) + Send + Sync + 'static,
+    {
+        let mut g = self.listeners.lock().expect("feature event lock");
+        g.push(Arc::new(f));
+        g.len() - 1
+    }
+
+    pub fn unsubscribe(&self, id: usize) {
+        let mut g = self.listeners.lock().expect("feature event lock");
+        if id < g.len() {
+            g[id] = Arc::new(|_: &FeatureEventArgs<TArg>| {});
+        }
+    }
+
+    /// Raise an event (C# `IRaiseFeatureEvent.OnChange`).
+    pub fn on_change(&self, event_type: PackageEventType, argument: TArg) {
+        let args = FeatureEventArgs::new(event_type, argument);
+        let listeners = self
+            .listeners
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        for l in listeners {
+            l(&args);
+        }
+    }
+
+    pub fn listener_count(&self) -> usize {
+        self.listeners.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
 /// Application host type flags (C# `ApplicationType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ApplicationType {
@@ -2231,5 +2305,27 @@ mod tests {
         assert!(shared.contains("ParagraphId"));
         assert!(shared.remove("ParagraphId"));
         assert_eq!(shared.count(), 0);
+    }
+
+    #[test]
+    fn feature_event_hub_on_change() {
+        let hub = FeatureEventHub::<String>::new();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let last = Arc::new(Mutex::new(String::new()));
+        let h = hits.clone();
+        let l = last.clone();
+        hub.subscribe(move |e| {
+            if e.event_type == PackageEventType::Added {
+                h.fetch_add(1, Ordering::SeqCst);
+                *l.lock().unwrap() = e.argument.clone();
+            }
+        });
+        hub.on_change(PackageEventType::Added, "/word/document.xml".into());
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            last.lock().unwrap().as_str(),
+            "/word/document.xml"
+        );
+        assert_eq!(hub.listener_count(), 1);
     }
 }
