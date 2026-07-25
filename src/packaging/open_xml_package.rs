@@ -1391,6 +1391,74 @@ impl OpenXmlPackage {
         id
     }
 
+    /// Add an external relationship with an explicit id after relationship filters.
+    pub fn add_external_relationship_with_id(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+        relationship_type: &str,
+        target: &str,
+    ) -> String {
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            id,
+            relationship_type,
+            target,
+        )
+        .with_target_mode("External");
+        if let Some(s) = source {
+            builder = builder.with_source_uri(s.as_str());
+        }
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let rid = if builder.id.is_empty() {
+            self.opc.add_external_relationship(
+                source,
+                &builder.relationship_type,
+                &builder.target,
+            )
+        } else {
+            self.opc.add_external_relationship_with_id(
+                source,
+                &builder.id,
+                &builder.relationship_type,
+                &builder.target,
+            )
+        };
+        self.reference_relationships_feature().add(
+            &rid,
+            &builder.relationship_type,
+            &builder.target,
+            true,
+        );
+        rid
+    }
+
+    /// Update an external relationship target (and optional type) by id, keeping
+    /// reference feature bags in sync.
+    pub fn set_external_relationship_target(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+        new_target: &str,
+    ) -> Option<String> {
+        let old = self.opc.get_reference_relationship(source, id)?;
+        if !old.is_external {
+            return None;
+        }
+        let rel_type = old.relationship_type.clone();
+        let _ = self.delete_reference_relationship(source, id);
+        Some(self.add_external_relationship_with_id(
+            source,
+            id,
+            &rel_type,
+            new_target,
+        ))
+    }
+
     /// Delete a reference relationship by id and drop it from feature shells
     /// (C# `DeleteReferenceRelationship`).
     pub fn delete_reference_relationship(
@@ -2243,5 +2311,43 @@ mod part_events_tests {
         assert!(!pkg.parts_feature().contains(theme.as_str()));
         assert!(pkg.parts_feature().contains(doc.as_str()));
         assert!(pkg.get_reference_relationship(Some(&doc), &rid).is_none());
+    }
+
+    #[test]
+    fn set_external_relationship_target_tracks_features() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        pkg.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            b"<w:document/>".to_vec(),
+        );
+        let id = pkg.add_external_relationship(
+            Some(&doc),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://example.com/old",
+        );
+        assert!(pkg.reference_relationships_feature().contains(&id));
+        assert_eq!(
+            pkg.reference_relationships_feature()
+                .try_get(&id)
+                .map(|t| t.1),
+            Some("https://example.com/old")
+        );
+        assert!(pkg
+            .set_external_relationship_target(Some(&doc), &id, "https://example.com/new")
+            .is_some());
+        assert_eq!(
+            pkg.reference_relationships_feature()
+                .try_get(&id)
+                .map(|t| t.1),
+            Some("https://example.com/new")
+        );
+        let got = pkg
+            .get_reference_relationship(Some(&doc), &id)
+            .expect("ref");
+        assert_eq!(got.target, "https://example.com/new");
+        assert!(got.is_external);
     }
 }

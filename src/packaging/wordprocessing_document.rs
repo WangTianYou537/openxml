@@ -4997,24 +4997,17 @@ impl WordprocessingDocument {
     /// this stores `w:attachedTemplate` with `r:id` after creating an external relationship.
     pub fn set_attached_template(&mut self, template_path: &str) -> Result<String> {
         let (settings_uri, mut root) = self.ensure_settings_root()?;
-        let rid = self
-            .package
-            .opc_mut()
-            .part_relationships_mut(&settings_uri)
-            .add(
-                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate",
-                template_path,
-                RelationshipTargetMode::External,
-            )
-            .id
-            .clone();
+        let rid = self.package.add_external_relationship(
+            Some(&settings_uri),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate",
+            template_path,
+        );
         root.children.retain(|c| c.local_name != "attachedTemplate");
         root.append_child(
             OpenXmlElement::w("attachedTemplate").with_attribute_qname("r:id", &rid),
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(rid)
     }
@@ -5042,15 +5035,13 @@ impl WordprocessingDocument {
         root.children.retain(|c| c.local_name != "attachedTemplate");
         let removed = root.children.len() < before;
         if let Some(id) = rid {
-            self.package
-                .opc_mut()
-                .part_relationships_mut(&settings_uri)
-                .remove(&id);
+            let _ = self
+                .package
+                .delete_reference_relationship(Some(&settings_uri), &id);
         }
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
                 .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(removed)
@@ -9596,19 +9587,19 @@ impl WordprocessingDocument {
             return Ok(false);
         };
         let main_uri = main.part().uri.clone();
-        let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-        // remove and re-add with same id if present
-        let Some(old) = rels.get(rid).cloned() else {
+        let Some(old) = self
+            .package
+            .get_reference_relationship(Some(&main_uri), rid)
+        else {
             return Ok(false);
         };
         if !old.relationship_type.contains("hyperlink") && old.relationship_type != rel::HYPERLINK {
             return Ok(false);
         }
-        let mode = old.target_mode;
-        let ty = old.relationship_type.clone();
-        rels.remove(rid);
-        rels.add_with_id(rid, ty, new_url, mode);
-        Ok(true)
+        Ok(self
+            .package
+            .set_external_relationship_target(Some(&main_uri), rid, new_url)
+            .is_some())
     }
 
     /// Remove an external hyperlink relationship by rId. Returns whether found.
@@ -9621,8 +9612,10 @@ impl WordprocessingDocument {
             return Ok(false);
         };
         let main_uri = main.part().uri.clone();
-        let rels = self.package.opc_mut().part_relationships_mut(&main_uri);
-        Ok(rels.remove(rid).is_some())
+        Ok(self
+            .package
+            .delete_reference_relationship(Some(&main_uri), rid)
+            .is_some())
     }
 
     /// List body `w:hyperlink` elements as `(rId_or_empty, anchor_or_empty, display_text)`.
