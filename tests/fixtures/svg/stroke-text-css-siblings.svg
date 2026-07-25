@@ -1,0 +1,17 @@
+<svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .a + .b { fill: #ef4444; }
+    .a ~ .c { stroke: #22c55e; stroke-width: 2; }
+  </style>
+  <polyline class="a" points="10,80 40,20 70,80" fill="none" stroke="#111"
+            stroke-width="6" stroke-linejoin="miter" stroke-miterlimit="2"/>
+  <rect class="b" x="100" y="30" width="40" height="30"/>
+  <circle class="c" cx="200" cy="50" r="18" fill="#94a3b8"/>
+  <g transform="scale(2)">
+    <line x1="10" y1="60" x2="50" y2="60" stroke="#0ea5e9" stroke-width="2"
+          vector-effect="non-scaling-stroke"/>
+  </g>
+  <text x="20" y="130" font-size="18" font-family="Liberation Sans, sans-serif"
+        textLength="120" lengthAdjust="spacing" dominant-baseline="middle"
+        fill="#0f172a">TEXT</text>
+</svg>

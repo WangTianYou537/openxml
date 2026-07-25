@@ -8,8 +8,14 @@ use super::matrix::{parse_numbers, Matrix};
 /// Absolute path segment after normalization.
 #[derive(Debug, Clone)]
 pub enum Segment {
-    MoveTo { x: f64, y: f64 },
-    LineTo { x: f64, y: f64 },
+    MoveTo {
+        x: f64,
+        y: f64,
+    },
+    LineTo {
+        x: f64,
+        y: f64,
+    },
     CubicTo {
         x1: f64,
         y1: f64,
@@ -18,7 +24,12 @@ pub enum Segment {
         x: f64,
         y: f64,
     },
-    QuadTo { x1: f64, y1: f64, x: f64, y: f64 },
+    QuadTo {
+        x1: f64,
+        y1: f64,
+        x: f64,
+        y: f64,
+    },
     Close,
 }
 
@@ -231,7 +242,8 @@ pub fn parse_path(d: &str) -> Vec<Segment> {
                     } else {
                         (vals[5], vals[6])
                     };
-                    let cubics = arc_to_cubics(cursor.0, cursor.1, rx, ry, x_rot, large, sweep, x, y);
+                    let cubics =
+                        arc_to_cubics(cursor.0, cursor.1, rx, ry, x_rot, large, sweep, x, y);
                     for (x1, y1, x2, y2, ex, ey) in cubics {
                         segs.push(Segment::CubicTo {
                             x1,
@@ -305,6 +317,26 @@ pub fn transform_segments(segs: &[Segment], m: Matrix) -> Vec<Segment> {
         .collect()
 }
 
+/// Scale all path points about the axis-aligned bbox center by `factor`.
+/// Used to approximate CSS `stroke-alignment: inner|outer` on freeforms
+/// (true parallel offset is expensive; uniform inset/outset of geometry is
+/// the same approximation used for rect/circle/ellipse).
+pub fn scale_segments_about_center(segs: &[Segment], factor: f64) -> Vec<Segment> {
+    if (factor - 1.0).abs() < 1e-12 {
+        return segs.to_vec();
+    }
+    let Some((min_x, min_y, max_x, max_y)) = bounds(segs) else {
+        return segs.to_vec();
+    };
+    let cx = (min_x + max_x) * 0.5;
+    let cy = (min_y + max_y) * 0.5;
+    // then = other * self → apply translate(-c), then scale, then translate(+c).
+    let m = Matrix::translate(-cx, -cy)
+        .then(Matrix::scale(factor, factor))
+        .then(Matrix::translate(cx, cy));
+    transform_segments(segs, m)
+}
+
 /// Bounding box of path segments.
 pub fn bounds(segs: &[Segment]) -> Option<(f64, f64, f64, f64)> {
     let mut min_x = f64::INFINITY;
@@ -355,10 +387,7 @@ pub fn ellipse_path(cx: f64, cy: f64, rx: f64, ry: f64) -> Vec<Segment> {
     let ox = rx * k;
     let oy = ry * k;
     vec![
-        Segment::MoveTo {
-            x: cx + rx,
-            y: cy,
-        },
+        Segment::MoveTo { x: cx + rx, y: cy },
         Segment::CubicTo {
             x1: cx + rx,
             y1: cy + oy,
@@ -415,14 +444,8 @@ pub fn rect_path(x: f64, y: f64, w: f64, h: f64, mut rx: f64, mut ry: f64) -> Ve
     let ox = rx * k;
     let oy = ry * k;
     vec![
-        Segment::MoveTo {
-            x: x + rx,
-            y,
-        },
-        Segment::LineTo {
-            x: x + w - rx,
-            y,
-        },
+        Segment::MoveTo { x: x + rx, y },
+        Segment::LineTo { x: x + w - rx, y },
         Segment::CubicTo {
             x1: x + w - rx + ox,
             y1: y,
@@ -455,10 +478,7 @@ pub fn rect_path(x: f64, y: f64, w: f64, h: f64, mut rx: f64, mut ry: f64) -> Ve
             x,
             y: y + h - ry,
         },
-        Segment::LineTo {
-            x,
-            y: y + ry,
-        },
+        Segment::LineTo { x, y: y + ry },
         Segment::CubicTo {
             x1: x,
             y1: y + ry - oy,
@@ -741,6 +761,221 @@ pub fn sample_points(segs: &[Segment], samples_per_curve: usize) -> Vec<(f64, f6
     pts
 }
 
+/// Expand a stroked path into discrete dash segments using SVG `stroke-dasharray`
+/// pattern (alternating on/off lengths in user units). Returns a list of open
+/// polylines (as MoveTo/LineTo chains). Empty if the path has no length.
+pub fn dash_segments(segs: &[Segment], dash: &[f64], dash_offset: f64) -> Vec<Vec<Segment>> {
+    if segs.is_empty() || dash.is_empty() {
+        return vec![segs.to_vec()];
+    }
+    let pattern: Vec<f64> = dash.iter().map(|v| (*v).abs().max(0.0)).collect();
+    if pattern.iter().all(|&v| v <= 0.0) {
+        return vec![segs.to_vec()];
+    }
+    // Dense polyline approximation of the path.
+    let dens = densify(segs, 12);
+    if dens.len() < 2 {
+        return Vec::new();
+    }
+    // Cumulative lengths
+    let mut cum = vec![0.0_f64; dens.len()];
+    for i in 1..dens.len() {
+        let dx = dens[i].0 - dens[i - 1].0;
+        let dy = dens[i].1 - dens[i - 1].1;
+        cum[i] = cum[i - 1] + (dx * dx + dy * dy).sqrt();
+    }
+    let total = *cum.last().unwrap();
+    if total <= 1e-9 {
+        return Vec::new();
+    }
+    let pat_sum: f64 = pattern.iter().sum();
+    if pat_sum <= 1e-9 {
+        return vec![segs.to_vec()];
+    }
+
+    // Walk along the path, emitting on-segments.
+    let mut out: Vec<Vec<Segment>> = Vec::new();
+    let mut pos = dash_offset.rem_euclid(pat_sum);
+    // Find which pattern slot `pos` falls into and whether it's an "on" slot.
+    let (mut slot, mut slot_pos) = {
+        let mut acc = 0.0;
+        let mut s = 0usize;
+        loop {
+            let plen = pattern[s % pattern.len()];
+            if pos < acc + plen || plen <= 0.0 {
+                break (s, pos - acc);
+            }
+            acc += plen;
+            s += 1;
+            if s > pattern.len() * 4 {
+                break (0, 0.0);
+            }
+        }
+    };
+    let mut path_pos = 0.0_f64;
+    while path_pos < total - 1e-9 {
+        let plen = pattern[slot % pattern.len()].max(1e-6);
+        let remain_in_slot = (plen - slot_pos).max(0.0);
+        let remain_on_path = total - path_pos;
+        let step = remain_in_slot.min(remain_on_path);
+        let is_on = (slot % 2) == 0; // even indices are dashes (drawn)
+        if is_on && step > 1e-6 {
+            let a = path_pos;
+            let b = path_pos + step;
+            if let Some(poly) = extract_subpoly(&dens, &cum, a, b) {
+                if poly.len() >= 2 {
+                    let mut chain = Vec::with_capacity(poly.len());
+                    chain.push(Segment::MoveTo {
+                        x: poly[0].0,
+                        y: poly[0].1,
+                    });
+                    for p in poly.iter().skip(1) {
+                        chain.push(Segment::LineTo { x: p.0, y: p.1 });
+                    }
+                    out.push(chain);
+                }
+            }
+        }
+        path_pos += step;
+        slot_pos += step;
+        if slot_pos >= plen - 1e-12 {
+            slot += 1;
+            slot_pos = 0.0;
+        }
+    }
+    out
+}
+
+fn densify(segs: &[Segment], samples_per_curve: usize) -> Vec<(f64, f64)> {
+    // Like sample_points but also densifies long straight segments.
+    let mut pts = Vec::new();
+    let mut cur = (0.0_f64, 0.0_f64);
+    let n = samples_per_curve.max(1);
+    let max_seg = 4.0_f64; // user units
+    let push_line = |pts: &mut Vec<(f64, f64)>, from: (f64, f64), to: (f64, f64)| {
+        let dx = to.0 - from.0;
+        let dy = to.1 - from.1;
+        let len = (dx * dx + dy * dy).sqrt();
+        let steps = ((len / max_seg).ceil() as usize).max(1);
+        for i in 1..=steps {
+            let t = i as f64 / steps as f64;
+            pts.push((from.0 + dx * t, from.1 + dy * t));
+        }
+    };
+    for s in segs {
+        match *s {
+            Segment::MoveTo { x, y } => {
+                cur = (x, y);
+                if pts.last().copied() != Some(cur) {
+                    pts.push(cur);
+                }
+            }
+            Segment::LineTo { x, y } => {
+                let to = (x, y);
+                push_line(&mut pts, cur, to);
+                cur = to;
+            }
+            Segment::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                let p0 = cur;
+                // adaptive-ish fixed samples
+                let approx_len = {
+                    let a = ((x1 - p0.0).hypot(y1 - p0.1))
+                        + ((x2 - x1).hypot(y2 - y1))
+                        + ((x - x2).hypot(y - y2));
+                    a
+                };
+                let steps = ((approx_len / max_seg).ceil() as usize).max(n);
+                for i in 1..=steps {
+                    let t = i as f64 / steps as f64;
+                    pts.push(cubic_point(p0, (x1, y1), (x2, y2), (x, y), t));
+                }
+                cur = (x, y);
+            }
+            Segment::QuadTo { x1, y1, x, y } => {
+                let p0 = cur;
+                let approx_len = ((x1 - p0.0).hypot(y1 - p0.1)) + ((x - x1).hypot(y - y1));
+                let steps = ((approx_len / max_seg).ceil() as usize).max(n);
+                for i in 1..=steps {
+                    let t = i as f64 / steps as f64;
+                    pts.push(quad_point(p0, (x1, y1), (x, y), t));
+                }
+                cur = (x, y);
+            }
+            Segment::Close => {
+                if let Some(&first) = pts.first() {
+                    if (first.0 - cur.0).abs() > 1e-9 || (first.1 - cur.1).abs() > 1e-9 {
+                        push_line(&mut pts, cur, first);
+                        cur = first;
+                    }
+                }
+            }
+        }
+    }
+    pts
+}
+
+fn extract_subpoly(dens: &[(f64, f64)], cum: &[f64], a: f64, b: f64) -> Option<Vec<(f64, f64)>> {
+    if b <= a + 1e-9 || dens.len() < 2 {
+        return None;
+    }
+    let mut out = Vec::new();
+    // start point
+    out.push(point_at(dens, cum, a)?);
+    for i in 1..dens.len() {
+        if cum[i] <= a + 1e-12 {
+            continue;
+        }
+        if cum[i] >= b - 1e-12 {
+            break;
+        }
+        out.push(dens[i]);
+    }
+    out.push(point_at(dens, cum, b)?);
+    // dedup consecutive
+    out.dedup_by(|p, q| (p.0 - q.0).abs() < 1e-9 && (p.1 - q.1).abs() < 1e-9);
+    Some(out)
+}
+
+fn point_at(dens: &[(f64, f64)], cum: &[f64], s: f64) -> Option<(f64, f64)> {
+    if dens.is_empty() {
+        return None;
+    }
+    if s <= 0.0 {
+        return Some(dens[0]);
+    }
+    let total = *cum.last()?;
+    if s >= total {
+        return dens.last().copied();
+    }
+    // binary search
+    let mut lo = 0usize;
+    let mut hi = cum.len() - 1;
+    while lo + 1 < hi {
+        let mid = (lo + hi) / 2;
+        if cum[mid] <= s {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let (s0, s1) = (cum[lo], cum[hi]);
+    let t = if (s1 - s0).abs() < 1e-12 {
+        0.0
+    } else {
+        ((s - s0) / (s1 - s0)).clamp(0.0, 1.0)
+    };
+    let (x0, y0) = dens[lo];
+    let (x1, y1) = dens[hi];
+    Some((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t))
+}
+
 fn cubic_point(
     p0: (f64, f64),
     p1: (f64, f64),
@@ -773,7 +1008,7 @@ pub fn marker_anchors(segs: &[Segment]) -> Option<MarkerAnchors> {
     }
     let start = pts[0];
     let end = *pts.last().unwrap();
-    // mid vertices: original LineTo/MoveTo corners only
+    // mid vertices: original LineTo/MoveTo/curve end corners only
     let mut corners = Vec::new();
     for s in segs {
         match *s {
@@ -782,11 +1017,27 @@ pub fn marker_anchors(segs: &[Segment]) -> Option<MarkerAnchors> {
             Segment::Close => {}
         }
     }
-    let mids = if corners.len() > 2 {
-        corners[1..corners.len() - 1].to_vec()
-    } else {
-        Vec::new()
-    };
+    let mut mids = Vec::new();
+    let mut mid_angles = Vec::new();
+    if corners.len() > 2 {
+        for i in 1..corners.len() - 1 {
+            let prev = corners[i - 1];
+            let cur = corners[i];
+            let next = corners[i + 1];
+            // Bisect incoming/outgoing tangents for a stable mid orientation.
+            let a1 = (cur.1 - prev.1).atan2(cur.0 - prev.0);
+            let a2 = (next.1 - cur.1).atan2(next.0 - cur.0);
+            let mut d = a2 - a1;
+            while d > std::f64::consts::PI {
+                d -= std::f64::consts::TAU;
+            }
+            while d < -std::f64::consts::PI {
+                d += std::f64::consts::TAU;
+            }
+            mids.push(cur);
+            mid_angles.push(a1 + d * 0.5);
+        }
+    }
     let start_ang = {
         let (dx, dy) = (pts[1].0 - pts[0].0, pts[1].1 - pts[0].1);
         dy.atan2(dx)
@@ -799,6 +1050,7 @@ pub fn marker_anchors(segs: &[Segment]) -> Option<MarkerAnchors> {
     Some(MarkerAnchors {
         start,
         mids,
+        mid_angles,
         end,
         start_angle: start_ang,
         end_angle: end_ang,
@@ -809,6 +1061,8 @@ pub fn marker_anchors(segs: &[Segment]) -> Option<MarkerAnchors> {
 pub struct MarkerAnchors {
     pub start: (f64, f64),
     pub mids: Vec<(f64, f64)>,
+    /// Tangent (or bisector) angle at each mid vertex, radians.
+    pub mid_angles: Vec<f64>,
     pub end: (f64, f64),
     pub start_angle: f64,
     pub end_angle: f64,
@@ -823,12 +1077,42 @@ pub fn clip_segments_to_rect(segs: &[Segment], rect: (f64, f64, f64, f64)) -> Ve
     clip_segments_by_predicate(segs, |x, y| point_in_rect(x, y, rect))
 }
 
-/// Clip path segments to an arbitrary polygon (even-odd fill rule).
+/// Clip path segments to an arbitrary polygon (clip-rule evenodd or nonzero).
 pub fn clip_segments_to_polygon(segs: &[Segment], poly: &[(f64, f64)]) -> Vec<Segment> {
-    if segs.is_empty() || poly.len() < 3 {
+    clip_segments_to_polygon_rule(segs, poly, true)
+}
+
+/// Clip path segments using SVG clip-rule (`evenodd` vs `nonzero`).
+pub fn clip_segments_to_polygon_rule(
+    segs: &[Segment],
+    poly: &[(f64, f64)],
+    even_odd: bool,
+) -> Vec<Segment> {
+    clip_segments_to_polygons_rule(segs, &[poly.to_vec()], even_odd)
+}
+
+/// Clip against a union of polygons (SVG clipPath with multiple children).
+pub fn clip_segments_to_polygons_rule(
+    segs: &[Segment],
+    polys: &[Vec<(f64, f64)>],
+    even_odd: bool,
+) -> Vec<Segment> {
+    if segs.is_empty() || polys.is_empty() {
         return Vec::new();
     }
-    clip_segments_by_predicate(segs, |x, y| point_in_polygon(x, y, poly))
+    let usable: Vec<&[(f64, f64)]> = polys
+        .iter()
+        .map(|p| p.as_slice())
+        .filter(|p| p.len() >= 3)
+        .collect();
+    if usable.is_empty() {
+        return Vec::new();
+    }
+    clip_segments_by_predicate(segs, |x, y| {
+        usable
+            .iter()
+            .any(|poly| point_in_polygon_rule(x, y, poly, even_odd))
+    })
 }
 
 fn clip_segments_by_predicate<F>(segs: &[Segment], inside: F) -> Vec<Segment>
@@ -864,22 +1148,48 @@ pub fn point_in_rect(x: f64, y: f64, rect: (f64, f64, f64, f64)) -> bool {
 
 /// Even-odd point-in-polygon test.
 pub fn point_in_polygon(x: f64, y: f64, poly: &[(f64, f64)]) -> bool {
+    point_in_polygon_rule(x, y, poly, true)
+}
+
+/// Even-odd (SVG default for clip-rule historically in many UAs) vs nonzero winding.
+pub fn point_in_polygon_rule(x: f64, y: f64, poly: &[(f64, f64)], even_odd: bool) -> bool {
     if poly.len() < 3 {
         return false;
     }
-    let mut inside = false;
-    let mut j = poly.len() - 1;
-    for i in 0..poly.len() {
-        let (xi, yi) = poly[i];
-        let (xj, yj) = poly[j];
-        let intersect = ((yi > y) != (yj > y))
-            && (x < (xj - xi) * (y - yi) / (yj - yi + 1e-30) + xi);
-        if intersect {
-            inside = !inside;
+    if even_odd {
+        let mut inside = false;
+        let mut j = poly.len() - 1;
+        for i in 0..poly.len() {
+            let (xi, yi) = poly[i];
+            let (xj, yj) = poly[j];
+            let intersect =
+                ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi + 1e-30) + xi);
+            if intersect {
+                inside = !inside;
+            }
+            j = i;
         }
-        j = i;
+        inside
+    } else {
+        // Nonzero winding number (Hormann/Agathos-style).
+        let mut wn = 0_i32;
+        let mut j = poly.len() - 1;
+        for i in 0..poly.len() {
+            let (xi, yi) = poly[i];
+            let (xj, yj) = poly[j];
+            // isLeft(j→i, p) = (xi-xj)*(y-yj) - (x-xj)*(yi-yj)
+            let is_left = (xi - xj) * (y - yj) - (x - xj) * (yi - yj);
+            if yj <= y {
+                if yi > y && is_left > 0.0 {
+                    wn += 1; // upward crossing
+                }
+            } else if yi <= y && is_left < 0.0 {
+                wn -= 1; // downward crossing
+            }
+            j = i;
+        }
+        wn != 0
     }
-    inside
 }
 
 /// Approximate polygon from path (corner points).
@@ -920,5 +1230,36 @@ mod tests {
         // C then S — S should reflect
         let s = parse_path("M0 0 C10 0 20 10 30 10 S50 0 60 0");
         assert_eq!(s.len(), 3);
+    }
+
+    #[test]
+    fn point_in_polygon_evenodd_vs_nonzero() {
+        // Axis-aligned square — both rules agree.
+        let square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)];
+        assert!(point_in_polygon_rule(5.0, 5.0, &square, true));
+        assert!(point_in_polygon_rule(5.0, 5.0, &square, false));
+        assert!(!point_in_polygon_rule(15.0, 5.0, &square, true));
+        assert!(!point_in_polygon_rule(15.0, 5.0, &square, false));
+
+        // Self-overlapping pentagram-like star: evenodd empties the center, nonzero fills it.
+        let star = [
+            (0.0, 0.0),
+            (5.0, 8.0),
+            (10.0, 0.0),
+            (2.0, 6.0),
+            (8.0, 6.0),
+        ];
+        // Center of the star should be evenodd=false, nonzero=true.
+        assert!(
+            !point_in_polygon_rule(5.0, 5.0, &star, true),
+            "evenodd should leave star center empty"
+        );
+        assert!(
+            point_in_polygon_rule(5.0, 5.0, &star, false),
+            "nonzero should fill star center"
+        );
+        // A tip of the star filled under both.
+        assert!(point_in_polygon_rule(5.0, 7.0, &star, true));
+        assert!(point_in_polygon_rule(5.0, 7.0, &star, false));
     }
 }

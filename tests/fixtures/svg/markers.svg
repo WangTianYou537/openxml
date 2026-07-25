@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180">
+  <title>Start, mid and end markers</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#dc2626"/>
+    </marker>
+    <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto" markerUnits="userSpaceOnUse">
+      <circle cx="5" cy="5" r="4" fill="#16a34a"/>
+    </marker>
+  </defs>
+  <path d="M30 45 L110 20 L190 65 L280 30" fill="none" stroke="#1e3a8a" stroke-width="4" marker-start="url(#dot)" marker-mid="url(#dot)" marker-end="url(#arrow)"/>
+  <polyline points="35,135 110,95 190,145 315,105" fill="none" stroke="#7c3aed" stroke-width="3" marker="url(#arrow)"/>
+</svg>

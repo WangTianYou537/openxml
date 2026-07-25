@@ -4,18 +4,18 @@ use super::open_xml_package::{OpenSettings, OpenXmlPackage};
 use crate::element::{parse_element, write_element, OpenXmlElement};
 use crate::error::{Error, Result};
 use crate::namespace::{content_type, rel};
-use crate::opc::{Relationships, 
-    CustomProperties, ExtendedProperties, OpcPackage, PackageMode, PackageProperties, PackUri,
-    RelationshipTargetMode,
+use crate::opc::{
+    CustomProperties, ExtendedProperties, OpcPackage, PackUri, PackageMode, PackageProperties,
+    RelationshipTargetMode, Relationships,
 };
 use crate::presentation::{
-    common_slide_data, group_shape_properties, group_shape_pr, dissolve_transition, fade_transition, handout_master, header_footer,
-    auto_shape, notes_master, notes_size, notes_slide, picture_shape, presentation, section,
-    section_list, section_list_ext, shape_tree, slide, slide_comment,
-    slide_comments, text_shape,
-    slide_id, slide_id_list, slide_layout, slide_layout_id, slide_master, slide_master_id,
-    slide_master_id_list, slide_size, slide_texts, slide_transition, slide_with_text,
-    solid_slide_background, table_graphic_frame, replace_slide_text, SLIDE_SIZE_16_9,
+    auto_shape, common_slide_data, dissolve_transition, fade_transition, group_shape_pr,
+    group_shape_properties, handout_master, header_footer, notes_master, notes_size, notes_slide,
+    picture_shape, presentation, replace_slide_text, section, section_list, section_list_ext,
+    shape_tree, slide, slide_comment, slide_comments, slide_id, slide_id_list, slide_layout,
+    slide_layout_id, slide_master, slide_master_id, slide_master_id_list, slide_size, slide_texts,
+    slide_transition, slide_with_text, solid_slide_background, table_graphic_frame, text_shape,
+    SLIDE_SIZE_16_9,
 };
 use std::path::Path;
 
@@ -122,10 +122,7 @@ pub struct PresentationDocument {
 
 impl PresentationDocument {
     /// Create a new presentation at `path`.
-    pub fn create(
-        path: impl AsRef<Path>,
-        document_type: PresentationDocumentType,
-    ) -> Result<Self> {
+    pub fn create(path: impl AsRef<Path>, document_type: PresentationDocumentType) -> Result<Self> {
         Self::create_with_settings(path, document_type, OpenSettings::default())
     }
 
@@ -309,7 +306,6 @@ impl PresentationDocument {
     pub fn package_mut(&mut self) -> &mut OpenXmlPackage {
         &mut self.package
     }
-
 
     /// Alias for [`open_bytes`](Self::open_bytes).
     pub fn from_bytes(data: impl AsRef<[u8]>) -> Result<Self> {
@@ -891,13 +887,7 @@ impl PresentationDocument {
             .opc()
             .package_relationships()
             .iter()
-            .map(|r| {
-                (
-                    r.id.clone(),
-                    r.relationship_type.clone(),
-                    r.target.clone(),
-                )
-            })
+            .map(|r| (r.id.clone(), r.relationship_type.clone(), r.target.clone()))
             .collect()
     }
 
@@ -909,18 +899,11 @@ impl PresentationDocument {
             .part_relationships(&pres)
             .map(|rels| {
                 rels.iter()
-                    .map(|r| {
-                        (
-                            r.id.clone(),
-                            r.relationship_type.clone(),
-                            r.target.clone(),
-                        )
-                    })
+                    .map(|r| (r.id.clone(), r.relationship_type.clone(), r.target.clone()))
                     .collect()
             })
             .unwrap_or_default()
     }
-
 
     /// Count relationships from the presentation part.
     pub fn presentation_relationship_count(&self) -> usize {
@@ -1165,13 +1148,7 @@ impl PresentationDocument {
             .part_relationships(&slide_info.uri)
             .map(|rels| {
                 rels.iter()
-                    .map(|r| {
-                        (
-                            r.id.clone(),
-                            r.relationship_type.clone(),
-                            r.target.clone(),
-                        )
-                    })
+                    .map(|r| (r.id.clone(), r.relationship_type.clone(), r.target.clone()))
                     .collect()
             })
             .unwrap_or_default())
@@ -1191,12 +1168,7 @@ impl PresentationDocument {
     }
 
     /// Write/replace raw part bytes and content type.
-    pub fn set_part_bytes(
-        &mut self,
-        uri: &str,
-        content_type: &str,
-        data: impl Into<Vec<u8>>,
-    ) {
+    pub fn set_part_bytes(&mut self, uri: &str, content_type: &str, data: impl Into<Vec<u8>>) {
         self.package
             .opc_mut()
             .set_part(PackUri::new(uri), content_type, data);
@@ -1232,11 +1204,9 @@ impl PresentationDocument {
         extension: &str,
     ) -> Result<String> {
         let uri = PackUri::new(format!("/docProps/thumbnail.{extension}"));
-        self.package.opc_mut().set_part(
-            uri.clone(),
-            content_type_str,
-            image_bytes.into(),
-        );
+        self.package
+            .opc_mut()
+            .set_part(uri.clone(), content_type_str, image_bytes.into());
         if let Some(existing) = self
             .package
             .opc()
@@ -1263,7 +1233,9 @@ impl PresentationDocument {
             || self
                 .package
                 .opc()
-                .part_uris().into_iter().any(|u| u.as_str().starts_with("/docProps/thumbnail."))
+                .part_uris()
+                .into_iter()
+                .any(|u| u.as_str().starts_with("/docProps/thumbnail."))
     }
 
     /// Remove the package thumbnail part and relationship.
@@ -1271,8 +1243,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/docProps/thumbnail."))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/docProps/thumbnail."))
             .collect();
         let had_rel = self
             .package
@@ -1373,7 +1346,9 @@ impl PresentationDocument {
     pub fn digital_signature_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.starts_with("/_xmlsignatures/") && s.ends_with(".xml")
             })
@@ -1385,8 +1360,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/_xmlsignatures/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/_xmlsignatures/"))
             .collect();
         let had_rel = self
             .package
@@ -1469,7 +1445,6 @@ impl PresentationDocument {
         Ok((rid, part_uri))
     }
 
-
     /// Attach a custom XML properties part to an existing custom XML item part.
     pub fn add_custom_xml_properties(
         &mut self,
@@ -1547,8 +1522,9 @@ impl PresentationDocument {
         let pres_uri = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT)?;
         let mut index = 1u32;
         let uri = loop {
-            let candidate =
-                PackUri::new(format!("/ppt/embeddings/Microsoft_Object{index}.{extension}"));
+            let candidate = PackUri::new(format!(
+                "/ppt/embeddings/Microsoft_Object{index}.{extension}"
+            ));
             if !self.package.opc().has_part(&candidate) {
                 break candidate;
             }
@@ -1565,8 +1541,6 @@ impl PresentationDocument {
         );
         Ok((rid, uri))
     }
-
-
 
     /// Alias for [`add_embedded_package`](Self::add_embedded_package) using package content type.
     pub fn add_embedded_package_part(
@@ -1613,14 +1587,18 @@ impl PresentationDocument {
     pub fn has_embeddings(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().starts_with("/ppt/embeddings/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().starts_with("/ppt/embeddings/"))
     }
 
     /// Count embedding parts under `/ppt/embeddings/`.
     pub fn embedding_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/embeddings/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/embeddings/"))
             .count()
     }
 
@@ -1628,8 +1606,9 @@ impl PresentationDocument {
     pub fn list_embeddings(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/embeddings/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/embeddings/"))
             .collect()
     }
 
@@ -1696,7 +1675,9 @@ impl PresentationDocument {
     pub fn has_vba_project(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("vbaProject") || u.as_str().ends_with("vbaProject.bin"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("vbaProject") || u.as_str().ends_with("vbaProject.bin"))
     }
 
     /// Remove VBA project parts and their relationships.
@@ -1729,20 +1710,22 @@ impl PresentationDocument {
 
     /// Parse `vbaProject.bin` CFB structure (streams/storages inventory; no macro execution).
     pub fn inspect_vba_project(&self) -> crate::Result<Option<crate::opc::CfbFile>> {
-        let Some(bytes) = self.vba_project_bytes() else { return Ok(None); };
+        let Some(bytes) = self.vba_project_bytes() else {
+            return Ok(None);
+        };
         Ok(Some(crate::opc::inspect_vba_project(&bytes)?))
     }
-
 
     pub fn clear_vba_project(&mut self) -> Result<bool> {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.contains("vbaProject") || s.contains("vbaData")
             })
-            
             .collect();
         if uris.is_empty() {
             return Ok(false);
@@ -1771,10 +1754,7 @@ impl PresentationDocument {
     }
 
     /// Add a Custom UI part (`/customUI/customUI.xml`) at package level.
-    pub fn add_custom_ui(
-        &mut self,
-        custom_ui_xml: impl AsRef<[u8]>,
-    ) -> Result<(String, PackUri)> {
+    pub fn add_custom_ui(&mut self, custom_ui_xml: impl AsRef<[u8]>) -> Result<(String, PackUri)> {
         let uri = PackUri::new("/customUI/customUI.xml");
         self.package.opc_mut().set_part(
             uri.clone(),
@@ -1850,7 +1830,10 @@ impl PresentationDocument {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package.opc_mut().package_relationships_mut().remove(&id);
+                self.package
+                    .opc_mut()
+                    .package_relationships_mut()
+                    .remove(&id);
             }
         }
         if had_part {
@@ -1860,10 +1843,7 @@ impl PresentationDocument {
     }
 
     /// Add a printer settings binary part shell related from the presentation.
-    pub fn add_printer_settings(
-        &mut self,
-        data: impl Into<Vec<u8>>,
-    ) -> Result<(String, PackUri)> {
+    pub fn add_printer_settings(&mut self, data: impl Into<Vec<u8>>) -> Result<(String, PackUri)> {
         let pres_uri = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT)?;
         let mut index = 1u32;
         let uri = loop {
@@ -1900,7 +1880,9 @@ impl PresentationDocument {
     pub fn printer_settings_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 u.as_str().contains("printerSettings") || u.as_str().contains("PrinterSettings")
             })
             .count()
@@ -1911,10 +1893,11 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 u.as_str().contains("printerSettings") || u.as_str().contains("PrinterSettings")
             })
-            
             .collect();
         let n = uris.len();
         if n == 0 {
@@ -1944,17 +1927,12 @@ impl PresentationDocument {
     }
 
     /// Add attached toolbars binary part shell related from the presentation.
-    pub fn add_attached_toolbars(
-        &mut self,
-        data: impl Into<Vec<u8>>,
-    ) -> Result<(String, PackUri)> {
+    pub fn add_attached_toolbars(&mut self, data: impl Into<Vec<u8>>) -> Result<(String, PackUri)> {
         let pres_uri = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT)?;
         let uri = PackUri::new("/ppt/attachedToolbars.bin");
-        self.package.opc_mut().set_part(
-            uri.clone(),
-            content_type::ATTACHED_TOOLBARS,
-            data.into(),
-        );
+        self.package
+            .opc_mut()
+            .set_part(uri.clone(), content_type::ATTACHED_TOOLBARS, data.into());
         if let Some(existing) = self
             .package
             .opc()
@@ -1983,7 +1961,9 @@ impl PresentationDocument {
             || self
                 .package
                 .opc()
-                .part_uris().into_iter().any(|u| u.as_str().contains("attachedToolbars"))
+                .part_uris()
+                .into_iter()
+                .any(|u| u.as_str().contains("attachedToolbars"))
     }
 
     /// Remove attached toolbars part and relationship.
@@ -2020,13 +2000,13 @@ impl PresentationDocument {
         let mso = "http://schemas.microsoft.com/office/2006/01/customui";
         let root = OpenXmlElement::new("mso", mso, "customUI")
             .with_ns_decl("mso", mso)
-            .with_child(
-                OpenXmlElement::new("mso", mso, "ribbon").with_child(
-                    OpenXmlElement::new("mso", mso, "qat").with_child(
-                        OpenXmlElement::new("mso", mso, "sharedControls"),
-                    ),
-                ),
-            );
+            .with_child(OpenXmlElement::new("mso", mso, "ribbon").with_child(
+                OpenXmlElement::new("mso", mso, "qat").with_child(OpenXmlElement::new(
+                    "mso",
+                    mso,
+                    "sharedControls",
+                )),
+            ));
         self.package.opc_mut().set_part(
             uri.clone(),
             content_type::QAT,
@@ -2082,7 +2062,10 @@ impl PresentationDocument {
             .get_by_type(rel::QAT)
             .map(|r| r.id.clone())
         {
-            self.package.opc_mut().package_relationships_mut().remove(&id);
+            self.package
+                .opc_mut()
+                .package_relationships_mut()
+                .remove(&id);
         }
         if had_part {
             self.package.opc_mut().remove_part(&uri);
@@ -2157,7 +2140,10 @@ impl PresentationDocument {
             .get_by_type(rel::LABEL_INFO)
             .map(|r| r.id.clone())
         {
-            self.package.opc_mut().package_relationships_mut().remove(&id);
+            self.package
+                .opc_mut()
+                .package_relationships_mut()
+                .remove(&id);
         }
         if had_part {
             self.package.opc_mut().remove_part(&uri);
@@ -2174,11 +2160,13 @@ impl PresentationDocument {
         let we_uri = PackUri::new("/ppt/webextensions/webextension1.xml");
         let tp_uri = PackUri::new("/ppt/webextensions/taskpanes.xml");
         let we = "http://schemas.microsoft.com/office/webextensions/webextension/2010/11";
-        let wetp =
-            "http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11";
+        let wetp = "http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11";
         let ext = OpenXmlElement::new("we", we, "webextension")
             .with_ns_decl("we", we)
-            .with_attribute("id", format!("{{{}-0000-0000-0000-000000000000}}", store_id))
+            .with_attribute(
+                "id",
+                format!("{{{}-0000-0000-0000-000000000000}}", store_id),
+            )
             .with_child(
                 OpenXmlElement::new("we", we, "reference")
                     .with_attribute("id", store_id)
@@ -2249,14 +2237,18 @@ impl PresentationDocument {
     pub fn has_web_extensions(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("/ppt/webextensions/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("/ppt/webextensions/"))
     }
 
     /// Count web extension parts under `/ppt/webextensions/`.
     pub fn web_extension_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/webextensions/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/webextensions/"))
             .count()
     }
 
@@ -2265,8 +2257,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/webextensions/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/webextensions/"))
             .collect();
         let n = uris.len();
         if n == 0 {
@@ -2280,7 +2273,10 @@ impl PresentationDocument {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package.opc_mut().package_relationships_mut().remove(&id);
+                self.package
+                    .opc_mut()
+                    .package_relationships_mut()
+                    .remove(&id);
             }
         }
         if let Ok(pres_uri) = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT) {
@@ -2310,19 +2306,22 @@ impl PresentationDocument {
         Ok(n)
     }
 
-
     /// Whether any SmartArt/diagram parts exist under `/ppt/diagrams/`.
     pub fn has_diagrams(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("/ppt/diagrams/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("/ppt/diagrams/"))
     }
 
     /// Count diagram parts under `/ppt/diagrams/`.
     pub fn diagram_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/diagrams/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/diagrams/"))
             .count()
     }
 
@@ -2330,8 +2329,9 @@ impl PresentationDocument {
     pub fn list_diagrams(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/diagrams/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/diagrams/"))
             .collect()
     }
 
@@ -2372,7 +2372,6 @@ impl PresentationDocument {
         Ok(n)
     }
 
-
     /// Add a SmartArt / diagram parts shell (data, layout, colors, style, persist layout).
     ///
     /// Creates minimal diagram parts under `/ppt/diagrams/` related from the main
@@ -2412,15 +2411,13 @@ impl PresentationDocument {
                                 OpenXmlElement::new("dgm", dgm, "prSet")
                                     .with_attribute("phldr", "1"),
                             )
-                            .with_child(
-                                OpenXmlElement::new("a", a, "t").with_child(
-                                    OpenXmlElement::new("a", a, "p").with_child(
-                                        OpenXmlElement::new("a", a, "r").with_child(
-                                            OpenXmlElement::new("a", a, "t").with_text("Node"),
-                                        ),
+                            .with_child(OpenXmlElement::new("a", a, "t").with_child(
+                                OpenXmlElement::new("a", a, "p").with_child(
+                                    OpenXmlElement::new("a", a, "r").with_child(
+                                        OpenXmlElement::new("a", a, "t").with_text("Node"),
                                     ),
                                 ),
-                            ),
+                            )),
                     ),
             )
             .with_child(OpenXmlElement::new("dgm", dgm, "cxnLst"));
@@ -2451,11 +2448,9 @@ impl PresentationDocument {
             (&style_uri, content_type::DIAGRAM_STYLE, style),
             (&drawing_uri, content_type::DIAGRAM_PERSIST_LAYOUT, drawing),
         ] {
-            self.package.opc_mut().set_part(
-                uri.clone(),
-                ct,
-                crate::element::write_element(&el)?,
-            );
+            self.package
+                .opc_mut()
+                .set_part(uri.clone(), ct, crate::element::write_element(&el)?);
         }
         // Relate four core diagram parts from main document
         for (uri, rel_ty) in [
@@ -2480,7 +2475,6 @@ impl PresentationDocument {
         );
         Ok(data_uri)
     }
-
 
     /// Add legacy diagram text parts shell (VML diagram text).
     pub fn add_legacy_diagram_text(
@@ -2569,12 +2563,13 @@ impl PresentationDocument {
         Ok((rid, uri))
     }
 
-
     /// Whether any media/image parts exist under `/ppt/media/`.
     pub fn has_images(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().starts_with("/ppt/media/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().starts_with("/ppt/media/"))
     }
 
     /// Count media/image parts under `/ppt/media/`.
@@ -2586,8 +2581,9 @@ impl PresentationDocument {
     pub fn list_images(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/media/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/media/"))
             .collect()
     }
 
@@ -2629,8 +2625,7 @@ impl PresentationDocument {
                 .map(|rels| {
                     rels.iter()
                         .filter(|r| {
-                            r.relationship_type == rel::IMAGE
-                                || r.target.contains("media/")
+                            r.relationship_type == rel::IMAGE || r.target.contains("media/")
                         })
                         .map(|r| r.id.clone())
                         .collect()
@@ -2702,10 +2697,13 @@ impl PresentationDocument {
 
     /// Read an integer custom property by name.
     pub fn get_custom_property_i4(&self, name: &str) -> Result<Option<i32>> {
-        Ok(self.custom_properties()?.get(name).and_then(|p| match &p.value {
-            crate::opc::CustomPropertyValue::I4(v) => Some(*v),
-            _ => None,
-        }))
+        Ok(self
+            .custom_properties()?
+            .get(name)
+            .and_then(|p| match &p.value {
+                crate::opc::CustomPropertyValue::I4(v) => Some(*v),
+                _ => None,
+            }))
     }
 
     /// Set a boolean custom property by name.
@@ -2717,10 +2715,13 @@ impl PresentationDocument {
 
     /// Read a boolean custom property by name.
     pub fn get_custom_property_bool(&self, name: &str) -> Result<Option<bool>> {
-        Ok(self.custom_properties()?.get(name).and_then(|p| match &p.value {
-            crate::opc::CustomPropertyValue::Bool(v) => Some(*v),
-            _ => None,
-        }))
+        Ok(self
+            .custom_properties()?
+            .get(name)
+            .and_then(|p| match &p.value {
+                crate::opc::CustomPropertyValue::Bool(v) => Some(*v),
+                _ => None,
+            }))
     }
 
     /// List custom property names.
@@ -2784,7 +2785,6 @@ impl PresentationDocument {
         self.validate()
     }
 
-
     /// Validate OPC package structure.
     pub fn validate_package(&self) -> Result<Vec<crate::validation::ValidationError>> {
         Ok(crate::validation::validate_package(
@@ -2842,12 +2842,15 @@ impl PresentationDocument {
         ))
     }
 
-
     /// Validate Schematron attribute constraints on the main document part root.
     pub fn validate_schematron_attributes(
         &self,
     ) -> Result<Vec<crate::validation::ValidationError>> {
-        let main_uri = match self.package.opc().main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT) {
+        let main_uri = match self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+        {
             Ok(u) => u,
             Err(_) => return Ok(Vec::new()),
         };
@@ -2862,7 +2865,6 @@ impl PresentationDocument {
     pub fn delete_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
         self.package.opc_mut().remove_part(&uri)
     }
-
 
     /// Alias for [`delete_part`](Self::delete_part).
     pub fn remove_part(&mut self, uri: &PackUri) -> Option<Vec<u8>> {
@@ -2980,11 +2982,10 @@ impl PresentationDocument {
 
     /// Set the layout type attribute (`p:sldLayout/@type`), e.g. `"blank"`, `"title"`, `"obj"`.
     pub fn set_slide_layout_type(&mut self, layout_index: usize, layout_type: &str) -> Result<()> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&layout.uri) {
             parse_element(data)?
         } else {
@@ -2992,11 +2993,9 @@ impl PresentationDocument {
         };
         root.set_attribute("type", layout_type);
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout.uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -3015,11 +3014,10 @@ impl PresentationDocument {
 
     /// Set whether a layout is preserved (`p:sldLayout/@preserve`).
     pub fn set_slide_layout_preserve(&mut self, layout_index: usize, preserve: bool) -> Result<()> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&layout.uri) {
             parse_element(data)?
         } else {
@@ -3027,11 +3025,9 @@ impl PresentationDocument {
         };
         root.set_attribute("preserve", if preserve { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout.uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -3057,11 +3053,10 @@ impl PresentationDocument {
         layout_index: usize,
         name: &str,
     ) -> Result<()> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&layout.uri) {
             parse_element(data)?
         } else {
@@ -3069,11 +3064,9 @@ impl PresentationDocument {
         };
         root.set_attribute("matchingName", name);
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout.uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -3097,11 +3090,10 @@ impl PresentationDocument {
 
     /// Clear layout `@matchingName`.
     pub fn clear_slide_layout_matching_name(&mut self, layout_index: usize) -> Result<bool> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&layout.uri) else {
             return Ok(false);
         };
@@ -3120,11 +3112,10 @@ impl PresentationDocument {
 
     /// Clear layout `@preserve` attribute.
     pub fn clear_slide_layout_preserve(&mut self, layout_index: usize) -> Result<bool> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&layout.uri) else {
             return Ok(false);
         };
@@ -3143,11 +3134,10 @@ impl PresentationDocument {
 
     /// Clear layout `@userDrawn` attribute.
     pub fn clear_slide_layout_user_drawn(&mut self, layout_index: usize) -> Result<bool> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&layout.uri) else {
             return Ok(false);
         };
@@ -3166,11 +3156,10 @@ impl PresentationDocument {
 
     /// Clear layout `@type` attribute.
     pub fn clear_slide_layout_type(&mut self, layout_index: usize) -> Result<bool> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&layout.uri) else {
             return Ok(false);
         };
@@ -3188,15 +3177,11 @@ impl PresentationDocument {
     }
 
     /// Clear layout `@showMasterSp` attribute.
-    pub fn clear_slide_layout_show_master_shapes(
-        &mut self,
-        layout_index: usize,
-    ) -> Result<bool> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+    pub fn clear_slide_layout_show_master_shapes(&mut self, layout_index: usize) -> Result<bool> {
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&layout.uri) else {
             return Ok(false);
         };
@@ -3214,15 +3199,11 @@ impl PresentationDocument {
     }
 
     /// Clear layout `@showMasterPhAnim` attribute.
-    pub fn clear_slide_layout_show_master_ph_anim(
-        &mut self,
-        layout_index: usize,
-    ) -> Result<bool> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+    pub fn clear_slide_layout_show_master_ph_anim(&mut self, layout_index: usize) -> Result<bool> {
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&layout.uri) else {
             return Ok(false);
         };
@@ -3230,7 +3211,8 @@ impl PresentationDocument {
         if root.get_attribute("showMasterPhAnim").is_none() {
             return Ok(false);
         }
-        root.attributes.retain(|a| a.local_name != "showMasterPhAnim");
+        root.attributes
+            .retain(|a| a.local_name != "showMasterPhAnim");
         self.package.opc_mut().set_part(
             layout.uri,
             content_type::PRESENTATION_SLIDE_LAYOUT,
@@ -3245,11 +3227,10 @@ impl PresentationDocument {
         layout_index: usize,
         user_drawn: bool,
     ) -> Result<()> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&layout.uri) {
             parse_element(data)?
         } else {
@@ -3257,11 +3238,9 @@ impl PresentationDocument {
         };
         root.set_attribute("userDrawn", if user_drawn { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout.uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -3282,16 +3261,11 @@ impl PresentationDocument {
     }
 
     /// Set whether a slide master is preserved (`p:sldMaster/@preserve`).
-    pub fn set_slide_master_preserve(
-        &mut self,
-        master_index: usize,
-        preserve: bool,
-    ) -> Result<()> {
-        let master = self
-            .masters
-            .get(master_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("master index {master_index} out of range")))?;
+    pub fn set_slide_master_preserve(&mut self, master_index: usize, preserve: bool) -> Result<()> {
+        let master =
+            self.masters.get(master_index).cloned().ok_or_else(|| {
+                Error::Package(format!("master index {master_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&master.uri) {
             parse_element(data)?
         } else {
@@ -3299,11 +3273,9 @@ impl PresentationDocument {
         };
         root.set_attribute("preserve", if preserve { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            master.uri,
-            content_type::PRESENTATION_SLIDE_MASTER,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(master.uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
         Ok(())
     }
 
@@ -3325,11 +3297,10 @@ impl PresentationDocument {
 
     /// Clear master `@preserve` attribute.
     pub fn clear_slide_master_preserve(&mut self, master_index: usize) -> Result<bool> {
-        let master = self
-            .masters
-            .get(master_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("master index {master_index} out of range")))?;
+        let master =
+            self.masters.get(master_index).cloned().ok_or_else(|| {
+                Error::Package(format!("master index {master_index} out of range"))
+            })?;
         let Some(data) = self.package.opc().get_part(&master.uri) else {
             return Ok(false);
         };
@@ -3432,9 +3403,7 @@ impl PresentationDocument {
     }
 
     /// Ensure a blank slide master + layout exist. Returns `(master, layout)`.
-    pub fn ensure_default_master_layout(
-        &mut self,
-    ) -> Result<(SlideMasterInfo, SlideLayoutInfo)> {
+    pub fn ensure_default_master_layout(&mut self) -> Result<(SlideMasterInfo, SlideLayoutInfo)> {
         if let Some(m) = self.masters.first().cloned() {
             if let Some(l) = self
                 .layouts
@@ -3450,9 +3419,7 @@ impl PresentationDocument {
     }
 
     /// Add a blank slide master with one blank layout.
-    pub fn add_blank_master_with_layout(
-        &mut self,
-    ) -> Result<(SlideMasterInfo, SlideLayoutInfo)> {
+    pub fn add_blank_master_with_layout(&mut self) -> Result<(SlideMasterInfo, SlideLayoutInfo)> {
         let pres_uri = self.ensure_presentation()?;
 
         // Full Office slide master + 11 layouts (binary-identical to a PowerPoint-created PPTX).
@@ -3514,7 +3481,9 @@ impl PresentationDocument {
             self.package.opc_mut().set_part(
                 master_uri.clone(),
                 content_type::PRESENTATION_SLIDE_MASTER,
-                include_str!("ppt_templates/slideMaster1.xml").as_bytes().to_vec(),
+                include_str!("ppt_templates/slideMaster1.xml")
+                    .as_bytes()
+                    .to_vec(),
             );
         }
         // Master relationships: load Office template (rId1..rId11 layouts, rId12 theme)
@@ -3585,10 +3554,7 @@ impl PresentationDocument {
     }
 
     /// Add a slide linked to the default blank layout (creates master/layout if needed).
-    pub fn add_slide_with_layout(
-        &mut self,
-        slide_root: OpenXmlElement,
-    ) -> Result<SlideInfo> {
+    pub fn add_slide_with_layout(&mut self, slide_root: OpenXmlElement) -> Result<SlideInfo> {
         let (_, layout) = self.ensure_default_master_layout()?;
         let info = self.add_slide(slide_root)?;
         // Relate slide → layout
@@ -3723,7 +3689,6 @@ impl PresentationDocument {
             .collect())
     }
 
-
     /// Whether a slide has any shapes with `cNvPr` ids.
     pub fn has_shape_ids(&self, slide_index: usize) -> Result<bool> {
         Ok(!self.list_shape_ids(slide_index)?.is_empty())
@@ -3768,11 +3733,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, name, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -3826,11 +3789,9 @@ impl PresentationDocument {
         let found = remove_from(&mut root, shape_id);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -3876,7 +3837,6 @@ impl PresentationDocument {
         }
         Ok(out)
     }
-
 
     /// Whether any slide has shapes (via list_all_shape_ids).
     pub fn has_any_shapes(&self) -> Result<bool> {
@@ -3969,7 +3929,6 @@ impl PresentationDocument {
         Ok(out)
     }
 
-
     /// Read first run font size (hundredths of a point) under a shape text body.
     pub fn shape_font_size(&self, slide_index: usize, shape_id: u32) -> Result<Option<u32>> {
         let info = self
@@ -4053,11 +4012,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, size_hundredths, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4106,15 +4063,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Whether any run under the shape is bold (`a:rPr/@b`).
     /// Clear font size on every shape of a slide. Returns shapes modified.
@@ -4128,7 +4082,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_bold(&self, slide_index: usize, shape_id: u32) -> Result<Option<bool>> {
         let info = self
@@ -4216,11 +4169,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, bold, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4229,7 +4180,6 @@ impl PresentationDocument {
     pub fn clear_shape_bold(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         self.set_shape_bold(slide_index, shape_id, false)
     }
-
 
     /// Whether italic is explicitly set on the shape text (`a:rPr/@i`).
     /// Clear bold on every shape of a slide. Returns shapes modified.
@@ -4243,7 +4193,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_italic(&self, slide_index: usize, shape_id: u32) -> Result<Option<bool>> {
         let info = self
@@ -4331,11 +4280,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, italic, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4344,7 +4291,6 @@ impl PresentationDocument {
     pub fn clear_shape_italic(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         self.set_shape_italic(slide_index, shape_id, false)
     }
-
 
     /// Read first run solid font color RGB under a shape.
     /// Clear italic on every shape of a slide. Returns shapes modified.
@@ -4358,7 +4304,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_font_color(&self, slide_index: usize, shape_id: u32) -> Result<Option<String>> {
         let info = self
@@ -4429,11 +4374,9 @@ impl PresentationDocument {
                 fn set_color(el: &mut OpenXmlElement, rgb: &str, a: &str, found: &mut bool) {
                     if el.local_name == "rPr" {
                         el.children.retain(|c| c.local_name != "solidFill");
-                        el.append_child(
-                            OpenXmlElement::new("a", a, "solidFill").with_child(
-                                OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
-                            ),
-                        );
+                        el.append_child(OpenXmlElement::new("a", a, "solidFill").with_child(
+                            OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
+                        ));
                         *found = true;
                     }
                     for c in el.children.iter_mut() {
@@ -4450,11 +4393,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, rgb, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4503,15 +4444,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Whether underline is set on shape text (`a:rPr/@u`).
     /// Clear font color on every shape of a slide. Returns shapes modified.
@@ -4525,7 +4463,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_underline(&self, slide_index: usize, shape_id: u32) -> Result<Option<String>> {
         let info = self
@@ -4618,11 +4555,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, underline, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4631,7 +4566,6 @@ impl PresentationDocument {
     pub fn clear_shape_underline(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         self.set_shape_underline(slide_index, shape_id, None)
     }
-
 
     /// Read first latin typeface under a shape's run properties.
     /// Clear underline on every shape of a slide. Returns shapes modified.
@@ -4645,7 +4579,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_font_name(&self, slide_index: usize, shape_id: u32) -> Result<Option<String>> {
         let info = self
@@ -4709,7 +4642,13 @@ impl PresentationDocument {
             })
         }
         let mut found = false;
-        fn visit(el: &mut OpenXmlElement, shape_id: u32, typeface: &str, a: &str, found: &mut bool) {
+        fn visit(
+            el: &mut OpenXmlElement,
+            shape_id: u32,
+            typeface: &str,
+            a: &str,
+            found: &mut bool,
+        ) {
             if el.local_name == "sp" && contains_id(el, shape_id) {
                 fn set_tf(el: &mut OpenXmlElement, typeface: &str, a: &str, found: &mut bool) {
                     if el.local_name == "rPr" {
@@ -4734,11 +4673,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, typeface, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4787,15 +4724,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Whether strike is set on shape text (`a:rPr/@strike`).
     /// Clear font name on every shape of a slide. Returns shapes modified.
@@ -4809,7 +4743,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     /// Set bodyPr anchor on a shape text body (`a:bodyPr/@anchor`: t/ctr/b).
     pub fn set_shape_text_anchor(
@@ -4856,11 +4789,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, anchor, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4941,15 +4872,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Set bodyPr wrap on a shape (`a:bodyPr/@wrap`: none/square).
     pub fn set_shape_text_wrap(
@@ -4996,11 +4924,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, wrap, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5081,15 +5007,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Set bodyPr upright on a shape (`a:bodyPr/@upright`).
     pub fn set_shape_text_upright(
@@ -5140,11 +5063,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, upright, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5183,7 +5104,6 @@ impl PresentationDocument {
     pub fn clear_shape_text_upright(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         self.set_shape_text_upright(slide_index, shape_id, false)
     }
-
 
     /// Set bodyPr vert on a shape (`a:bodyPr/@vert`: horz/vert/vert270/wordArtVert/…).
     pub fn set_shape_text_vert(
@@ -5230,11 +5150,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, vert, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5315,15 +5233,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Set bodyPr insets on a shape (EMU). Pass `None` for any side to leave unchanged.
     pub fn set_shape_text_insets(
@@ -5392,11 +5307,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, l_ins, t_ins, r_ins, b_ins, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5427,9 +5340,7 @@ impl PresentationDocument {
             if e.local_name == "sp" && contains_id(e, shape_id) {
                 if let Some(tx) = e.child("txBody") {
                     if let Some(bp) = tx.child("bodyPr") {
-                        let parse = |n: &str| {
-                            bp.get_attribute(n).and_then(|s| s.parse().ok())
-                        };
+                        let parse = |n: &str| bp.get_attribute(n).and_then(|s| s.parse().ok());
                         let l = parse("lIns");
                         let t = parse("tIns");
                         let r = parse("rIns");
@@ -5492,15 +5403,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Set bodyPr column count (`a:bodyPr/@numCol`).
     pub fn set_shape_text_num_col(
@@ -5547,11 +5455,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, num_col, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5632,15 +5538,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Set bodyPr column spacing (`a:bodyPr/@spcCol` EMUs).
     pub fn set_shape_text_spc_col(
@@ -5687,11 +5590,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, spc_col, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5772,15 +5673,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Set bodyPr fromWordArt flag.
     pub fn set_shape_text_from_word_art(
@@ -5831,21 +5729,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Whether bodyPr fromWordArt is set.
-    pub fn has_shape_text_from_word_art(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_from_word_art(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -5882,7 +5774,6 @@ impl PresentationDocument {
     ) -> Result<bool> {
         self.set_shape_text_from_word_art(slide_index, shape_id, false)
     }
-
 
     /// Set bodyPr anchorCtr (center horizontally when anchoring).
     pub fn set_shape_text_anchor_ctr(
@@ -5933,21 +5824,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Whether bodyPr anchorCtr is set.
-    pub fn has_shape_text_anchor_ctr(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_anchor_ctr(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -5984,7 +5869,6 @@ impl PresentationDocument {
     ) -> Result<bool> {
         self.set_shape_text_anchor_ctr(slide_index, shape_id, false)
     }
-
 
     /// Set bodyPr rtlCol (right-to-left columns).
     pub fn set_shape_text_rtl_col(
@@ -6035,11 +5919,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6078,7 +5960,6 @@ impl PresentationDocument {
     pub fn clear_shape_text_rtl_col(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         self.set_shape_text_rtl_col(slide_index, shape_id, false)
     }
-
 
     /// Set bodyPr forceAA (force anti-alias).
     pub fn set_shape_text_force_aa(
@@ -6129,11 +6010,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6222,21 +6101,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Whether bodyPr compatLnSpc is set.
-    pub fn has_shape_text_compat_ln_spc(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_compat_ln_spc(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -6274,7 +6147,6 @@ impl PresentationDocument {
         self.set_shape_text_compat_ln_spc(slide_index, shape_id, false)
     }
 
-
     /// Set bodyPr spcFirst (space before first paragraph, EMUs or percent-ish depending on font).
     pub fn set_shape_text_spc_first(
         &mut self,
@@ -6296,7 +6168,11 @@ impl PresentationDocument {
     }
 
     /// Clear bodyPr spcFirst.
-    pub fn clear_shape_text_spc_first(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
+    pub fn clear_shape_text_spc_first(
+        &mut self,
+        slide_index: usize,
+        shape_id: u32,
+    ) -> Result<bool> {
         self.set_shape_body_pr_i64(slide_index, shape_id, "spcFirst", None)
     }
 
@@ -6381,11 +6257,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, attr, value, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6424,7 +6298,6 @@ impl PresentationDocument {
         Ok(None)
     }
 
-
     /// Enable or clear bodyPr normAutofit child.
     pub fn set_shape_text_norm_autofit(
         &mut self,
@@ -6451,13 +6324,7 @@ impl PresentationDocument {
             })
         }
         let mut found = false;
-        fn visit(
-            el: &mut OpenXmlElement,
-            shape_id: u32,
-            enabled: bool,
-            a: &str,
-            found: &mut bool,
-        ) {
+        fn visit(el: &mut OpenXmlElement, shape_id: u32, enabled: bool, a: &str, found: &mut bool) {
             if *found {
                 return;
             }
@@ -6465,7 +6332,10 @@ impl PresentationDocument {
                 if let Some(tx) = el.child_mut("txBody") {
                     if let Some(bp) = tx.child_mut("bodyPr") {
                         bp.children.retain(|c| {
-                            !matches!(c.local_name.as_str(), "normAutofit" | "noAutofit" | "spAutoFit")
+                            !matches!(
+                                c.local_name.as_str(),
+                                "normAutofit" | "noAutofit" | "spAutoFit"
+                            )
                         });
                         if enabled {
                             bp.append_child(OpenXmlElement::new("a", a, "normAutofit"));
@@ -6482,21 +6352,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Whether bodyPr has normAutofit.
-    pub fn has_shape_text_norm_autofit(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_norm_autofit(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -6560,13 +6424,7 @@ impl PresentationDocument {
             })
         }
         let mut found = false;
-        fn visit(
-            el: &mut OpenXmlElement,
-            shape_id: u32,
-            enabled: bool,
-            a: &str,
-            found: &mut bool,
-        ) {
+        fn visit(el: &mut OpenXmlElement, shape_id: u32, enabled: bool, a: &str, found: &mut bool) {
             if *found {
                 return;
             }
@@ -6594,21 +6452,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Whether bodyPr has spAutoFit.
-    pub fn has_shape_text_sp_autofit(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_sp_autofit(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -6672,13 +6524,7 @@ impl PresentationDocument {
             })
         }
         let mut found = false;
-        fn visit(
-            el: &mut OpenXmlElement,
-            shape_id: u32,
-            enabled: bool,
-            a: &str,
-            found: &mut bool,
-        ) {
+        fn visit(el: &mut OpenXmlElement, shape_id: u32, enabled: bool, a: &str, found: &mut bool) {
             if *found {
                 return;
             }
@@ -6706,21 +6552,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, enabled, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Whether bodyPr has noAutofit.
-    pub fn has_shape_text_no_autofit(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_no_autofit(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -6824,21 +6664,15 @@ impl PresentationDocument {
         visit(&mut root, shape_id, font_scale, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
 
     /// Read normAutofit fontScale when present.
-    pub fn shape_text_font_scale(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<Option<u32>> {
+    pub fn shape_text_font_scale(&self, slide_index: usize, shape_id: u32) -> Result<Option<u32>> {
         let info = self
             .slides
             .get(slide_index)
@@ -6860,9 +6694,7 @@ impl PresentationDocument {
                 if let Some(tx) = e.child("txBody") {
                     if let Some(bp) = tx.child("bodyPr") {
                         if let Some(na) = bp.child("normAutofit") {
-                            return Ok(na
-                                .get_attribute("fontScale")
-                                .and_then(|s| s.parse().ok()));
+                            return Ok(na.get_attribute("fontScale").and_then(|s| s.parse().ok()));
                         }
                     }
                 }
@@ -6872,11 +6704,7 @@ impl PresentationDocument {
     }
 
     /// Whether normAutofit has fontScale.
-    pub fn has_shape_text_font_scale(
-        &self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn has_shape_text_font_scale(&self, slide_index: usize, shape_id: u32) -> Result<bool> {
         Ok(self.shape_text_font_scale(slide_index, shape_id)?.is_some())
     }
 
@@ -6944,10 +6772,7 @@ impl PresentationDocument {
                                 bp.append_child(OpenXmlElement::new("a", a, "normAutofit"));
                             }
                             if let Some(na) = bp.child_mut("normAutofit") {
-                                na.set_attribute(
-                                    "lnSpcReduction",
-                                    reduction.unwrap().to_string(),
-                                );
+                                na.set_attribute("lnSpcReduction", reduction.unwrap().to_string());
                             }
                         }
                         *found = true;
@@ -6962,11 +6787,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, reduction, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7033,7 +6856,6 @@ impl PresentationDocument {
         Ok(had)
     }
 
-
     pub fn shape_strike(&self, slide_index: usize, shape_id: u32) -> Result<Option<String>> {
         let info = self
             .slides
@@ -7095,12 +6917,7 @@ impl PresentationDocument {
             })
         }
         let mut found = false;
-        fn visit(
-            el: &mut OpenXmlElement,
-            shape_id: u32,
-            strike: Option<&str>,
-            found: &mut bool,
-        ) {
+        fn visit(el: &mut OpenXmlElement, shape_id: u32, strike: Option<&str>, found: &mut bool) {
             if el.local_name == "sp" && contains_id(el, shape_id) {
                 fn set_s(el: &mut OpenXmlElement, strike: Option<&str>, found: &mut bool) {
                     if el.local_name == "rPr" {
@@ -7125,11 +6942,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, strike, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7138,7 +6953,6 @@ impl PresentationDocument {
     pub fn clear_shape_strike(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         self.set_shape_strike(slide_index, shape_id, None)
     }
-
 
     /// Clear strike on every shape of a slide. Returns shapes modified.
     pub fn clear_all_shape_strike(&mut self, slide_index: usize) -> Result<usize> {
@@ -7151,7 +6965,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn set_shape_hidden(
         &mut self,
@@ -7190,11 +7003,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, hidden, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7229,11 +7040,7 @@ impl PresentationDocument {
     /// Sets the first `a:t` node; creates none if the shape has no text body.
     /// Returns whether a text node was updated.
     /// Remove the `hidden` attribute from a shape's cNvPr (defaults to visible).
-    pub fn clear_shape_hidden(
-        &mut self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<bool> {
+    pub fn clear_shape_hidden(&mut self, slide_index: usize, shape_id: u32) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -7270,7 +7077,6 @@ impl PresentationDocument {
         }
         Ok(found)
     }
-
 
     pub fn set_shape_text(
         &mut self,
@@ -7330,11 +7136,9 @@ impl PresentationDocument {
         set_text(&mut root, shape_id, content, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7377,12 +7181,7 @@ impl PresentationDocument {
     }
 
     /// Set solid fill RGB (6-hex, no `#`) on the shape with `cNvPr/@id == shape_id`.
-    pub fn set_shape_fill(
-        &mut self,
-        slide_index: usize,
-        shape_id: u32,
-        rgb: &str,
-    ) -> Result<bool> {
+    pub fn set_shape_fill(&mut self, slide_index: usize, shape_id: u32, rgb: &str) -> Result<bool> {
         let info = self
             .slides
             .get(slide_index)
@@ -7416,14 +7215,17 @@ impl PresentationDocument {
                     sp_pr.children.retain(|c| {
                         !matches!(
                             c.local_name.as_str(),
-                            "solidFill" | "noFill" | "gradFill" | "blipFill" | "pattFill" | "grpFill"
+                            "solidFill"
+                                | "noFill"
+                                | "gradFill"
+                                | "blipFill"
+                                | "pattFill"
+                                | "grpFill"
                         )
                     });
-                    sp_pr.append_child(
-                        OpenXmlElement::new("a", a, "solidFill").with_child(
-                            OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
-                        ),
-                    );
+                    sp_pr.append_child(OpenXmlElement::new("a", a, "solidFill").with_child(
+                        OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
+                    ));
                     *found = true;
                     return;
                 }
@@ -7435,11 +7237,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, rgb, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7475,7 +7275,12 @@ impl PresentationDocument {
                     sp_pr.children.retain(|c| {
                         !matches!(
                             c.local_name.as_str(),
-                            "solidFill" | "noFill" | "gradFill" | "blipFill" | "pattFill" | "grpFill"
+                            "solidFill"
+                                | "noFill"
+                                | "gradFill"
+                                | "blipFill"
+                                | "pattFill"
+                                | "grpFill"
                         )
                     });
                     sp_pr.append_child(OpenXmlElement::new("a", a, "noFill"));
@@ -7491,17 +7296,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
-
-
 
     /// Read shape flip flags as `(flipH, flipV)` from `spPr/xfrm`.
     /// Clear fill on every shape of a slide. Returns shapes modified.
@@ -7515,7 +7315,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     /// Set solid fill alpha on a shape (0–100000 thousandths of a percent).
     ///
@@ -7571,11 +7370,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, alpha, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7662,15 +7459,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     pub fn shape_flip(&self, slide_index: usize, shape_id: u32) -> Result<Option<(bool, bool)>> {
         let info = self
@@ -7775,11 +7569,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, flip_h, flip_v, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7801,7 +7593,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_rotation(&self, slide_index: usize, shape_id: u32) -> Result<Option<i32>> {
         let info = self
@@ -7886,11 +7677,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, rot, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7936,11 +7725,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7957,7 +7744,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn shape_preset_geom(&self, slide_index: usize, shape_id: u32) -> Result<Option<String>> {
         let info = self
@@ -8045,11 +7831,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, preset, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8093,15 +7877,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Read shape transform as `(x, y, cx, cy)` EMUs from `spPr/xfrm`.
     pub fn shape_transform(
@@ -8235,11 +8016,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, x, y, cx, cy, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8332,11 +8111,9 @@ impl PresentationDocument {
                     if let Some(w) = width_emu {
                         ln.set_attribute("w", w.to_string());
                     }
-                    ln.append_child(
-                        OpenXmlElement::new("a", a, "solidFill").with_child(
-                            OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
-                        ),
-                    );
+                    ln.append_child(OpenXmlElement::new("a", a, "solidFill").with_child(
+                        OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
+                    ));
                     sp_pr.append_child(ln);
                     *found = true;
                     return;
@@ -8349,11 +8126,9 @@ impl PresentationDocument {
         visit(&mut root, shape_id, rgb, width_emu, a, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8397,15 +8172,12 @@ impl PresentationDocument {
         visit(&mut root, shape_id, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
-
 
     /// Remove all shapes whose `cNvPr/@name` matches `name`. Returns count removed.
     /// Clear outline/line on every shape of a slide. Returns shapes modified.
@@ -8419,7 +8191,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn remove_shapes_by_name(&mut self, slide_index: usize, name: &str) -> Result<usize> {
         let ids: Vec<u32> = self
@@ -8467,11 +8238,9 @@ impl PresentationDocument {
         }
         if count > 0 {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(count)
     }
@@ -8588,7 +8357,6 @@ impl PresentationDocument {
         Ok(count)
     }
 
-
     pub fn has_notes(&self, slide_index: usize) -> Result<bool> {
         let slide_info = self
             .slides
@@ -8623,7 +8391,11 @@ impl PresentationDocument {
         } else {
             let base = slide_info.uri.as_str();
             let parent = base.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
-            PackUri::new(format!("{}/{}", parent, rel.target.trim_start_matches("./")))
+            PackUri::new(format!(
+                "{}/{}",
+                parent,
+                rel.target.trim_start_matches("./")
+            ))
         };
         if self.package.opc().has_part(&target) {
             Ok(Some(target))
@@ -8709,7 +8481,6 @@ impl PresentationDocument {
         );
         Ok(true)
     }
-
 
     pub fn set_notes_header_footer(
         &mut self,
@@ -8823,15 +8594,18 @@ impl PresentationDocument {
     pub fn has_theme(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("/ppt/theme/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("/ppt/theme/"))
     }
-
 
     /// Count theme parts under `/ppt/theme/`.
     pub fn theme_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/theme/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/theme/"))
             .count()
     }
 
@@ -8839,8 +8613,9 @@ impl PresentationDocument {
     pub fn list_themes(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/theme/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/theme/"))
             .collect()
     }
 
@@ -8925,13 +8700,13 @@ impl PresentationDocument {
         Ok(true)
     }
 
-
     pub fn clear_theme(&mut self) -> Result<bool> {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/theme/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/theme/"))
             .collect();
         if uris.is_empty() {
             return Ok(false);
@@ -8999,8 +8774,9 @@ impl PresentationDocument {
     pub fn list_media(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/media/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/media/"))
             .collect()
     }
 
@@ -9099,8 +8875,9 @@ impl PresentationDocument {
     pub fn list_drawings(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/drawings/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/drawings/"))
             .collect()
     }
 
@@ -9114,11 +8891,12 @@ impl PresentationDocument {
         let parents: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.starts_with("/ppt/slides/") || s.starts_with("/ppt/charts/")
             })
-            
             .collect();
         for parent in parents {
             let ids: Vec<String> = self
@@ -9149,7 +8927,6 @@ impl PresentationDocument {
         Ok(n)
     }
 
-
     /// Whether any chart parts exist under `/ppt/charts/`.
     pub fn has_charts(&self) -> bool {
         self.chart_count() > 0
@@ -9159,8 +8936,9 @@ impl PresentationDocument {
     pub fn list_charts(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/charts/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/charts/"))
             .collect()
     }
 
@@ -9217,7 +8995,6 @@ impl PresentationDocument {
         self.masters.len()
     }
 
-
     /// Whether any slide masters exist.
     pub fn has_slide_masters(&self) -> bool {
         self.master_count() > 0
@@ -9267,8 +9044,9 @@ impl PresentationDocument {
     pub fn list_notes_masters(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/notesMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/notesMasters/"))
             .collect()
     }
 
@@ -9286,8 +9064,9 @@ impl PresentationDocument {
     pub fn list_handout_masters(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/handoutMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/handoutMasters/"))
             .collect()
     }
 
@@ -9305,8 +9084,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains(path_prefix))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains(path_prefix))
             .collect();
         if uris.is_empty() {
             return Ok(false);
@@ -9358,31 +9138,37 @@ impl PresentationDocument {
     pub fn has_user_defined_tags(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("/ppt/tags/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("/ppt/tags/"))
     }
 
     /// Count user-defined tag parts under `/ppt/tags/`.
     pub fn user_defined_tag_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/tags/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/tags/"))
             .count()
     }
 
     /// Whether any slide sync data parts exist.
     pub fn has_slide_sync_data(&self) -> bool {
-        self.package.opc().part_uris().into_iter().any(|u| {
-            u.as_str().contains("slideUpdateInfo") || u.as_str().contains("slideSync")
-        })
+        self.package
+            .opc()
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("slideUpdateInfo") || u.as_str().contains("slideSync"))
     }
 
     /// Count slide sync data parts.
     pub fn slide_sync_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| {
-                u.as_str().contains("slideUpdateInfo") || u.as_str().contains("slideSync")
-            })
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("slideUpdateInfo") || u.as_str().contains("slideSync"))
             .count()
     }
 
@@ -9432,12 +9218,7 @@ impl PresentationDocument {
     /// Append a single comment author entry, creating the part if needed.
     ///
     /// Returns the author id that was written.
-    pub fn append_comment_author(
-        &mut self,
-        id: u32,
-        name: &str,
-        initials: &str,
-    ) -> Result<u32> {
+    pub fn append_comment_author(&mut self, id: u32, name: &str, initials: &str) -> Result<u32> {
         let uri = PackUri::new("/ppt/commentAuthors.xml");
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         let mut authors = self.list_comment_authors()?;
@@ -9448,8 +9229,7 @@ impl PresentationDocument {
             .map(|(i, n, init)| (*i, n.as_str(), init.as_str()))
             .collect();
         if self.package.opc().has_part(&uri) {
-            let mut root =
-                OpenXmlElement::new("p", p, "cmAuthorLst").with_ns_decl("p", p);
+            let mut root = OpenXmlElement::new("p", p, "cmAuthorLst").with_ns_decl("p", p);
             for (i, n, init) in &pairs {
                 root.append_child(
                     OpenXmlElement::new("p", p, "cmAuthor")
@@ -9481,9 +9261,7 @@ impl PresentationDocument {
         let before = root.children.len();
         root.children.retain(|c| {
             !(c.local_name == "cmAuthor"
-                && c.get_attribute("id")
-                    .and_then(|s| s.parse::<u32>().ok())
-                    == Some(id))
+                && c.get_attribute("id").and_then(|s| s.parse::<u32>().ok()) == Some(id))
         });
         let removed = root.children.len() < before;
         if removed {
@@ -9504,8 +9282,9 @@ impl PresentationDocument {
     pub fn list_user_defined_tags(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/tags/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/tags/"))
             .collect()
     }
 
@@ -9540,13 +9319,11 @@ impl PresentationDocument {
     pub fn list_slide_sync_parts(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| {
-                u.as_str().contains("slideUpdateInfo") || u.as_str().contains("slideSync")
-            })
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("slideUpdateInfo") || u.as_str().contains("slideSync"))
             .collect()
     }
-
 
     /// Whether any slide sync / update-info parts exist.
     pub fn has_slide_sync_parts(&self) -> bool {
@@ -9573,7 +9350,9 @@ impl PresentationDocument {
     pub fn modern_comment_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.contains("modernComment")
                     || s.contains("/ppt/comments/modern")
@@ -9612,17 +9391,21 @@ impl PresentationDocument {
         let parents: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.starts_with("/ppt/slides/") || s.starts_with("/ppt/charts/")
             })
-            
             .collect();
         parents.iter().any(|p| {
             self.package
                 .opc()
                 .part_relationships(p)
-                .map(|rels| rels.iter().any(|r| r.relationship_type == rel::CHART_DRAWING))
+                .map(|rels| {
+                    rels.iter()
+                        .any(|r| r.relationship_type == rel::CHART_DRAWING)
+                })
                 .unwrap_or(false)
         })
     }
@@ -9633,7 +9416,9 @@ impl PresentationDocument {
         let parents: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.starts_with("/ppt/slides/")
                     || s.starts_with("/ppt/charts/")
@@ -9644,9 +9429,7 @@ impl PresentationDocument {
             if let Some(rels) = self.package.opc().part_relationships(parent) {
                 for r in rels.iter() {
                     if r.relationship_type == rel::CHART_DRAWING {
-                        if let Ok(uri) =
-                            self.package.opc().resolve_relationship(Some(parent), r)
-                        {
+                        if let Ok(uri) = self.package.opc().resolve_relationship(Some(parent), r) {
                             if !uris.iter().any(|x| x == &uri) {
                                 uris.push(uri);
                             }
@@ -9713,11 +9496,12 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.ends_with(".glb") || s.ends_with(".gltf") || s.contains("model3d")
             })
-            
             .collect();
         let n = uris.len();
         if n == 0 {
@@ -9763,8 +9547,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains(path_hint))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains(path_hint))
             .collect();
         let n = uris.len();
         if n == 0 {
@@ -9857,13 +9642,14 @@ impl PresentationDocument {
                 .package
                 .opc()
                 .part_relationships(&pres_uri)
-                .and_then(|rels| {
-                    rels.get_by_type(rel::NOTES_MASTER)
-                        .map(|r| r.id.clone())
-                })
+                .and_then(|rels| rels.get_by_type(rel::NOTES_MASTER).map(|r| r.id.clone()))
                 .unwrap_or_else(|| "rIdNotesMaster".into());
-            let entry = OpenXmlElement::new("p", crate::namespace::ns::PRESENTATIONML.uri, "notesMasterId")
-                .with_attribute_qname("r:id", &rid);
+            let entry = OpenXmlElement::new(
+                "p",
+                crate::namespace::ns::PRESENTATIONML.uri,
+                "notesMasterId",
+            )
+            .with_attribute_qname("r:id", &rid);
             let list = OpenXmlElement::new(
                 "p",
                 crate::namespace::ns::PRESENTATIONML.uri,
@@ -9897,7 +9683,9 @@ impl PresentationDocument {
         if !self
             .package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("/notesMasters/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("/notesMasters/"))
         {
             self.add_notes_master()?;
         }
@@ -9905,8 +9693,9 @@ impl PresentationDocument {
         let master_uri = self
             .package
             .opc()
-            .part_uris().into_iter().find(|u| u.as_str().contains("/notesMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .find(|u| u.as_str().contains("/notesMasters/"))
             .ok_or_else(|| Error::Package("notes master missing".into()))?;
         let mut root = parse_element(
             self.package
@@ -9924,11 +9713,9 @@ impl PresentationDocument {
                 .with_attribute("dt", if show_date { "1" } else { "0" }),
         );
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            master_uri,
-            content_type::PRESENTATION_NOTES_MASTER,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(master_uri, content_type::PRESENTATION_NOTES_MASTER, xml);
         Ok(())
     }
 
@@ -9936,7 +9723,9 @@ impl PresentationDocument {
     pub fn has_notes_master_header_footer(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/notesMasters/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/notesMasters/"))
             .any(|u| {
                 self.package
                     .opc()
@@ -9952,8 +9741,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/notesMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/notesMasters/"))
             .collect();
         let mut n = 0;
         for uri in uris {
@@ -9965,11 +9755,9 @@ impl PresentationDocument {
             root.children.retain(|c| c.local_name != "hf");
             if root.children.len() < before {
                 let xml = write_element(&root)?;
-                self.package.opc_mut().set_part(
-                    uri,
-                    content_type::PRESENTATION_NOTES_MASTER,
-                    xml,
-                );
+                self.package
+                    .opc_mut()
+                    .set_part(uri, content_type::PRESENTATION_NOTES_MASTER, xml);
                 n += 1;
             }
         }
@@ -9987,15 +9775,18 @@ impl PresentationDocument {
         if !self
             .package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().contains("/handoutMasters/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().contains("/handoutMasters/"))
         {
             self.add_handout_master()?;
         }
         let master_uri = self
             .package
             .opc()
-            .part_uris().into_iter().find(|u| u.as_str().contains("/handoutMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .find(|u| u.as_str().contains("/handoutMasters/"))
             .ok_or_else(|| Error::Package("handout master missing".into()))?;
         let mut root = parse_element(
             self.package
@@ -10013,11 +9804,9 @@ impl PresentationDocument {
                 .with_attribute("dt", if show_date { "1" } else { "0" }),
         );
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            master_uri,
-            content_type::PRESENTATION_HANDOUT_MASTER,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(master_uri, content_type::PRESENTATION_HANDOUT_MASTER, xml);
         Ok(())
     }
 
@@ -10025,7 +9814,9 @@ impl PresentationDocument {
     pub fn has_handout_master_header_footer(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/handoutMasters/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/handoutMasters/"))
             .any(|u| {
                 self.package
                     .opc()
@@ -10041,8 +9832,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/handoutMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/handoutMasters/"))
             .collect();
         let mut n = 0;
         for uri in uris {
@@ -10076,8 +9868,9 @@ impl PresentationDocument {
         let master_uri = self
             .package
             .opc()
-            .part_uris().into_iter().find(|u| u.as_str().contains("/slideMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .find(|u| u.as_str().contains("/slideMasters/"))
             .ok_or_else(|| Error::Package("slide master missing".into()))?;
         let mut root = parse_element(
             self.package
@@ -10095,11 +9888,9 @@ impl PresentationDocument {
                 .with_attribute("dt", if show_date { "1" } else { "0" }),
         );
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            master_uri,
-            content_type::PRESENTATION_SLIDE_MASTER,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(master_uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
         Ok(())
     }
 
@@ -10107,7 +9898,9 @@ impl PresentationDocument {
     pub fn has_slide_master_header_footer(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/slideMasters/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/slideMasters/"))
             .any(|u| {
                 self.package
                     .opc()
@@ -10123,8 +9916,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/slideMasters/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/slideMasters/"))
             .collect();
         let mut n = 0;
         for uri in uris {
@@ -10136,11 +9930,9 @@ impl PresentationDocument {
             root.children.retain(|c| c.local_name != "hf");
             if root.children.len() < before {
                 let xml = write_element(&root)?;
-                self.package.opc_mut().set_part(
-                    uri,
-                    content_type::PRESENTATION_SLIDE_MASTER,
-                    xml,
-                );
+                self.package
+                    .opc_mut()
+                    .set_part(uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
                 n += 1;
             }
         }
@@ -10158,8 +9950,9 @@ impl PresentationDocument {
         let layout_uri = self
             .package
             .opc()
-            .part_uris().into_iter().find(|u| u.as_str().contains("/slideLayouts/"))
-            
+            .part_uris()
+            .into_iter()
+            .find(|u| u.as_str().contains("/slideLayouts/"))
             .ok_or_else(|| Error::Package("slide layout missing".into()))?;
         let mut root = parse_element(
             self.package
@@ -10177,11 +9970,9 @@ impl PresentationDocument {
                 .with_attribute("dt", if show_date { "1" } else { "0" }),
         );
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout_uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout_uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -10189,7 +9980,9 @@ impl PresentationDocument {
     pub fn has_slide_layout_header_footer(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/slideLayouts/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/slideLayouts/"))
             .any(|u| {
                 self.package
                     .opc()
@@ -10205,8 +9998,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/slideLayouts/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/slideLayouts/"))
             .collect();
         let mut n = 0;
         for uri in uris {
@@ -10218,11 +10012,9 @@ impl PresentationDocument {
             root.children.retain(|c| c.local_name != "hf");
             if root.children.len() < before {
                 let xml = write_element(&root)?;
-                self.package.opc_mut().set_part(
-                    uri,
-                    content_type::PRESENTATION_SLIDE_LAYOUT,
-                    xml,
-                );
+                self.package
+                    .opc_mut()
+                    .set_part(uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
                 n += 1;
             }
         }
@@ -10234,8 +10026,7 @@ impl PresentationDocument {
         let pres_uri = self.ensure_presentation()?;
         let mut index = 1u32;
         let master_uri = loop {
-            let candidate =
-                PackUri::new(format!("/ppt/handoutMasters/handoutMaster{index}.xml"));
+            let candidate = PackUri::new(format!("/ppt/handoutMasters/handoutMaster{index}.xml"));
             if !self.package.opc().has_part(&candidate) {
                 break candidate;
             }
@@ -10272,10 +10063,7 @@ impl PresentationDocument {
                 .package
                 .opc()
                 .part_relationships(&pres_uri)
-                .and_then(|rels| {
-                    rels.get_by_type(rel::HANDOUT_MASTER)
-                        .map(|r| r.id.clone())
-                })
+                .and_then(|rels| rels.get_by_type(rel::HANDOUT_MASTER).map(|r| r.id.clone()))
                 .unwrap_or_else(|| "rIdHandoutMaster".into());
             let entry = OpenXmlElement::new(
                 "p",
@@ -10293,10 +10081,7 @@ impl PresentationDocument {
                 .children
                 .iter()
                 .position(|c| {
-                    matches!(
-                        c.local_name.as_str(),
-                        "sldMasterIdLst" | "notesMasterIdLst"
-                    )
+                    matches!(c.local_name.as_str(), "sldMasterIdLst" | "notesMasterIdLst")
                 })
                 .map(|i| i + 1)
                 .unwrap_or(0);
@@ -10325,8 +10110,7 @@ impl PresentationDocument {
             .ok_or_else(|| Error::Package(format!("slide index {slide_index} out of range")))?;
         let mut index = 1u32;
         let uri = loop {
-            let candidate =
-                PackUri::new(format!("/ppt/comments/comment{index}.xml"));
+            let candidate = PackUri::new(format!("/ppt/comments/comment{index}.xml"));
             if !self.package.opc().has_part(&candidate) {
                 break candidate;
             }
@@ -10335,9 +10119,7 @@ impl PresentationDocument {
         let cms: Vec<_> = comments
             .iter()
             .enumerate()
-            .map(|(i, (aid, dt, x, y, text))| {
-                slide_comment(*aid, i as u32 + 1, dt, *x, *y, text)
-            })
+            .map(|(i, (aid, dt, x, y, text))| slide_comment(*aid, i as u32 + 1, dt, *x, *y, text))
             .collect();
         let root = slide_comments(cms);
         self.package.opc_mut().set_part(
@@ -10415,11 +10197,9 @@ impl PresentationDocument {
             }
             index += 1;
         };
-        self.package.opc_mut().set_part(
-            uri.clone(),
-            content_type::MODEL_3D,
-            glb_data.into(),
-        );
+        self.package
+            .opc_mut()
+            .set_part(uri.clone(), content_type::MODEL_3D, glb_data.into());
         let rid = self.package.opc_mut().add_part_relationship(
             &slide_info.uri,
             rel::MODEL_3D,
@@ -10606,19 +10386,22 @@ impl PresentationDocument {
         Ok((uri, rid))
     }
 
-
     /// Whether any embedded font parts exist under `/ppt/fonts/`.
     pub fn has_font_parts(&self) -> bool {
         self.package
             .opc()
-            .part_uris().into_iter().any(|u| u.as_str().starts_with("/ppt/fonts/"))
+            .part_uris()
+            .into_iter()
+            .any(|u| u.as_str().starts_with("/ppt/fonts/"))
     }
 
     /// Count embedded font parts under `/ppt/fonts/`.
     pub fn font_part_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/fonts/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/fonts/"))
             .count()
     }
 
@@ -10626,8 +10409,9 @@ impl PresentationDocument {
     pub fn list_font_parts(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/fonts/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/fonts/"))
             .collect()
     }
 
@@ -10682,10 +10466,11 @@ impl PresentationDocument {
     pub fn slide_comments_part_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/comments/"))
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/comments/"))
             .count()
     }
-
 
     /// Whether any classic slide comment parts exist under `/ppt/comments/`.
     pub fn has_comments(&self) -> bool {
@@ -10701,11 +10486,11 @@ impl PresentationDocument {
     pub fn list_comment_parts(&self) -> Vec<PackUri> {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().starts_with("/ppt/comments/"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().starts_with("/ppt/comments/"))
             .collect()
     }
-
 
     /// Whether any classic comment parts exist under `/ppt/comments/`.
     pub fn has_comment_parts(&self) -> bool {
@@ -10828,10 +10613,7 @@ impl PresentationDocument {
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0);
                 let dt = cm.get_attribute("dt").unwrap_or("").to_string();
-                let text = cm
-                    .child("text")
-                    .map(|t| t.inner_text())
-                    .unwrap_or_default();
+                let text = cm.child("text").map(|t| t.inner_text()).unwrap_or_default();
                 out.push((author_id, idx, dt, text));
             }
         }
@@ -10860,8 +10642,7 @@ impl PresentationDocument {
             index += 1;
         };
         let p188 = "http://schemas.microsoft.com/office/powerpoint/2018/8/main";
-        let mut root =
-            OpenXmlElement::new("p188", p188, "cmLst").with_ns_decl("p188", p188);
+        let mut root = OpenXmlElement::new("p188", p188, "cmLst").with_ns_decl("p188", p188);
         for (i, (author_id, text)) in comments.iter().enumerate() {
             root.append_child(
                 OpenXmlElement::new("p188", p188, "cm")
@@ -10869,26 +10650,22 @@ impl PresentationDocument {
                     .with_attribute("authorId", *author_id)
                     .with_child(
                         OpenXmlElement::new("p188", p188, "txBody").with_child(
-                            OpenXmlElement::new(
-                                "a",
-                                crate::namespace::ns::DRAWINGML.uri,
-                                "p",
-                            )
-                            .with_child(
-                                OpenXmlElement::new(
-                                    "a",
-                                    crate::namespace::ns::DRAWINGML.uri,
-                                    "r",
-                                )
+                            OpenXmlElement::new("a", crate::namespace::ns::DRAWINGML.uri, "p")
                                 .with_child(
                                     OpenXmlElement::new(
                                         "a",
                                         crate::namespace::ns::DRAWINGML.uri,
-                                        "t",
+                                        "r",
                                     )
-                                    .with_text(*text),
+                                    .with_child(
+                                        OpenXmlElement::new(
+                                            "a",
+                                            crate::namespace::ns::DRAWINGML.uri,
+                                            "t",
+                                        )
+                                        .with_text(*text),
+                                    ),
                                 ),
-                            ),
                         ),
                     ),
             );
@@ -10908,15 +10685,11 @@ impl PresentationDocument {
     }
 
     /// Add modern PowerPoint authors part shell.
-    pub fn add_modern_authors(
-        &mut self,
-        authors: &[(&str, &str)],
-    ) -> Result<(PackUri, String)> {
+    pub fn add_modern_authors(&mut self, authors: &[(&str, &str)]) -> Result<(PackUri, String)> {
         let pres_uri = self.ensure_presentation()?;
         let uri = PackUri::new("/ppt/authors.xml");
         let p188 = "http://schemas.microsoft.com/office/powerpoint/2018/8/main";
-        let mut root =
-            OpenXmlElement::new("p188", p188, "authorLst").with_ns_decl("p188", p188);
+        let mut root = OpenXmlElement::new("p188", p188, "authorLst").with_ns_decl("p188", p188);
         for (id, name) in authors {
             root.append_child(
                 OpenXmlElement::new("p188", p188, "author")
@@ -10959,8 +10732,7 @@ impl PresentationDocument {
         let pres_uri = self.ensure_presentation()?;
         let uri = PackUri::new("/ppt/commentAuthors.xml");
         let p = crate::namespace::ns::PRESENTATIONML.uri;
-        let mut root =
-            OpenXmlElement::new("p", p, "cmAuthorLst").with_ns_decl("p", p);
+        let mut root = OpenXmlElement::new("p", p, "cmAuthorLst").with_ns_decl("p", p);
         for (id, name, initials) in authors {
             root.append_child(
                 OpenXmlElement::new("p", p, "cmAuthor")
@@ -10980,10 +10752,7 @@ impl PresentationDocument {
             .package
             .opc()
             .part_relationships(&pres_uri)
-            .and_then(|rels| {
-                rels.get_by_type(rel::COMMENT_AUTHORS)
-                    .map(|r| r.id.clone())
-            })
+            .and_then(|rels| rels.get_by_type(rel::COMMENT_AUTHORS).map(|r| r.id.clone()))
         {
             return Ok((uri, existing));
         }
@@ -11303,9 +11072,9 @@ impl PresentationDocument {
         let (uri, mut root) = self.ensure_presentation_properties_root()?;
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         let show_pr = self.ensure_show_pr_mut(&mut root);
-        show_pr.children.retain(|c| {
-            !matches!(c.local_name.as_str(), "sldAll" | "sldRg" | "custShow")
-        });
+        show_pr
+            .children
+            .retain(|c| !matches!(c.local_name.as_str(), "sldAll" | "sldRg" | "custShow"));
         show_pr.append_child(
             OpenXmlElement::new("p", p, "sldRg")
                 .with_attribute("st", start.to_string())
@@ -11319,9 +11088,9 @@ impl PresentationDocument {
         let (uri, mut root) = self.ensure_presentation_properties_root()?;
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         let show_pr = self.ensure_show_pr_mut(&mut root);
-        show_pr.children.retain(|c| {
-            !matches!(c.local_name.as_str(), "sldAll" | "sldRg" | "custShow")
-        });
+        show_pr
+            .children
+            .retain(|c| !matches!(c.local_name.as_str(), "sldAll" | "sldRg" | "custShow"));
         show_pr.append_child(OpenXmlElement::new("p", p, "sldAll"));
         self.save_presentation_properties(uri, &root)
     }
@@ -11331,9 +11100,9 @@ impl PresentationDocument {
         let (uri, mut root) = self.ensure_presentation_properties_root()?;
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         let show_pr = self.ensure_show_pr_mut(&mut root);
-        show_pr.children.retain(|c| {
-            !matches!(c.local_name.as_str(), "sldAll" | "sldRg" | "custShow")
-        });
+        show_pr
+            .children
+            .retain(|c| !matches!(c.local_name.as_str(), "sldAll" | "sldRg" | "custShow"));
         show_pr.append_child(
             OpenXmlElement::new("p", p, "custShow")
                 .with_attribute("id", custom_show_id.to_string()),
@@ -11440,9 +11209,9 @@ impl PresentationDocument {
             return Ok(false);
         };
         let before = show_pr.children.len();
-        show_pr.children.retain(|c| {
-            !matches!(c.local_name.as_str(), "present" | "browse" | "kiosk")
-        });
+        show_pr
+            .children
+            .retain(|c| !matches!(c.local_name.as_str(), "present" | "browse" | "kiosk"));
         let removed = show_pr.children.len() < before;
         if removed {
             self.save_presentation_properties(uri, &root)?;
@@ -11525,9 +11294,8 @@ impl PresentationDocument {
         let show_pr = self.ensure_show_pr_mut(&mut root);
         show_pr.children.retain(|c| c.local_name != "penClr");
         show_pr.append_child(
-            OpenXmlElement::new("p", p, "penClr").with_child(
-                OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb),
-            ),
+            OpenXmlElement::new("p", p, "penClr")
+                .with_child(OpenXmlElement::new("a", a, "srgbClr").with_attribute("val", rgb)),
         );
         self.save_presentation_properties(uri, &root)
     }
@@ -11745,9 +11513,7 @@ impl PresentationDocument {
             if show.local_name != "custShow" {
                 continue;
             }
-            let sid = show
-                .get_attribute("id")
-                .and_then(|s| s.parse::<u32>().ok());
+            let sid = show.get_attribute("id").and_then(|s| s.parse::<u32>().ok());
             if sid == Some(id) {
                 show.set_attribute("name", new_name);
                 found = true;
@@ -11773,11 +11539,7 @@ impl PresentationDocument {
     }
 
     /// Replace the slide list of a custom show by id with the given slide indices.
-    pub fn set_custom_show_slides(
-        &mut self,
-        id: u32,
-        slide_indices: &[usize],
-    ) -> Result<bool> {
+    pub fn set_custom_show_slides(&mut self, id: u32, slide_indices: &[usize]) -> Result<bool> {
         let pres_uri = self.ensure_presentation()?;
         let mut root = parse_element(
             self.package
@@ -11795,9 +11557,7 @@ impl PresentationDocument {
             if show.local_name != "custShow" {
                 continue;
             }
-            let sid = show
-                .get_attribute("id")
-                .and_then(|s| s.parse::<u32>().ok());
+            let sid = show.get_attribute("id").and_then(|s| s.parse::<u32>().ok());
             if sid != Some(id) {
                 continue;
             }
@@ -11874,11 +11634,8 @@ impl PresentationDocument {
             return Ok(false);
         };
         let before = lst.children.len();
-        lst.children.retain(|c| {
-            c.get_attribute("id")
-                .and_then(|s| s.parse::<u32>().ok())
-                != Some(id)
-        });
+        lst.children
+            .retain(|c| c.get_attribute("id").and_then(|s| s.parse::<u32>().ok()) != Some(id));
         let removed = lst.children.len() < before;
         if lst.children.is_empty() {
             root.children.retain(|c| c.local_name != "custShowLst");
@@ -12143,21 +11900,24 @@ impl PresentationDocument {
             .has_part(&PackUri::new("/ppt/tableStyles.xml"))
     }
 
-
     /// Whether any styles part exists (table styles or `/ppt/styles`).
     pub fn has_styles(&self) -> bool {
         self.has_table_styles()
             || self
                 .package
                 .opc()
-                .part_uris().into_iter().any(|u| u.as_str().contains("/ppt/styles"))
+                .part_uris()
+                .into_iter()
+                .any(|u| u.as_str().contains("/ppt/styles"))
     }
 
     /// Count styles-related parts.
     pub fn styles_count(&self) -> usize {
         self.package
             .opc()
-            .part_uris().into_iter().filter(|u| {
+            .part_uris()
+            .into_iter()
+            .filter(|u| {
                 let s = u.as_str();
                 s.contains("tableStyles") || s.contains("/ppt/styles")
             })
@@ -12170,8 +11930,9 @@ impl PresentationDocument {
         let uris: Vec<PackUri> = self
             .package
             .opc()
-            .part_uris().into_iter().filter(|u| u.as_str().contains("/ppt/styles"))
-            
+            .part_uris()
+            .into_iter()
+            .filter(|u| u.as_str().contains("/ppt/styles"))
             .collect();
         for uri in uris {
             self.package.opc_mut().remove_part(&uri);
@@ -12437,7 +12198,10 @@ impl PresentationDocument {
         Ok(removed)
     }
 
-    fn ensure_normal_view_pr_mut<'a>(&self, root: &'a mut OpenXmlElement) -> &'a mut OpenXmlElement {
+    fn ensure_normal_view_pr_mut<'a>(
+        &self,
+        root: &'a mut OpenXmlElement,
+    ) -> &'a mut OpenXmlElement {
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         if root.child("normalViewPr").is_none() {
             root.append_child(
@@ -12586,7 +12350,8 @@ impl PresentationDocument {
                 el.set_attribute("autoAdjust", if aa { "1" } else { "0" });
             }
         } else {
-            let mut el = OpenXmlElement::new("p", p, "restoredLeft").with_attribute("sz", sz.to_string());
+            let mut el =
+                OpenXmlElement::new("p", p, "restoredLeft").with_attribute("sz", sz.to_string());
             if let Some(aa) = auto_adjust {
                 el.set_attribute("autoAdjust", if aa { "1" } else { "0" });
             }
@@ -12602,7 +12367,10 @@ impl PresentationDocument {
             return Ok(None);
         };
         let root = parse_element(data)?;
-        let Some(el) = root.child("normalViewPr").and_then(|n| n.child("restoredLeft")) else {
+        let Some(el) = root
+            .child("normalViewPr")
+            .and_then(|n| n.child("restoredLeft"))
+        else {
             return Ok(None);
         };
         let sz = el
@@ -12627,7 +12395,8 @@ impl PresentationDocument {
                 el.set_attribute("autoAdjust", if aa { "1" } else { "0" });
             }
         } else {
-            let mut el = OpenXmlElement::new("p", p, "restoredTop").with_attribute("sz", sz.to_string());
+            let mut el =
+                OpenXmlElement::new("p", p, "restoredTop").with_attribute("sz", sz.to_string());
             if let Some(aa) = auto_adjust {
                 el.set_attribute("autoAdjust", if aa { "1" } else { "0" });
             }
@@ -12643,7 +12412,10 @@ impl PresentationDocument {
             return Ok(None);
         };
         let root = parse_element(data)?;
-        let Some(el) = root.child("normalViewPr").and_then(|n| n.child("restoredTop")) else {
+        let Some(el) = root
+            .child("normalViewPr")
+            .and_then(|n| n.child("restoredTop"))
+        else {
             return Ok(None);
         };
         let sz = el
@@ -13519,11 +13291,9 @@ impl PresentationDocument {
             root.attributes.retain(|a| a.local_name != "show");
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -13546,7 +13316,6 @@ impl PresentationDocument {
     pub fn unhide_slide(&mut self, slide_index: usize) -> Result<()> {
         self.set_slide_hidden(slide_index, false)
     }
-
 
     pub fn is_slide_hidden(&self, slide_index: usize) -> Result<bool> {
         let slide_info = self
@@ -13576,11 +13345,9 @@ impl PresentationDocument {
         };
         root.set_attribute("showMasterSp", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -13614,11 +13381,9 @@ impl PresentationDocument {
         };
         root.set_attribute("showMasterPhAnim", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -13675,7 +13440,8 @@ impl PresentationDocument {
         if root.get_attribute("showMasterPhAnim").is_none() {
             return Ok(false);
         }
-        root.attributes.retain(|a| a.local_name != "showMasterPhAnim");
+        root.attributes
+            .retain(|a| a.local_name != "showMasterPhAnim");
         self.package.opc_mut().set_part(
             slide_info.uri,
             content_type::PRESENTATION_SLIDE,
@@ -13685,11 +13451,7 @@ impl PresentationDocument {
     }
 
     /// Set whether master shapes are shown on a notes slide (`p:notes/@showMasterSp`).
-    pub fn set_notes_show_master_shapes(
-        &mut self,
-        slide_index: usize,
-        show: bool,
-    ) -> Result<bool> {
+    pub fn set_notes_show_master_shapes(&mut self, slide_index: usize, show: bool) -> Result<bool> {
         let Some(uri) = self.notes_uri_for_slide(slide_index)? else {
             return Ok(false);
         };
@@ -13726,11 +13488,10 @@ impl PresentationDocument {
         layout_index: usize,
         show: bool,
     ) -> Result<()> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&layout.uri) {
             parse_element(data)?
         } else {
@@ -13738,11 +13499,9 @@ impl PresentationDocument {
         };
         root.set_attribute("showMasterSp", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout.uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -13768,11 +13527,10 @@ impl PresentationDocument {
         layout_index: usize,
         show: bool,
     ) -> Result<()> {
-        let layout = self
-            .layouts
-            .get(layout_index)
-            .cloned()
-            .ok_or_else(|| Error::Package(format!("layout index {layout_index} out of range")))?;
+        let layout =
+            self.layouts.get(layout_index).cloned().ok_or_else(|| {
+                Error::Package(format!("layout index {layout_index} out of range"))
+            })?;
         let mut root = if let Some(data) = self.package.opc().get_part(&layout.uri) {
             parse_element(data)?
         } else {
@@ -13780,11 +13538,9 @@ impl PresentationDocument {
         };
         root.set_attribute("showMasterPhAnim", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            layout.uri,
-            content_type::PRESENTATION_SLIDE_LAYOUT,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
 
@@ -13873,7 +13629,8 @@ impl PresentationDocument {
         if root.get_attribute("showMasterPhAnim").is_none() {
             return Ok(false);
         }
-        root.attributes.retain(|a| a.local_name != "showMasterPhAnim");
+        root.attributes
+            .retain(|a| a.local_name != "showMasterPhAnim");
         self.package.opc_mut().set_part(
             uri,
             content_type::PRESENTATION_NOTES_SLIDE,
@@ -14194,9 +13951,8 @@ impl PresentationDocument {
         )?;
         fn remove(el: &mut OpenXmlElement, name: &str) -> bool {
             let before = el.children.len();
-            el.children.retain(|c| {
-                !(c.local_name == "section" && c.get_attribute("name") == Some(name))
-            });
+            el.children
+                .retain(|c| !(c.local_name == "section" && c.get_attribute("name") == Some(name)));
             let mut found = el.children.len() < before;
             for child in el.children.iter_mut() {
                 if remove(child, name) {
@@ -14330,7 +14086,6 @@ impl PresentationDocument {
         Ok(out)
     }
 
-
     /// Whether any slides have transitions configured.
     pub fn has_slide_transitions(&self) -> Result<bool> {
         Ok(!self.list_slide_transitions()?.is_empty())
@@ -14388,9 +14143,7 @@ impl PresentationDocument {
             .get_attribute("advClick")
             .map(|s| s == "1" || s.eq_ignore_ascii_case("true"))
             .unwrap_or(true);
-        let adv_tm = tr
-            .get_attribute("advTm")
-            .and_then(|s| s.parse().ok());
+        let adv_tm = tr.get_attribute("advTm").and_then(|s| s.parse().ok());
         Ok(Some((effect, speed, adv_click, adv_tm)))
     }
 
@@ -14431,11 +14184,9 @@ impl PresentationDocument {
             }
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(true)
     }
 
@@ -14457,11 +14208,9 @@ impl PresentationDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -14477,11 +14226,7 @@ impl PresentationDocument {
         )?;
         root.children.retain(|c| c.local_name != "notesSz");
         let sz = notes_size(cx, cy);
-        if let Some(pos) = root
-            .children
-            .iter()
-            .position(|c| c.local_name == "sldSz")
-        {
+        if let Some(pos) = root.children.iter().position(|c| c.local_name == "sldSz") {
             root.children.insert(pos + 1, sz);
         } else {
             root.children.insert(0, sz);
@@ -14492,7 +14237,6 @@ impl PresentationDocument {
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
-
 
     /// Set presentation `firstSlideNum` attribute.
     pub fn set_first_slide_num(&mut self, num: u32) -> Result<()> {
@@ -14518,7 +14262,9 @@ impl PresentationDocument {
             return Ok(None);
         };
         let root = parse_element(data)?;
-        Ok(root.get_attribute("firstSlideNum").and_then(|s| s.parse().ok()))
+        Ok(root
+            .get_attribute("firstSlideNum")
+            .and_then(|s| s.parse().ok()))
     }
 
     /// Whether `firstSlideNum` is set on the presentation.
@@ -14861,16 +14607,14 @@ impl PresentationDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                pres_uri,
-                self.document_type.content_type(),
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
 
-        /// Set the presentation slide size in EMUs (e.g. [`SLIDE_SIZE_16_9`]).
+    /// Set the presentation slide size in EMUs (e.g. [`SLIDE_SIZE_16_9`]).
     pub fn set_slide_size(&mut self, cx: i64, cy: i64) -> Result<()> {
         let pres_uri = self.ensure_presentation()?;
         let mut root = if let Some(data) = self.package.opc().get_part(&pres_uri) {
@@ -15015,8 +14759,7 @@ impl PresentationDocument {
         };
         let mut root = parse_element(data)?;
         let before = root.children.len();
-        root.children
-            .retain(|c| c.local_name != "defaultTextStyle");
+        root.children.retain(|c| c.local_name != "defaultTextStyle");
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
@@ -15080,7 +14823,6 @@ impl PresentationDocument {
         Ok(self.slide_size()?.is_some())
     }
 
-
     /// Remove presentation `sldSz`. Returns whether it was present.
     pub fn clear_slide_size(&mut self) -> Result<bool> {
         let pres_uri = PackUri::new(PRESENTATION_URI);
@@ -15093,11 +14835,9 @@ impl PresentationDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                pres_uri,
-                self.document_type.content_type(),
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -15143,7 +14883,8 @@ impl PresentationDocument {
         let Some(bg) = csld.child("bg") else {
             return Ok(None);
         };
-        Ok(bg.descendants()
+        Ok(bg
+            .descendants()
             .find(|e| e.local_name == "srgbClr")
             .and_then(|e| e.get_attribute("val").map(|s| s.to_string())))
     }
@@ -15167,11 +14908,9 @@ impl PresentationDocument {
             csld.children.insert(0, solid_slide_background(rgb));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -15196,11 +14935,9 @@ impl PresentationDocument {
         }
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -15224,11 +14961,9 @@ impl PresentationDocument {
             return Err(Error::Package("cSld missing".into()));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -15262,7 +14997,6 @@ impl PresentationDocument {
         Ok(out)
     }
 
-
     /// Whether any slides have non-empty names.
     pub fn has_slide_names(&self) -> Result<bool> {
         Ok(!self.list_slide_names()?.is_empty())
@@ -15289,11 +15023,9 @@ impl PresentationDocument {
         let removed = csld.attributes.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -15311,10 +15043,7 @@ impl PresentationDocument {
     }
 
     pub fn has_slide_named(&self, name: &str) -> Result<bool> {
-        Ok(self
-            .list_slide_names()?
-            .iter()
-            .any(|(_, n)| n == name))
+        Ok(self.list_slide_names()?.iter().any(|(_, n)| n == name))
     }
 
     /// Whether any slide currently has a background.
@@ -15362,11 +15091,9 @@ impl PresentationDocument {
         root.children.retain(|c| c.local_name != "hf");
         root.append_child(header_footer(show_date, show_footer, show_slide_number));
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -15474,7 +15201,10 @@ impl PresentationDocument {
             .get_attribute("showCaptions")
             .map(|s| s == "1" || s.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
-        let layout = pa.get_attribute("layout").unwrap_or("fitToSlide").to_string();
+        let layout = pa
+            .get_attribute("layout")
+            .unwrap_or("fitToSlide")
+            .to_string();
         let frame = pa.get_attribute("frame").unwrap_or("rectangle").to_string();
         Ok(Some((bw, caps, layout, frame)))
     }
@@ -15768,9 +15498,8 @@ impl PresentationDocument {
             return Ok(false);
         };
         let before = mv.attributes.len();
-        mv.attributes.retain(|a| {
-            a.local_name != "algorithmName" && a.local_name != "spinCount"
-        });
+        mv.attributes
+            .retain(|a| a.local_name != "algorithmName" && a.local_name != "spinCount");
         if mv.attributes.len() == before {
             return Ok(false);
         }
@@ -15849,11 +15578,7 @@ impl PresentationDocument {
     ///
     /// `typeface` is the font name; relationship ids for font data parts are optional.
     /// When an entry for the same typeface already exists, the provided face slots are merged.
-    pub fn add_embedded_font(
-        &mut self,
-        typeface: &str,
-        regular_rid: Option<&str>,
-    ) -> Result<()> {
+    pub fn add_embedded_font(&mut self, typeface: &str, regular_rid: Option<&str>) -> Result<()> {
         self.add_embedded_font_faces(typeface, regular_rid, None)
     }
 
@@ -15864,6 +15589,18 @@ impl PresentationDocument {
         regular_rid: Option<&str>,
         bold_rid: Option<&str>,
     ) -> Result<()> {
+        self.add_embedded_font_faces_ex(typeface, regular_rid, bold_rid, None, None)
+    }
+
+    /// Add/merge embedded font entry with optional `charset` / `pitchFamily` on `p:font`.
+    pub fn add_embedded_font_faces_ex(
+        &mut self,
+        typeface: &str,
+        regular_rid: Option<&str>,
+        bold_rid: Option<&str>,
+        charset: Option<i32>,
+        pitch_family: Option<i32>,
+    ) -> Result<()> {
         let pres_uri = self.ensure_presentation()?;
         let mut root = parse_element(
             self.package
@@ -15873,6 +15610,22 @@ impl PresentationDocument {
         )?;
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         let a = crate::namespace::ns::DRAWINGML.uri;
+
+        let make_font_el = |typeface: &str| {
+            let mut font = OpenXmlElement::new("p", p, "font")
+                .with_attribute("typeface", typeface)
+                .with_ns_decl("a", a);
+            // DrawingML CT_TextFont attrs (optional)
+            if let Some(cs) = charset {
+                font = font.with_attribute("charset", cs.to_string());
+            }
+            if let Some(pf) = pitch_family {
+                font = font.with_attribute("pitchFamily", pf.to_string());
+            }
+            // Common panose for sans-serif Latin; CJK faces ignore it safely.
+            font = font.with_attribute("panose", "020B0604020202020204");
+            font
+        };
 
         // Find existing entry for typeface
         let mut found = false;
@@ -15908,11 +15661,8 @@ impl PresentationDocument {
                 break;
             }
             if !found {
-                let mut entry = OpenXmlElement::new("p", p, "embeddedFont").with_child(
-                    OpenXmlElement::new("p", p, "font")
-                        .with_attribute("typeface", typeface)
-                        .with_ns_decl("a", a),
-                );
+                let mut entry =
+                    OpenXmlElement::new("p", p, "embeddedFont").with_child(make_font_el(typeface));
                 if let Some(rid) = regular_rid {
                     entry.append_child(
                         OpenXmlElement::new("p", p, "regular").with_attribute_qname("r:id", rid),
@@ -15926,11 +15676,8 @@ impl PresentationDocument {
                 lst.append_child(entry);
             }
         } else {
-            let mut entry = OpenXmlElement::new("p", p, "embeddedFont").with_child(
-                OpenXmlElement::new("p", p, "font")
-                    .with_attribute("typeface", typeface)
-                    .with_ns_decl("a", a),
-            );
+            let mut entry =
+                OpenXmlElement::new("p", p, "embeddedFont").with_child(make_font_el(typeface));
             if let Some(rid) = regular_rid {
                 entry.append_child(
                     OpenXmlElement::new("p", p, "regular").with_attribute_qname("r:id", rid),
@@ -15994,8 +15741,7 @@ impl PresentationDocument {
             return Ok(0);
         };
         let mut root = parse_element(data)?;
-        root.children
-            .retain(|c| c.local_name != "embeddedFontLst");
+        root.children.retain(|c| c.local_name != "embeddedFontLst");
         let xml = write_element(&root)?;
         self.package
             .opc_mut()
@@ -16016,14 +15762,11 @@ impl PresentationDocument {
         let before = lst.children.len();
         lst.children.retain(|e| {
             !(e.local_name == "embeddedFont"
-                && e.child("font")
-                    .and_then(|f| f.get_attribute("typeface"))
-                    == Some(typeface))
+                && e.child("font").and_then(|f| f.get_attribute("typeface")) == Some(typeface))
         });
         let removed = lst.children.len() < before;
         if lst.children.is_empty() {
-            root.children
-                .retain(|c| c.local_name != "embeddedFontLst");
+            root.children.retain(|c| c.local_name != "embeddedFontLst");
         }
         if removed {
             let xml = write_element(&root)?;
@@ -16044,14 +15787,13 @@ impl PresentationDocument {
                 .ok_or_else(|| Error::PartNotFound(pres_uri.to_string()))?,
         )?;
         let p = crate::namespace::ns::PRESENTATIONML.uri;
-        let entry = OpenXmlElement::new("p", p, "custData")
-            .with_attribute_qname("r:id", relationship_id);
+        let entry =
+            OpenXmlElement::new("p", p, "custData").with_attribute_qname("r:id", relationship_id);
         if let Some(lst) = root.child_mut("custDataLst") {
             lst.append_child(entry);
         } else {
-            root.children.push(
-                OpenXmlElement::new("p", p, "custDataLst").with_child(entry),
-            );
+            root.children
+                .push(OpenXmlElement::new("p", p, "custDataLst").with_child(entry));
         }
         let xml = write_element(&root)?;
         self.package
@@ -16177,11 +15919,9 @@ impl PresentationDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -16205,7 +15945,6 @@ impl PresentationDocument {
     pub fn transition_count(&self) -> Result<usize> {
         Ok(self.slides_with_transition()?.len())
     }
-
 
     /// Whether any slide has a transition.
     pub fn has_any_transition(&self) -> Result<bool> {
@@ -16269,11 +16008,9 @@ impl PresentationDocument {
         let removed = root.children.len() < before;
         if removed {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -16308,11 +16045,7 @@ impl PresentationDocument {
         Ok(self.list_animation_shape_ids(slide_index)?.len())
     }
 
-    pub fn set_simple_appear_animation(
-        &mut self,
-        slide_index: usize,
-        shape_id: u32,
-    ) -> Result<()> {
+    pub fn set_simple_appear_animation(&mut self, slide_index: usize, shape_id: u32) -> Result<()> {
         self.set_animation_effect(slide_index, shape_id, "fade", "in")
     }
 
@@ -16341,8 +16074,8 @@ impl PresentationDocument {
         root.children.retain(|c| c.local_name != "timing");
         // Build timing with custom filter/transition (same structure as simple_appear_timing).
         let p_ns = "http://schemas.openxmlformats.org/presentationml/2006/main";
-        let sp_tgt = OpenXmlElement::new("p", p_ns, "spTgt")
-            .with_attribute("spid", shape_id.to_string());
+        let sp_tgt =
+            OpenXmlElement::new("p", p_ns, "spTgt").with_attribute("spid", shape_id.to_string());
         let tgt_el = OpenXmlElement::new("p", p_ns, "tgtEl").with_child(sp_tgt);
         let c_bhvr = OpenXmlElement::new("p", p_ns, "cBhvr").with_child(
             OpenXmlElement::new("p", p_ns, "cTn")
@@ -16366,11 +16099,9 @@ impl PresentationDocument {
             .with_child(OpenXmlElement::new("p", p_ns, "tnLst").with_child(par));
         root.append_child(timing);
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -16457,11 +16188,7 @@ impl PresentationDocument {
     }
 
     /// Set duration on the first animEffect `cBhvr/cTn@dur` (e.g. `"500"` ms or `"indefinite"`).
-    pub fn set_animation_duration(
-        &mut self,
-        slide_index: usize,
-        dur: &str,
-    ) -> Result<bool> {
+    pub fn set_animation_duration(&mut self, slide_index: usize, dur: &str) -> Result<bool> {
         let slide_info = self
             .slides
             .get(slide_index)
@@ -16494,11 +16221,9 @@ impl PresentationDocument {
         visit(&mut root, dur, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -16538,11 +16263,9 @@ impl PresentationDocument {
         visit(&mut root, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -16592,11 +16315,9 @@ impl PresentationDocument {
         visit(&mut root, filter, transition, &mut found);
         if found {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -16605,7 +16326,6 @@ impl PresentationDocument {
     pub fn clear_animation_filter(&mut self, slide_index: usize) -> Result<bool> {
         self.set_animation_filter(slide_index, None, None)
     }
-
 
     /// List animation effects on a slide as `(shape_id, filter, transition)`.
     pub fn list_slide_animation_effects(
@@ -16690,11 +16410,9 @@ impl PresentationDocument {
                 root.children.retain(|c| c.local_name != "timing");
             }
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                slide_info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -16724,11 +16442,9 @@ impl PresentationDocument {
         root.children.retain(|c| c.local_name != "transition");
         root.append_child(slide_transition(effect, speed, true, advance_after_ms));
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
@@ -16889,11 +16605,9 @@ impl PresentationDocument {
         let slide_uri = PackUri::new(format!("/ppt/slides/slide{index}.xml"));
 
         let xml = write_element(&slide_root)?;
-        self.package.opc_mut().set_part(
-            slide_uri.clone(),
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri.clone(), content_type::PRESENTATION_SLIDE, xml);
 
         let slide_rel = self.package.opc_mut().add_part_relationship(
             &pres_uri,
@@ -16945,18 +16659,15 @@ impl PresentationDocument {
 
         let mut img_index = 1u32;
         let image_uri = loop {
-            let candidate =
-                PackUri::new(format!("/ppt/media/image{img_index}.{extension}"));
+            let candidate = PackUri::new(format!("/ppt/media/image{img_index}.{extension}"));
             if !self.package.opc().has_part(&candidate) {
                 break candidate;
             }
             img_index += 1;
         };
-        self.package.opc_mut().set_part(
-            image_uri.clone(),
-            content_type_str,
-            image_bytes.to_vec(),
-        );
+        self.package
+            .opc_mut()
+            .set_part(image_uri.clone(), content_type_str, image_bytes.to_vec());
         let img_rel = self.package.opc_mut().add_part_relationship(
             &slide_uri,
             rel::IMAGE,
@@ -16990,11 +16701,9 @@ impl PresentationDocument {
             root.append_child(common_slide_data(vec![shape_tree(vec![pic])]));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok((image_uri, img_rel))
     }
 
@@ -17047,31 +16756,30 @@ impl PresentationDocument {
         let conv = svg_to_shapes::svg_to_shapes(svg_bytes, cx, cy, start_id)?;
         // Embed fonts used by the SVG text runs as ODTTF (Office obfuscated font).
         // GUID is generated per face; first 32 bytes XOR'd per ECMA-376 / MS-OFFCRYPTO.
+        // TTC sources are expected to already be extracted to single-face SFNT by the
+        // converter (see font::cjk_face_for_embed / ttc::extract_face).
         for uf in &conv.used_fonts {
-            if uf.data.len() > 4_000_000 {
+            // Noto CJK single-face OTTO extract is typically ~16–17MB; allow up to 24MB.
+            if uf.data.len() > 24_000_000 {
                 continue;
             }
-            let ext = uf
-                .path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("ttf");
-            // Skip TTC collections for now (multi-face).
-            if ext.eq_ignore_ascii_case("ttc") {
+            // Skip residual TTC blobs that were not extracted.
+            if uf.data.get(0..4) == Some(b"ttcf") {
                 continue;
             }
             let guid = crate::presentation::svg_to_shapes::odttf::new_font_guid();
             let odttf = crate::presentation::svg_to_shapes::odttf::to_odttf(&uf.data, &guid);
             let ct = content_type::FONT_ODTTF;
             if let Ok((_uri, rid)) = self.add_font_part(odttf, ct, "odttf") {
-                // Store GUID on the font part relationship target is enough for many hosts;
-                // Office also puts panose etc. — typeface mapping is via embeddedFontLst.
-                if uf.bold {
-                    let _ = self.add_embedded_font_faces(&uf.typeface, None, Some(&rid));
-                } else {
-                    let _ = self.add_embedded_font_faces(&uf.typeface, Some(&rid), None);
-                }
-                let _ = guid; // retained for future panose/guid attribute write
+                // panose/charset: set common defaults so Office accepts the face
+                let _ = self.add_embedded_font_faces_ex(
+                    &uf.typeface,
+                    if uf.bold { None } else { Some(&rid) },
+                    if uf.bold { Some(&rid) } else { None },
+                    /* charset */ Some(0), // ANSI default; EA faces still work
+                    /* pitchFamily */ Some(34), // Swiss variable (2<<4 | 2)
+                );
+                let _ = guid;
             }
         }
         // Offset all shapes by (x, y) if non-zero
@@ -17118,11 +16826,9 @@ impl PresentationDocument {
             );
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(count)
     }
 
@@ -17162,11 +16868,7 @@ impl PresentationDocument {
             // Insert media part without creating a content-type Override.
             let opc = self.package.opc_mut();
             // set_part always overrides; strip the override afterward so Default applies.
-            opc.set_part(
-                svg_uri.clone(),
-                content_type::IMAGE_SVG,
-                svg_bytes.to_vec(),
-            );
+            opc.set_part(svg_uri.clone(), content_type::IMAGE_SVG, svg_bytes.to_vec());
             opc.content_types_mut()
                 .overrides
                 .shift_remove(svg_uri.as_str());
@@ -17216,11 +16918,9 @@ impl PresentationDocument {
             );
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(svg_uri)
     }
 
@@ -17268,11 +16968,9 @@ impl PresentationDocument {
             root.append_child(common_slide_data(vec![shape_tree(vec![shape])]));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(shape_id)
     }
 
@@ -17318,11 +17016,9 @@ impl PresentationDocument {
             root.append_child(common_slide_data(vec![shape_tree(vec![shape])]));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(shape_id)
     }
 
@@ -17414,19 +17110,17 @@ impl PresentationDocument {
             root.append_child(common_slide_data(vec![shape_tree(vec![frame])]));
         }
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            slide_uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
 
     /// Add presentation part with a single empty slide.
     pub fn add_presentation_with_slide(&mut self) -> Result<String> {
-        let sld = slide(vec![common_slide_data(vec![shape_tree(
-            Vec::<OpenXmlElement>::new(),
-        )])]);
+        let sld = slide(vec![common_slide_data(vec![shape_tree(Vec::<
+            OpenXmlElement,
+        >::new())])]);
         let info = self.add_slide(sld)?;
         Ok(info.relationship_id)
     }
@@ -17492,11 +17186,9 @@ impl PresentationDocument {
         };
         let count = replace_slide_text(&mut root, from, to);
         let xml = write_element(&root)?;
-        self.package.opc_mut().set_part(
-            info.uri,
-            content_type::PRESENTATION_SLIDE,
-            xml,
-        );
+        self.package
+            .opc_mut()
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(count)
     }
 
@@ -17519,11 +17211,9 @@ impl PresentationDocument {
         set_first_t(&mut root, text, &mut updated);
         if updated {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(updated)
     }
@@ -17547,7 +17237,13 @@ impl PresentationDocument {
         };
         let mut idx = 0usize;
         let mut updated = false;
-        fn visit(el: &mut OpenXmlElement, target: usize, text: &str, idx: &mut usize, updated: &mut bool) {
+        fn visit(
+            el: &mut OpenXmlElement,
+            target: usize,
+            text: &str,
+            idx: &mut usize,
+            updated: &mut bool,
+        ) {
             if *updated {
                 return;
             }
@@ -17566,11 +17262,9 @@ impl PresentationDocument {
         visit(&mut root, text_index, text, &mut idx, &mut updated);
         if updated {
             let xml = write_element(&root)?;
-            self.package.opc_mut().set_part(
-                info.uri,
-                content_type::PRESENTATION_SLIDE,
-                xml,
-            );
+            self.package
+                .opc_mut()
+                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(updated)
     }
@@ -17594,11 +17288,7 @@ impl PresentationDocument {
     ///
     /// Returns the relationship id. Callers can wire it into a shape click via
     /// DrawingML `hlinkClick`; this method only creates the package relationship.
-    pub fn add_slide_hyperlink(
-        &mut self,
-        slide_index: usize,
-        url: &str,
-    ) -> Result<String> {
+    pub fn add_slide_hyperlink(&mut self, slide_index: usize, url: &str) -> Result<String> {
         let slide_info = self
             .slides
             .get(slide_index)
@@ -17665,7 +17355,10 @@ impl PresentationDocument {
             .get(slide_index)
             .cloned()
             .ok_or_else(|| Error::Package(format!("slide index {slide_index} out of range")))?;
-        let rels = self.package.opc_mut().part_relationships_mut(&slide_info.uri);
+        let rels = self
+            .package
+            .opc_mut()
+            .part_relationships_mut(&slide_info.uri);
         let removed = rels.remove(rid).is_some();
         Ok(removed)
     }
@@ -17698,7 +17391,6 @@ impl PresentationDocument {
         }
         Ok(out)
     }
-
 
     /// Alias for [`list_hyperlinks`](Self::list_hyperlinks) (Word-compatible name).
     pub fn list_external_hyperlinks(&self) -> Result<Vec<(usize, String, String)>> {
@@ -17750,7 +17442,6 @@ impl PresentationDocument {
         }
         Ok(n)
     }
-
 
     pub fn save(&mut self) -> Result<()> {
         self.package.save()
@@ -17828,7 +17519,6 @@ impl Drop for PresentationDocument {
         }
     }
 }
-
 
 fn offset_shape(elem: &mut OpenXmlElement, dx: i64, dy: i64) {
     if elem.local_name == "off" {

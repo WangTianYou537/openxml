@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240">
+  <title>Basic geometry and all SVG path commands</title>
+  <rect x="10" y="10" width="50" height="30" rx="6" fill="#ef4444"/>
+  <circle cx="95" cy="25" r="18" fill="#f59e0b"/>
+  <ellipse cx="150" cy="25" rx="28" ry="16" fill="#10b981"/>
+  <line x1="190" y1="10" x2="245" y2="40" stroke="#2563eb" stroke-width="4"/>
+  <polyline points="260,40 280,10 300,40" fill="none" stroke="#7c3aed" stroke-width="3"/>
+  <polygon points="20,80 50,55 80,80 65,115 35,115" fill="#06b6d4"/>
+  <path d="M100 70 L125 55 H150 V80 C160 45 185 45 195 80 S225 115 235 80 Q250 50 265 80 T300 80 A18 12 0 0 1 270 115 Z
+           m-170 45 l20 0 h15 v15 c10 0 15 8 20 15 s15 15 25 0 q10 -12 20 0 t20 0 a10 8 0 0 0 25 8 z"
+        fill="#fde047" stroke="#78350f" stroke-width="2"/>
+</svg>

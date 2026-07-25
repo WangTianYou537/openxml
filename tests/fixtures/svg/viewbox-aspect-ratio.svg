@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="-40 -20 400 200" preserveAspectRatio="xMidYMid meet">
+  <title>Non-zero viewBox and preserveAspectRatio variants</title>
+  <rect x="-40" y="-20" width="400" height="200" fill="#e2e8f0"/>
+  <rect x="0" y="0" width="120" height="80" fill="#0ea5e9"/>
+  <svg x="150" y="15" width="80" height="80" viewBox="0 0 100 50" preserveAspectRatio="xMinYMin slice">
+    <circle cx="50" cy="25" r="22" fill="#f97316"/>
+  </svg>
+  <g transform="translate(250 40) scale(0.8) rotate(12)">
+    <rect width="80" height="60" fill="#8b5cf6"/>
+  </g>
+</svg>

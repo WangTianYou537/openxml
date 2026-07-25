@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 180">
+  <title>Common SVG filter primitives and approximations</title>
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-30%" y="-30%" width="180%" height="180%">
+      <feOffset in="SourceAlpha" dx="5" dy="7" result="offset"/>
+      <feGaussianBlur in="offset" stdDeviation="4" result="blur"/>
+      <feFlood flood-color="#111827" flood-opacity=".55" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="shadow"/>
+      <feBlend in="SourceGraphic" in2="shadow" mode="normal"/>
+    </filter>
+    <filter id="drop"><feDropShadow dx="4" dy="4" stdDeviation="3" flood-color="#dc2626" flood-opacity=".7"/></filter>
+    <filter id="matrix"><feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .7 0"/></filter>
+  </defs>
+  <circle cx="55" cy="90" r="34" fill="#0ea5e9" filter="url(#glow)"/>
+  <rect x="125" y="50" width="75" height="80" rx="10" fill="#22c55e" filter="url(#shadow)"/>
+  <polygon points="275,40 310,130 235,130" fill="#facc15" filter="url(#drop)"/>
+  <ellipse cx="355" cy="90" rx="32" ry="48" fill="#a855f7" filter="url(#matrix)"/>
+</svg>

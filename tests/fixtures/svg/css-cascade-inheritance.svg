@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180">
+  <title>CSS element, class, id, presentation and inline cascade</title>
+  <style><![CDATA[
+    rect { fill: #cbd5e1; stroke: #334155; stroke-width: 2; }
+    .accent { fill: #22c55e; opacity: .85; }
+    .heavy { stroke-width: 5; stroke-linejoin: round; }
+    #winner { fill: #eab308; stroke: #7c2d12; }
+  ]]></style>
+  <g fill="#0ea5e9" stroke="#0f172a" stroke-width="3" opacity="0.9">
+    <circle cx="45" cy="50" r="28"/>
+    <ellipse class="accent" cx="120" cy="50" rx="38" ry="24"/>
+    <path class="heavy" d="M175 75 Q220 5 270 75" fill="none"/>
+  </g>
+  <rect x="20" y="105" width="70" height="45" class="accent"/>
+  <rect id="winner" class="accent" x="120" y="105" width="70" height="45"/>
+  <rect x="220" y="105" width="70" height="45" fill="#ef4444" style="fill:#a855f7;stroke-dasharray:8 4"/>
+</svg>

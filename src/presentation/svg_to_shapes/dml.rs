@@ -7,8 +7,9 @@ use crate::element::OpenXmlElement;
 const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 
-/// Path coordinate space resolution for custGeom (higher = smoother).
-pub const PATH_SPACE: i64 = 100_000;
+/// Path coordinate space resolution for custGeom (higher = smoother glyph outlines).
+/// 2e6 gives sub-pixel fidelity at 1280×720 while staying well under DrawingML int limits.
+pub const PATH_SPACE: i64 = 2_000_000;
 
 /// Optional DrawingML shape effect approximating an SVG filter.
 #[derive(Debug, Clone, Default)]
@@ -17,6 +18,9 @@ pub struct ShapeEffect {
     pub glow_rad_emu: i64,
     pub glow_rgb: [u8; 3],
     pub glow_alpha: f64,
+    /// Soft edge radius in EMUs (`a:softEdge/@rad`) — blurs the shape itself
+    /// (maps SVG blur-only filters that replace SourceGraphic).
+    pub soft_edge_emu: i64,
     /// Outer shadow blur radius (EMU). Zero disables.
     pub shadow_blur_emu: i64,
     pub shadow_dist_emu: i64,
@@ -24,11 +28,16 @@ pub struct ShapeEffect {
     pub shadow_dir: i32,
     pub shadow_rgb: [u8; 3],
     pub shadow_alpha: f64,
+    /// When true, emit `a:innerShdw` instead of `a:outerShdw` (CSS inset box-shadow).
+    pub shadow_inset: bool,
 }
 
 impl ShapeEffect {
     pub fn is_empty(&self) -> bool {
-        self.glow_rad_emu <= 0 && self.shadow_blur_emu <= 0 && self.shadow_dist_emu <= 0
+        self.glow_rad_emu <= 0
+            && self.soft_edge_emu <= 0
+            && self.shadow_blur_emu <= 0
+            && self.shadow_dist_emu <= 0
     }
 }
 
@@ -48,7 +57,11 @@ pub struct ShapeBuild {
     pub stroke_dash: Option<&'static str>,
     pub stroke_cap: Option<&'static str>,
     pub stroke_join: Option<&'static str>,
+    /// DrawingML miter lim (100000ths); ignored unless join is miter.
+    pub stroke_miter_lim: Option<i64>,
     pub effect: Option<ShapeEffect>,
+    /// DrawingML path fill mode: None = default (norm), Some("evenOdd") for glyph holes.
+    pub path_fill_mode: Option<&'static str>,
 }
 
 pub fn freeform_shape(b: &ShapeBuild) -> OpenXmlElement {
@@ -71,17 +84,23 @@ pub fn freeform_shape(b: &ShapeBuild) -> OpenXmlElement {
         .with_attribute("h", path_h.to_string());
     if matches!(b.fill, Paint::None) {
         path = path.with_attribute("fill", "none");
+    } else if let Some(mode) = b.path_fill_mode {
+        path = path.with_attribute("fill", mode);
     }
 
+    // Track pen in user space so QuadTo can be promoted to cubicBezTo.
+    let mut pen = (min_x, min_y);
     for s in &b.segments {
         match *s {
             Segment::MoveTo { x, y } => {
                 let (px, py) = to_path(x, y);
                 path = path.with_child(pt_cmd("moveTo", px, py));
+                pen = (x, y);
             }
             Segment::LineTo { x, y } => {
                 let (px, py) = to_path(x, y);
                 path = path.with_child(pt_cmd("lnTo", px, py));
+                pen = (x, y);
             }
             Segment::CubicTo {
                 x1,
@@ -100,15 +119,26 @@ pub fn freeform_shape(b: &ShapeBuild) -> OpenXmlElement {
                         .with_child(pt(p2x, p2y))
                         .with_child(pt(px, py)),
                 );
+                pen = (x, y);
             }
             Segment::QuadTo { x1, y1, x, y } => {
-                let (pcx, pcy) = to_path(x1, y1);
+                // LO rasterizes quadBezTo poorly for TrueType glyph outlines.
+                // Exact degree-elevation: CP1 = P0 + 2/3 (Q-P0), CP2 = P2 + 2/3 (Q-P2).
+                let (p0x, p0y) = pen;
+                let c1x = p0x + 2.0 / 3.0 * (x1 - p0x);
+                let c1y = p0y + 2.0 / 3.0 * (y1 - p0y);
+                let c2x = x + 2.0 / 3.0 * (x1 - x);
+                let c2y = y + 2.0 / 3.0 * (y1 - y);
+                let (p1x, p1y) = to_path(c1x, c1y);
+                let (p2x, p2y) = to_path(c2x, c2y);
                 let (px, py) = to_path(x, y);
                 path = path.with_child(
-                    OpenXmlElement::new("a", A, "quadBezTo")
-                        .with_child(pt(pcx, pcy))
+                    OpenXmlElement::new("a", A, "cubicBezTo")
+                        .with_child(pt(p1x, p1y))
+                        .with_child(pt(p2x, p2y))
                         .with_child(pt(px, py)),
                 );
+                pen = (x, y);
             }
             Segment::Close => {
                 path = path.with_child(OpenXmlElement::new("a", A, "close"));
@@ -142,6 +172,7 @@ pub fn freeform_shape(b: &ShapeBuild) -> OpenXmlElement {
         b.stroke_dash,
         b.stroke_cap,
         b.stroke_join,
+        b.stroke_miter_lim,
     );
     if let Some(ref e) = b.effect {
         sp_pr = sp_pr.with_child(effect_lst(e));
@@ -166,6 +197,7 @@ pub fn preset_shape(
     dash: Option<&'static str>,
     cap: Option<&'static str>,
     join: Option<&'static str>,
+    miter_lim: Option<i64>,
     effect: Option<&ShapeEffect>,
 ) -> OpenXmlElement {
     let mut av = OpenXmlElement::new("a", A, "avLst");
@@ -184,7 +216,7 @@ pub fn preset_shape(
                 .with_child(av),
         );
     sp_pr = append_fill(sp_pr, fill);
-    sp_pr = append_stroke(sp_pr, stroke, stroke_w, dash, cap, join);
+    sp_pr = append_stroke(sp_pr, stroke, stroke_w, dash, cap, join, miter_lim);
     if let Some(e) = effect {
         sp_pr = sp_pr.with_child(effect_lst(e));
     }
@@ -231,12 +263,10 @@ pub fn text_shape(o: &TextShapeOpts) -> OpenXmlElement {
     r_pr = r_pr.with_child(
         OpenXmlElement::new("a", A, "latin").with_attribute("typeface", o.latin.as_str()),
     );
-    r_pr = r_pr.with_child(
-        OpenXmlElement::new("a", A, "ea").with_attribute("typeface", o.ea.as_str()),
-    );
-    r_pr = r_pr.with_child(
-        OpenXmlElement::new("a", A, "cs").with_attribute("typeface", o.latin.as_str()),
-    );
+    r_pr = r_pr
+        .with_child(OpenXmlElement::new("a", A, "ea").with_attribute("typeface", o.ea.as_str()));
+    r_pr = r_pr
+        .with_child(OpenXmlElement::new("a", A, "cs").with_attribute("typeface", o.latin.as_str()));
 
     let run = OpenXmlElement::new("a", A, "r")
         .with_child(r_pr)
@@ -350,6 +380,12 @@ fn effect_lst(e: &ShapeEffect) -> OpenXmlElement {
                 .with_child(clr),
         );
     }
+    if e.soft_edge_emu > 0 {
+        lst = lst.with_child(
+            OpenXmlElement::new("a", A, "softEdge")
+                .with_attribute("rad", e.soft_edge_emu.to_string()),
+        );
+    }
     if e.shadow_blur_emu > 0 || e.shadow_dist_emu > 0 {
         let mut clr =
             OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(e.shadow_rgb));
@@ -359,15 +395,17 @@ fn effect_lst(e: &ShapeEffect) -> OpenXmlElement {
                     .with_attribute("val", alpha_val(e.shadow_alpha).to_string()),
             );
         }
-        lst = lst.with_child(
-            OpenXmlElement::new("a", A, "outerShdw")
-                .with_attribute("blurRad", e.shadow_blur_emu.max(0).to_string())
-                .with_attribute("dist", e.shadow_dist_emu.max(0).to_string())
-                .with_attribute("dir", e.shadow_dir.to_string())
+        let tag = if e.shadow_inset { "innerShdw" } else { "outerShdw" };
+        let mut shdw = OpenXmlElement::new("a", A, tag)
+            .with_attribute("blurRad", e.shadow_blur_emu.max(0).to_string())
+            .with_attribute("dist", e.shadow_dist_emu.max(0).to_string())
+            .with_attribute("dir", e.shadow_dir.to_string());
+        if !e.shadow_inset {
+            shdw = shdw
                 .with_attribute("algn", "ctr")
-                .with_attribute("rotWithShape", "0")
-                .with_child(clr),
-        );
+                .with_attribute("rotWithShape", "0");
+        }
+        lst = lst.with_child(shdw.with_child(clr));
     }
     lst
 }
@@ -383,11 +421,11 @@ fn pt_cmd(name: &str, x: i64, y: i64) -> OpenXmlElement {
 }
 
 fn solid_fill(rgb: [u8; 3], alpha: f64) -> OpenXmlElement {
-    let mut clr =
-        OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(rgb));
+    let mut clr = OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(rgb));
     if (alpha - 1.0).abs() > 0.001 {
         clr = clr.with_child(
-            OpenXmlElement::new("a", A, "alpha").with_attribute("val", alpha_val(alpha).to_string()),
+            OpenXmlElement::new("a", A, "alpha")
+                .with_attribute("val", alpha_val(alpha).to_string()),
         );
     }
     OpenXmlElement::new("a", A, "solidFill").with_child(clr)
@@ -397,11 +435,51 @@ fn append_fill(mut sp_pr: OpenXmlElement, paint: &Paint) -> OpenXmlElement {
     match paint {
         Paint::None => sp_pr.with_child(OpenXmlElement::new("a", A, "noFill")),
         Paint::Solid { rgb, alpha } => sp_pr.with_child(solid_fill(*rgb, *alpha)),
-        Paint::LinearGradient { stops, angle } => {
-            sp_pr.with_child(grad_fill_linear(stops, *angle))
+        Paint::LinearGradient { stops, angle, flip } => {
+            sp_pr.with_child(grad_fill_linear(stops, *angle, flip.as_str()))
         }
-        Paint::RadialGradient { stops } => sp_pr.with_child(grad_fill_radial(stops)),
+        Paint::RadialGradient {
+            stops,
+            cx,
+            cy,
+            r: _,
+            flip,
+        } => sp_pr.with_child(grad_fill_radial(stops, *cx, *cy, flip.as_str())),
+        Paint::PatternFill {
+            prst,
+            fg,
+            fg_alpha,
+            bg,
+            bg_alpha,
+        } => sp_pr.with_child(patt_fill(prst, *fg, *fg_alpha, *bg, *bg_alpha)),
     }
+}
+
+fn patt_fill(
+    prst: &str,
+    fg: [u8; 3],
+    fg_alpha: f64,
+    bg: [u8; 3],
+    bg_alpha: f64,
+) -> OpenXmlElement {
+    let mut fg_clr = OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(fg));
+    if (fg_alpha - 1.0).abs() > 0.001 {
+        fg_clr = fg_clr.with_child(
+            OpenXmlElement::new("a", A, "alpha")
+                .with_attribute("val", alpha_val(fg_alpha).to_string()),
+        );
+    }
+    let mut bg_clr = OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(bg));
+    if (bg_alpha - 1.0).abs() > 0.001 {
+        bg_clr = bg_clr.with_child(
+            OpenXmlElement::new("a", A, "alpha")
+                .with_attribute("val", alpha_val(bg_alpha).to_string()),
+        );
+    }
+    OpenXmlElement::new("a", A, "pattFill")
+        .with_attribute("prst", prst)
+        .with_child(OpenXmlElement::new("a", A, "fgClr").with_child(fg_clr))
+        .with_child(OpenXmlElement::new("a", A, "bgClr").with_child(bg_clr))
 }
 
 fn append_stroke(
@@ -411,11 +489,15 @@ fn append_stroke(
     dash: Option<&'static str>,
     cap: Option<&'static str>,
     join: Option<&'static str>,
+    miter_lim: Option<i64>,
 ) -> OpenXmlElement {
     let cap_val = cap.unwrap_or("rnd");
     let join_el = match join.unwrap_or("round") {
         "bevel" => OpenXmlElement::new("a", A, "bevel"),
-        "miter" => OpenXmlElement::new("a", A, "miter").with_attribute("lim", "800000"),
+        "miter" => OpenXmlElement::new("a", A, "miter").with_attribute(
+            "lim",
+            miter_lim.unwrap_or(400_000).to_string(),
+        ),
         _ => OpenXmlElement::new("a", A, "round"),
     };
     match paint {
@@ -436,25 +518,39 @@ fn append_stroke(
             ln = ln.with_child(join_el);
             sp_pr.with_child(ln)
         }
-        Paint::LinearGradient { stops, angle } => {
+        Paint::LinearGradient { stops, angle, flip } => {
             let mut ln = OpenXmlElement::new("a", A, "ln")
                 .with_attribute("w", width.max(1270).to_string())
                 .with_attribute("cap", cap_val)
-                .with_child(grad_fill_linear(stops, *angle));
-            ln = ln.with_child(
-                OpenXmlElement::new("a", A, "prstDash").with_attribute("val", "solid"),
-            );
+                .with_child(grad_fill_linear(stops, *angle, flip.as_str()));
+            ln = ln
+                .with_child(OpenXmlElement::new("a", A, "prstDash").with_attribute("val", "solid"));
             ln = ln.with_child(join_el);
             sp_pr.with_child(ln)
         }
-        Paint::RadialGradient { stops } => {
+        Paint::RadialGradient { stops, cx, cy, flip, .. } => {
             let mut ln = OpenXmlElement::new("a", A, "ln")
                 .with_attribute("w", width.max(1270).to_string())
                 .with_attribute("cap", cap_val)
-                .with_child(grad_fill_radial(stops));
-            ln = ln.with_child(
-                OpenXmlElement::new("a", A, "prstDash").with_attribute("val", "solid"),
-            );
+                .with_child(grad_fill_radial(stops, *cx, *cy, flip.as_str()));
+            ln = ln
+                .with_child(OpenXmlElement::new("a", A, "prstDash").with_attribute("val", "solid"));
+            ln = ln.with_child(join_el);
+            sp_pr.with_child(ln)
+        }
+        Paint::PatternFill {
+            prst,
+            fg,
+            fg_alpha,
+            bg,
+            bg_alpha,
+        } => {
+            let mut ln = OpenXmlElement::new("a", A, "ln")
+                .with_attribute("w", width.max(1270).to_string())
+                .with_attribute("cap", cap_val)
+                .with_child(patt_fill(prst, *fg, *fg_alpha, *bg, *bg_alpha));
+            ln = ln
+                .with_child(OpenXmlElement::new("a", A, "prstDash").with_attribute("val", "solid"));
             ln = ln.with_child(join_el);
             sp_pr.with_child(ln)
         }
@@ -465,8 +561,7 @@ fn gs_list(stops: &[ColorStop]) -> OpenXmlElement {
     let mut lst = OpenXmlElement::new("a", A, "gsLst");
     for s in stops {
         let pos = ((s.offset.clamp(0.0, 1.0) * 100_000.0).round() as i64).clamp(0, 100_000);
-        let mut clr =
-            OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(s.rgb));
+        let mut clr = OpenXmlElement::new("a", A, "srgbClr").with_attribute("val", rgb_hex(s.rgb));
         if (s.alpha - 1.0).abs() > 0.001 {
             clr = clr.with_child(
                 OpenXmlElement::new("a", A, "alpha")
@@ -482,9 +577,9 @@ fn gs_list(stops: &[ColorStop]) -> OpenXmlElement {
     lst
 }
 
-fn grad_fill_linear(stops: &[ColorStop], angle: i32) -> OpenXmlElement {
+fn grad_fill_linear(stops: &[ColorStop], angle: i32, flip: &str) -> OpenXmlElement {
     OpenXmlElement::new("a", A, "gradFill")
-        .with_attribute("flip", "none")
+        .with_attribute("flip", flip)
         .with_attribute("rotWithShape", "1")
         .with_child(gs_list(stops))
         .with_child(
@@ -494,9 +589,18 @@ fn grad_fill_linear(stops: &[ColorStop], angle: i32) -> OpenXmlElement {
         )
 }
 
-fn grad_fill_radial(stops: &[ColorStop]) -> OpenXmlElement {
+fn grad_fill_radial(stops: &[ColorStop], cx: f64, cy: f64, flip: &str) -> OpenXmlElement {
+    // DrawingML path="circle" with fillToRect defines the focus rectangle.
+    // SVG radial focus (cx,cy) in 0..1 maps to:
+    //   l = cx*100000, t = cy*100000, r = (1-cx)*100000, b = (1-cy)*100000
+    // so the focus point sits at (cx,cy) of the shape.
+    let to_pct = |v: f64| ((v.clamp(0.0, 1.0) * 100_000.0).round() as i64).clamp(0, 100_000);
+    let l = to_pct(cx);
+    let t = to_pct(cy);
+    let r = to_pct(1.0 - cx);
+    let b = to_pct(1.0 - cy);
     OpenXmlElement::new("a", A, "gradFill")
-        .with_attribute("flip", "none")
+        .with_attribute("flip", flip)
         .with_attribute("rotWithShape", "1")
         .with_child(gs_list(stops))
         .with_child(
@@ -504,10 +608,10 @@ fn grad_fill_radial(stops: &[ColorStop]) -> OpenXmlElement {
                 .with_attribute("path", "circle")
                 .with_child(
                     OpenXmlElement::new("a", A, "fillToRect")
-                        .with_attribute("l", "50000")
-                        .with_attribute("t", "50000")
-                        .with_attribute("r", "50000")
-                        .with_attribute("b", "50000"),
+                        .with_attribute("l", l.to_string())
+                        .with_attribute("t", t.to_string())
+                        .with_attribute("r", r.to_string())
+                        .with_attribute("b", b.to_string()),
                 ),
         )
 }

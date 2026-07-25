@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 220">
+  <defs>
+    <clipPath id="left" clipPathUnits="objectBoundingBox">
+      <rect x="0" y="0" width="0.5" height="1"/>
+    </clipPath>
+    <clipPath id="diamond">
+      <polygon points="180,20 340,110 180,200 20,110"/>
+    </clipPath>
+  </defs>
+  <rect x="10" y="30" width="160" height="160" fill="#ef4444" clip-path="url(#left)"/>
+  <rect x="20" y="20" width="320" height="180" fill="#22c55e" opacity=".75" clip-path="url(#diamond)"/>
+  <g clip-path="url(#diamond)">
+    <circle cx="180" cy="110" r="100" fill="#3b82f6" opacity=".65"/>
+  </g>
+</svg>

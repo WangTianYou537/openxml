@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 180">
+  <title>Clip paths and luminance masks</title>
+  <defs>
+    <clipPath id="roundClip"><circle cx="85" cy="90" r="65"/></clipPath>
+    <clipPath id="objectClip" clipPathUnits="objectBoundingBox"><polygon points="0,0 1,0 .75,1 .25,1"/></clipPath>
+    <mask id="fadeMask" maskUnits="userSpaceOnUse" x="180" y="20" width="160" height="140">
+      <rect x="180" y="20" width="160" height="140" fill="#b0b0b0"/>
+    </mask>
+  </defs>
+  <rect x="10" y="20" width="150" height="140" fill="#38bdf8" clip-path="url(#roundClip)"/>
+  <polygon points="5,150 85,15 165,150" fill="#f97316" clip-path="url(#roundClip)"/>
+  <rect x="190" y="25" width="145" height="130" fill="#8b5cf6" clip-path="url(#objectClip)"/>
+  <circle cx="265" cy="90" r="45" fill="#ec4899" mask="url(#fadeMask)"/>
+</svg>

@@ -48,14 +48,74 @@ def soffice_convert(src: Path, outdir: Path, fmt: str = "png") -> Path:
     return pngs[0]
 
 
+def raster_svg_rsvg(svg: Path, dest: Path, size=(1280, 720)) -> Path:
+    """Preferred: librsvg via PyGObject (browser-like)."""
+    import gi
+
+    gi.require_version("Rsvg", "2.0")
+    from gi.repository import Rsvg
+    import cairo
+
+    data = svg.read_bytes()
+    handle = Rsvg.Handle.new_from_data(data)
+    w, h = size
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+    ctx = cairo.Context(surface)
+    vp = Rsvg.Rectangle()
+    vp.x = 0
+    vp.y = 0
+    vp.width = w
+    vp.height = h
+    handle.render_document(ctx, vp)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    surface.write_to_png(str(dest))
+    return dest
+
+
+def raster_svg_chrome(svg: Path, dest: Path, size=(1280, 720)) -> Path:
+    """Chromium headless screenshot — closest to browser ground truth."""
+    import shutil
+    import subprocess
+
+    chrome = shutil.which("google-chrome") or shutil.which("chromium") or shutil.which(
+        "chromium-browser"
+    )
+    if not chrome:
+        raise RuntimeError("chrome not found")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    w, h = size
+    uri = svg.resolve().as_uri()
+    subprocess.run(
+        [
+            chrome,
+            "--headless",
+            "--disable-gpu",
+            f"--screenshot={dest}",
+            f"--window-size={w},{h}",
+            uri,
+        ],
+        check=True,
+        capture_output=True,
+    )
+    if not dest.exists():
+        raise RuntimeError("chrome produced no screenshot")
+    return dest
+
+
 def raster_svg(svg: Path, outdir: Path, size=(1280, 720)) -> Path:
-    """Best-effort SVG raster. Prefer LO; fall back to embedding SVG in a tiny PPTX path is heavy,
-    so try `soffice` directly on SVG (Draw)."""
+    """Best-effort SVG raster. Prefer Chrome, then librsvg, then LibreOffice."""
+    dest = outdir / "svg" / f"{svg.stem}.png"
+    errors = []
+    for fn in (raster_svg_chrome, raster_svg_rsvg):
+        try:
+            return fn(svg, dest, size)
+        except Exception as e:
+            errors.append(f"{fn.__name__}: {e}")
     try:
         return soffice_convert(svg, outdir / "svg")
     except Exception as e:
-        # fallback: write a minimal HTML wrapper? skip
-        raise RuntimeError(f"SVG raster failed: {e}") from e
+        errors.append(f"soffice: {e}")
+        raise RuntimeError("SVG raster failed: " + "; ".join(errors)) from e
 
 
 def mean_abs_diff(a: Image.Image, b: Image.Image) -> tuple[float, float]:
