@@ -2671,6 +2671,71 @@ impl OpenXmlPackage {
         self.opc.part_relationships(source)
     }
 
+    /// First package-level relationship of `relationship_type`, if any.
+    pub fn package_relationship_by_type(
+        &self,
+        relationship_type: &str,
+    ) -> Option<&crate::opc::Relationship> {
+        self.opc.package_relationships().get_by_type(relationship_type)
+    }
+
+    /// All package-level relationships of `relationship_type`.
+    pub fn package_relationships_by_type(
+        &self,
+        relationship_type: &str,
+    ) -> Vec<&crate::opc::Relationship> {
+        self.opc
+            .package_relationships()
+            .find_all_by_type(relationship_type)
+    }
+
+    /// First relationship of `relationship_type` under `source` (package when `None`).
+    pub fn relationship_by_type(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        relationship_type: &str,
+    ) -> Option<crate::opc::Relationship> {
+        match source {
+            Some(s) => self
+                .opc
+                .part_relationships(s)?
+                .get_by_type(relationship_type)
+                .cloned(),
+            None => self
+                .opc
+                .package_relationships()
+                .get_by_type(relationship_type)
+                .cloned(),
+        }
+    }
+
+    /// All relationships of `relationship_type` under `source` (package when `None`).
+    pub fn relationships_by_type(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        relationship_type: &str,
+    ) -> Vec<crate::opc::Relationship> {
+        match source {
+            Some(s) => self
+                .opc
+                .part_relationships(s)
+                .map(|r| {
+                    r.find_all_by_type(relationship_type)
+                        .into_iter()
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default(),
+            None => self
+                .opc
+                .package_relationships()
+                .find_all_by_type(relationship_type)
+                .into_iter()
+                .cloned()
+                .collect(),
+        }
+    }
+
     /// External relationships under `source` (package-level when `None`)
     /// (C# `OpenXmlPartContainer.ExternalRelationships`).
     pub fn external_relationships(
@@ -4005,5 +4070,37 @@ mod part_events_tests {
         let s2 = OpenSettings::from_other(&s);
         assert_eq!(s2.max_characters_in_part, 1000);
         assert!(!s2.auto_save);
+    }
+
+    #[test]
+    fn relationships_by_type_queries() {
+        use crate::namespace::rel;
+        use crate::opc::RelationshipTargetMode;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(doc.clone(), "application/xml", b"<w:document/>");
+        pkg.opc_mut().add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &doc,
+            RelationshipTargetMode::Internal,
+        );
+        assert!(pkg
+            .package_relationship_by_type(rel::OFFICE_DOCUMENT)
+            .is_some());
+        assert_eq!(
+            pkg.package_relationships_by_type(rel::OFFICE_DOCUMENT).len(),
+            1
+        );
+        let styles = crate::opc::PackUri::new("/word/styles.xml");
+        pkg.set_part(styles.clone(), "application/xml", b"<w:styles/>");
+        let _ = pkg.add_part_relationship(
+            &doc,
+            rel::STYLES,
+            &styles,
+            RelationshipTargetMode::Internal,
+        );
+        assert!(pkg.relationship_by_type(Some(&doc), rel::STYLES).is_some());
+        assert_eq!(pkg.relationships_by_type(Some(&doc), rel::STYLES).len(), 1);
     }
 }

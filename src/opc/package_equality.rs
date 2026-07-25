@@ -28,6 +28,48 @@ impl Default for PackageEqualityOptions {
     }
 }
 
+impl PackageEqualityOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Compare only part URI sets (no content / relationships / content types).
+    pub fn structure_only() -> Self {
+        Self {
+            compare_content_types: false,
+            compare_relationships: false,
+            compare_part_bytes: false,
+            compare_xml_as_dom: false,
+            xml_options: EqualityOptions::default(),
+        }
+    }
+
+    pub fn with_compare_content_types(mut self, value: bool) -> Self {
+        self.compare_content_types = value;
+        self
+    }
+
+    pub fn with_compare_relationships(mut self, value: bool) -> Self {
+        self.compare_relationships = value;
+        self
+    }
+
+    pub fn with_compare_part_bytes(mut self, value: bool) -> Self {
+        self.compare_part_bytes = value;
+        self
+    }
+
+    pub fn with_compare_xml_as_dom(mut self, value: bool) -> Self {
+        self.compare_xml_as_dom = value;
+        self
+    }
+
+    pub fn with_xml_options(mut self, options: EqualityOptions) -> Self {
+        self.xml_options = options;
+        self
+    }
+}
+
 /// Result of a package comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageDiff {
@@ -38,11 +80,39 @@ pub struct PackageDiff {
 }
 
 impl PackageDiff {
+    pub fn empty() -> Self {
+        Self {
+            only_in_left: Vec::new(),
+            only_in_right: Vec::new(),
+            content_mismatch: Vec::new(),
+            relationship_mismatch: Vec::new(),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.only_in_left.is_empty()
             && self.only_in_right.is_empty()
             && self.content_mismatch.is_empty()
             && self.relationship_mismatch.is_empty()
+    }
+
+    pub fn has_uri_differences(&self) -> bool {
+        !self.only_in_left.is_empty() || !self.only_in_right.is_empty()
+    }
+
+    pub fn has_content_differences(&self) -> bool {
+        !self.content_mismatch.is_empty()
+    }
+
+    pub fn has_relationship_differences(&self) -> bool {
+        !self.relationship_mismatch.is_empty()
+    }
+
+    pub fn total_differences(&self) -> usize {
+        self.only_in_left.len()
+            + self.only_in_right.len()
+            + self.content_mismatch.len()
+            + self.relationship_mismatch.len()
     }
 }
 
@@ -193,5 +263,29 @@ mod tests {
         let d = compare_packages(&a, &b, &PackageEqualityOptions::default());
         assert!(!d.is_empty());
         assert!(d.only_in_right.iter().any(|u| u.contains("styles")));
+        assert!(d.has_uri_differences());
+        assert!(d.total_differences() >= 1);
+    }
+
+    #[test]
+    fn structure_only_ignores_content() {
+        let mut a = OpcPackage::create();
+        let mut b = OpcPackage::create();
+        let uri = PackUri::new("/word/document.xml");
+        a.set_part(uri.clone(), "application/xml", b"<a/>");
+        b.set_part(uri, "application/xml", b"<b/>");
+        let full = compare_packages(&a, &b, &PackageEqualityOptions::default());
+        assert!(!full.is_empty());
+        let structure = compare_packages(&a, &b, &PackageEqualityOptions::structure_only());
+        assert!(structure.is_empty(), "{structure:?}");
+        assert_eq!(PackageDiff::empty().total_differences(), 0);
+        assert!(!full.has_uri_differences());
+        assert!(full.has_content_differences() || full.total_differences() > 0);
+        let opts = PackageEqualityOptions::new()
+            .with_compare_part_bytes(false)
+            .with_compare_xml_as_dom(false)
+            .with_compare_relationships(false)
+            .with_compare_content_types(false);
+        assert!(compare_packages(&a, &b, &opts).is_empty());
     }
 }
