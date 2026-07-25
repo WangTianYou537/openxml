@@ -66,15 +66,16 @@ pub mod wordprocessing;
 pub use element::{OpenXmlAttribute, OpenXmlContent, OpenXmlElement, OpenXmlQualifiedName, OpenXmlDomReader, OpenXmlElementContext, OpenXmlLoadMode, ElementEvent, ElementEventKind, OpenXmlMiscKind, OpenXmlPartReader, OpenXmlPartReaderOptions, OpenXmlPartWriter, OpenXmlPartWriterSettings, ElementState, OpenXmlUnknownMarker, XmlLineInfo, XmlPath, LAZY_STEPS, XMLNS_PREFIX, XMLNS_URI};
 pub use error::{Error, Result};
 pub use features::{
-    AnnotationsFeature, ApplicationType, ContentTypeFeature, DataPartsFeature, DisposableFeature,
-    DocumentTypeFeature, FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature,
-    PackageCapabilities, PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature,
-    PackageFeature, PackageInitializerFeature, PackagePartFeature, PackageRelationshipBuilder,
-    PackageStreamFeature, ParagraphIdGenerator, PartEvents, PartFactoryFeature,
-    PartRelationshipsFeature, PartRootEvents, PartsFeature, PartUriFeature,
-    ProgrammaticIdentifierFeature, ReferenceRelationshipsFeature, RelationshipFilterFeature,
-    RootElementFeature, SaveFeature, SchemaTrackingFeature, StrictNamespaceFeature, TargetFeature,
-    TypedPartFactoryFeature,
+    AnnotationsFeature, ApplicationType, ContainerDisposableFeature, ContentTypeFeature,
+    DataPartsFeature, DisposableFeature, DocumentTypeFeature, ElementEventsFeature,
+    FeatureCollection, KnownDataPartFeature, LockFeature, MainPartFeature,
+    OpenXmlNamespaceResolverFeature, PackageCapabilities, PackageEvent, PackageEventType,
+    PackageEvents, PackageFactoryFeature, PackageFeature, PackageInitializerFeature,
+    PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature, ParagraphIdGenerator,
+    PartElementEvent, PartEvents, PartFactoryFeature, PartRelationshipsFeature, PartRootEvents,
+    PartsFeature, PartUriFeature, ProgrammaticIdentifierFeature, RandomNumberGeneratorFeature,
+    ReferenceRelationshipsFeature, RelationshipFilterFeature, RootElementFeature, SaveFeature,
+    SchemaTrackingFeature, StrictNamespaceFeature, TargetFeature, TypedPartFactoryFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{

@@ -829,6 +829,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Word/Excel/PPT `add_external_relationship` routes through filtered package API
 - [x] `TargetFeature` / `RootElementFeature` / `SaveFeature` / `PackageFeature` shells + package accessors
 - [x] `OpenXmlPackage::{save,save_as}` run `ISaveFeature` hooks before package events
+- [x] `OpenXmlNamespaceResolverFeature` / `RandomNumberGeneratorFeature` / `ContainerDisposableFeature` / `ElementEventsFeature` shells + package accessors
+- [x] Close path runs container disposable hooks
 
 **Still intentionally deferred / partial:**
 

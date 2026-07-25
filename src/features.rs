@@ -1163,6 +1163,304 @@ impl PackageFeature {
     }
 }
 
+/// Obsolete / alternate → expected namespace URI map + Strict/Transitional helpers
+/// (C# `IOpenXmlNamespaceResolver` shell).
+#[derive(Debug, Clone)]
+pub struct OpenXmlNamespaceResolverFeature {
+    /// Obsolete namespace URI → expected URI.
+    extended: Vec<(String, String)>,
+}
+
+impl Default for OpenXmlNamespaceResolverFeature {
+    fn default() -> Self {
+        Self::with_defaults()
+    }
+}
+
+impl OpenXmlNamespaceResolverFeature {
+    pub fn new() -> Self {
+        Self {
+            extended: Vec::new(),
+        }
+    }
+
+    pub fn with_defaults() -> Self {
+        let extended = [
+            (
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/3/main",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            ),
+            (
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/5/main",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            ),
+            (
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/6/main",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            ),
+            (
+                "http://schemas.openxmlformats.org/spreadsheetml/2006/5/main",
+                "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            ),
+            (
+                "http://schemas.openxmlformats.org/spreadsheetml/2006/7/main",
+                "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            ),
+            (
+                "http://schemas.openxmlformats.org/presentationml/2006/3/main",
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ),
+            (
+                "http://schemas.openxmlformats.org/drawingml/2006/3/main",
+                "http://schemas.openxmlformats.org/drawingml/2006/main",
+            ),
+            (
+                "http://schemas.microsoft.com/office/word/2010/11/wordml",
+                "http://schemas.microsoft.com/office/word/2012/wordml",
+            ),
+        ]
+        .into_iter()
+        .map(|(a, b)| (a.to_string(), b.to_string()))
+        .collect();
+        Self { extended }
+    }
+
+    pub fn register_extended(
+        &mut self,
+        obsolete: impl Into<String>,
+        expected: impl Into<String>,
+    ) {
+        let obsolete = obsolete.into();
+        let expected = expected.into();
+        if let Some(e) = self.extended.iter_mut().find(|(o, _)| o == &obsolete) {
+            e.1 = expected;
+        } else {
+            self.extended.push((obsolete, expected));
+        }
+    }
+
+    pub fn try_get_extended_namespace(&self, uri: &str) -> Option<&str> {
+        self.extended
+            .iter()
+            .find(|(o, _)| o == uri)
+            .map(|(_, e)| e.as_str())
+    }
+
+    pub fn try_get_transitional_namespace(&self, uri: &str) -> Option<&'static str> {
+        crate::namespace_rewrite::to_transitional_namespace(uri)
+    }
+
+    pub fn try_get_transitional_relationship(&self, uri: &str) -> Option<&'static str> {
+        crate::namespace_rewrite::to_transitional_relationship(uri)
+    }
+
+    /// Normalize obsolete then Strict→Transitional (C# `NormalizeNamespace` shell).
+    pub fn normalize_namespace(&self, uri: &str) -> String {
+        let base = self
+            .try_get_extended_namespace(uri)
+            .unwrap_or(uri);
+        self.try_get_transitional_namespace(base)
+            .unwrap_or(base)
+            .to_string()
+    }
+
+    /// Best-effort version for well-known Office namespaces (C# `GetVersion` subset).
+    pub fn get_version(&self, uri: &str) -> crate::file_format::FileFormatVersions {
+        use crate::file_format::FileFormatVersions;
+        let n = self.normalize_namespace(uri);
+        if n.contains("schemas.openxmlformats.org/wordprocessingml/2006")
+            || n.contains("schemas.openxmlformats.org/spreadsheetml/2006")
+            || n.contains("schemas.openxmlformats.org/presentationml/2006")
+            || n.contains("schemas.openxmlformats.org/drawingml/2006")
+            || n.contains("schemas.openxmlformats.org/officeDocument/2006")
+        {
+            return FileFormatVersions::OFFICE2007;
+        }
+        if n.contains("/2010/") || n.contains("2010/") {
+            return FileFormatVersions::OFFICE2010;
+        }
+        if n.contains("/2012/") || n.contains("2012/") || n.contains("/2013/") {
+            return FileFormatVersions::OFFICE2013;
+        }
+        if n.contains("/2014/") || n.contains("/2016/") {
+            return FileFormatVersions::OFFICE2016;
+        }
+        if n.contains("/2018/") || n.contains("/2019/") {
+            return FileFormatVersions::OFFICE2019;
+        }
+        if n.contains("/2021/") {
+            return FileFormatVersions::OFFICE2021;
+        }
+        FileFormatVersions::NONE
+    }
+}
+
+/// Cryptographic-style random fill (C# `IRandomNumberGeneratorFeature` shell).
+#[derive(Debug, Default)]
+pub struct RandomNumberGeneratorFeature;
+
+impl RandomNumberGeneratorFeature {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Fill `buf` with random bytes (thread-local LCG shell; not crypto-grade).
+    pub fn get_bytes(&self, buf: &mut [u8]) {
+        use std::cell::Cell;
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        thread_local! {
+            static STATE: Cell<u64> = const { Cell::new(0) };
+        }
+        STATE.with(|s| {
+            let mut state = s.get();
+            if state == 0 {
+                let mut h = DefaultHasher::new();
+                (self as *const Self as usize).hash(&mut h);
+                std::thread::current().id().hash(&mut h);
+                // Mix in a fixed salt so empty hasher state is unlikely.
+                0xC0FFEE_u64.hash(&mut h);
+                state = h.finish() | 1;
+            }
+            for b in buf.iter_mut() {
+                // Numerical Recipes LCG
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1);
+                *b = (state >> 33) as u8;
+            }
+            s.set(state);
+        });
+    }
+
+    pub fn next_u32(&self) -> u32 {
+        let mut b = [0u8; 4];
+        self.get_bytes(&mut b);
+        u32::from_le_bytes(b)
+    }
+
+    pub fn next_u64(&self) -> u64 {
+        let mut b = [0u8; 8];
+        self.get_bytes(&mut b);
+        u64::from_le_bytes(b)
+    }
+}
+
+/// Container-level dispose marker (C# `IContainerDisposableFeature` shell).
+#[derive(Default)]
+pub struct ContainerDisposableFeature {
+    hooks: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+}
+
+impl std::fmt::Debug for ContainerDisposableFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.hooks.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("ContainerDisposableFeature")
+            .field("hooks", &n)
+            .finish()
+    }
+}
+
+impl ContainerDisposableFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        if let Ok(mut g) = self.hooks.lock() {
+            g.push(Box::new(f));
+        }
+    }
+
+    pub fn dispose(&self) {
+        let hooks: Vec<_> = self
+            .hooks
+            .lock()
+            .map(|mut g| std::mem::take(&mut *g))
+            .unwrap_or_default();
+        for h in hooks.into_iter().rev() {
+            h();
+        }
+    }
+
+    pub fn pending_count(&self) -> usize {
+        self.hooks.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
+/// Part-scoped element event hub (C# `IElementEventFeature` / `PartElementEventArgs` shell).
+#[derive(Debug, Clone)]
+pub struct PartElementEvent {
+    pub event_type: PackageEventType,
+    pub part_uri: String,
+    pub element_name: String,
+    pub parent_name: Option<String>,
+}
+
+type ElementListener = Arc<dyn Fn(&PartElementEvent) + Send + Sync>;
+
+#[derive(Clone, Default)]
+pub struct ElementEventsFeature {
+    listeners: Arc<Mutex<Vec<ElementListener>>>,
+}
+
+impl std::fmt::Debug for ElementEventsFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.listeners.lock().map(|g| g.len()).unwrap_or(0);
+        f.debug_struct("ElementEventsFeature")
+            .field("listeners", &n)
+            .finish()
+    }
+}
+
+impl ElementEventsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn subscribe<F>(&self, f: F) -> usize
+    where
+        F: Fn(&PartElementEvent) + Send + Sync + 'static,
+    {
+        let mut g = self.listeners.lock().expect("element events lock");
+        g.push(Arc::new(f));
+        g.len() - 1
+    }
+
+    pub fn raise(&self, event: PartElementEvent) {
+        let listeners = self
+            .listeners
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        for l in listeners {
+            l(&event);
+        }
+    }
+
+    pub fn raise_kind(
+        &self,
+        event_type: PackageEventType,
+        part_uri: impl Into<String>,
+        element_name: impl Into<String>,
+        parent_name: Option<String>,
+    ) {
+        self.raise(PartElementEvent {
+            event_type,
+            part_uri: part_uri.into(),
+            element_name: element_name.into(),
+            parent_name,
+        });
+    }
+
+    pub fn listener_count(&self) -> usize {
+        self.listeners.lock().map(|g| g.len()).unwrap_or(0)
+    }
+}
+
 /// Package initializer callbacks (C# `IPackageInitializer` shell).
 ///
 /// Runs registered hooks after a package is constructed (builder path).
@@ -1715,5 +2013,66 @@ mod tests {
         pkg.reload();
         pkg.reload();
         assert_eq!(pkg.reload_count, 2);
+    }
+
+    #[test]
+    fn namespace_resolver_random_element_events() {
+        let r = OpenXmlNamespaceResolverFeature::with_defaults();
+        assert_eq!(
+            r.try_get_extended_namespace(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/3/main"
+            ),
+            Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+        );
+        assert_eq!(
+            r.get_version("http://schemas.openxmlformats.org/wordprocessingml/2006/main"),
+            crate::file_format::FileFormatVersions::OFFICE2007
+        );
+        assert_eq!(
+            r.get_version("http://schemas.microsoft.com/office/word/2010/wordml"),
+            crate::file_format::FileFormatVersions::OFFICE2010
+        );
+        assert!(r
+            .try_get_transitional_namespace(
+                "http://purl.oclc.org/ooxml/wordprocessingml/main"
+            )
+            .is_some());
+
+        let rng = RandomNumberGeneratorFeature::new();
+        let mut a = [0u8; 16];
+        let mut b = [0u8; 16];
+        rng.get_bytes(&mut a);
+        rng.get_bytes(&mut b);
+        assert_ne!(a, [0u8; 16]);
+        // Not required to differ, but next_u64 should be non-zero with high probability.
+        assert_ne!(rng.next_u64(), 0);
+
+        let cd = ContainerDisposableFeature::new();
+        let n = Arc::new(AtomicUsize::new(0));
+        let c = n.clone();
+        cd.register(move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(cd.pending_count(), 1);
+        cd.dispose();
+        assert_eq!(n.load(Ordering::SeqCst), 1);
+        assert_eq!(cd.pending_count(), 0);
+
+        let ee = ElementEventsFeature::new();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let h = hits.clone();
+        ee.subscribe(move |e| {
+            if e.element_name == "w:p" {
+                h.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        ee.raise_kind(
+            PackageEventType::Added,
+            "/word/document.xml",
+            "w:p",
+            Some("w:body".into()),
+        );
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        assert_eq!(ee.listener_count(), 1);
     }
 }

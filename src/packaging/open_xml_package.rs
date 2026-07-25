@@ -935,6 +935,68 @@ impl OpenXmlPackage {
             .expect("just inserted")
     }
 
+    /// Namespace resolver (C# `IOpenXmlNamespaceResolver`).
+    pub fn namespace_resolver_feature(
+        &mut self,
+    ) -> &mut crate::features::OpenXmlNamespaceResolverFeature {
+        if !self
+            .features
+            .contains::<crate::features::OpenXmlNamespaceResolverFeature>()
+        {
+            self.features
+                .set(crate::features::OpenXmlNamespaceResolverFeature::with_defaults());
+        }
+        self.features
+            .get_mut::<crate::features::OpenXmlNamespaceResolverFeature>()
+            .expect("just inserted")
+    }
+
+    /// Random number generator (C# `IRandomNumberGeneratorFeature`).
+    pub fn random_number_generator_feature(
+        &mut self,
+    ) -> &crate::features::RandomNumberGeneratorFeature {
+        if !self
+            .features
+            .contains::<crate::features::RandomNumberGeneratorFeature>()
+        {
+            self.features
+                .set(crate::features::RandomNumberGeneratorFeature::new());
+        }
+        self.features
+            .get::<crate::features::RandomNumberGeneratorFeature>()
+            .expect("just inserted")
+    }
+
+    /// Container dispose hooks (C# `IContainerDisposableFeature`).
+    pub fn container_disposable_feature(
+        &mut self,
+    ) -> &crate::features::ContainerDisposableFeature {
+        if !self
+            .features
+            .contains::<crate::features::ContainerDisposableFeature>()
+        {
+            self.features
+                .set(crate::features::ContainerDisposableFeature::new());
+        }
+        self.features
+            .get::<crate::features::ContainerDisposableFeature>()
+            .expect("just inserted")
+    }
+
+    /// Part element events (C# `IElementEventFeature`).
+    pub fn element_events_feature(&mut self) -> &crate::features::ElementEventsFeature {
+        if !self
+            .features
+            .contains::<crate::features::ElementEventsFeature>()
+        {
+            self.features
+                .set(crate::features::ElementEventsFeature::new());
+        }
+        self.features
+            .get::<crate::features::ElementEventsFeature>()
+            .expect("just inserted")
+    }
+
     /// Record package source bytes on the stream feature (C# open-from-stream path).
     pub fn set_package_stream_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
         self.package_stream_feature().set_bytes(bytes);
@@ -1095,6 +1157,12 @@ impl OpenXmlPackage {
         self.opc.delete_unused_data_parts();
         if let Some(d) = self.features.get_mut::<crate::features::DisposableFeature>() {
             d.dispose_all();
+        }
+        if let Some(d) = self
+            .features
+            .get::<crate::features::ContainerDisposableFeature>()
+        {
+            d.dispose();
         }
         self.mark_closed();
         Ok(())
@@ -1467,5 +1535,41 @@ mod part_events_tests {
             .contains(crate::features::PackageCapabilities::CACHED));
         pkg.package_feature().reload();
         assert_eq!(pkg.package_feature().reload_count, 1);
+    }
+
+    #[test]
+    fn namespace_random_element_feature_accessors() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        assert_eq!(
+            pkg.namespace_resolver_feature().get_version(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            ),
+            crate::file_format::FileFormatVersions::OFFICE2007
+        );
+        let mut buf = [0u8; 8];
+        pkg.random_number_generator_feature().get_bytes(&mut buf);
+        assert_ne!(buf, [0u8; 8]);
+        let n = Arc::new(AtomicUsize::new(0));
+        let c = n.clone();
+        pkg.element_events_feature().subscribe(move |e| {
+            if e.part_uri == "/word/document.xml" {
+                c.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        pkg.element_events_feature().raise_kind(
+            PackageEventType::Added,
+            "/word/document.xml",
+            "w:r",
+            None,
+        );
+        assert_eq!(n.load(Ordering::SeqCst), 1);
+        let d = Arc::new(AtomicUsize::new(0));
+        let dd = d.clone();
+        pkg.container_disposable_feature().register(move || {
+            dd.fetch_add(1, Ordering::SeqCst);
+        });
+        pkg.container_disposable_feature().dispose();
+        assert_eq!(d.load(Ordering::SeqCst), 1);
     }
 }
