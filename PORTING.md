@@ -748,6 +748,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `StrictRelationshipFound` / strict namespace detect; `DeleteParts` batch; MC `ProcessAllParts`
 - [x] DOM path/sibling helpers: Next/PreviousSibling-at, Remove/Replace path, GetOrAddFirstChild, find_path
 - [x] `ExtendedPart` type; `OpenXmlPart::reload`/`save_root`; `CanSave`/`FileOpenAccess`/`Close` + unused data-part cleanup
+- [x] Cross-package `copy_part_from` / `import_part` (C# `AddPart` when part is foreign)
 
 **Still intentionally deferred / partial:**
 

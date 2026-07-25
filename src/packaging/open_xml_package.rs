@@ -341,6 +341,20 @@ impl OpenXmlPackage {
         Ok(())
     }
 
+    /// Import a part (optionally recursive) from another package (C# `AddPart` cross-package).
+    pub fn copy_part_from(
+        &mut self,
+        source: &OpenXmlPackage,
+        source_uri: &crate::opc::PackUri,
+        dest_uri: &crate::opc::PackUri,
+        opts: crate::opc::CopyPartOptions,
+    ) -> Result<std::collections::HashMap<crate::opc::PackUri, crate::opc::PackUri>> {
+        self.ensure_open()?;
+        self.opc
+            .copy_part_from(source.opc(), source_uri, dest_uri, opts)
+    }
+
+
 
     pub(crate) fn ensure_open(&self) -> Result<()> {
         if self.closed {

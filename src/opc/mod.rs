@@ -13,6 +13,7 @@ mod extended_properties;
 mod flat_opc;
 mod media;
 mod package;
+mod part_copy;
 mod part_extension;
 mod part_uri;
 mod properties;
@@ -31,6 +32,7 @@ pub use flat_opc::{from_flat_opc, progid, to_flat_opc};
 pub use media::{add_media_part, media_rel, MediaKind, MediaPartInfo};
 pub use package::{CompressionOption, OpcPackage, PackageMode};
 // Lazy open helpers are methods on OpcPackage: open_lazy / open_bytes_lazy / open_reader_lazy.
+pub use part_copy::CopyPartOptions;
 pub use part_extension::PartExtensionProvider;
 pub use part_uri::{PartUriHelper, RelatedPart};
 pub use properties::PackageProperties;

@@ -3305,6 +3305,58 @@ fn extended_part_and_package_close() {
 }
 
 #[test]
+fn copy_part_from_other_package() {
+    use officexml::opc::{CopyPartOptions, PackUri};
+
+    let mut src =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    src.add_main_document_part()
+        .set_document(simple_document(vec![paragraph_with_text("source")]));
+    src.add_default_styles().unwrap();
+    let src_main = src.main_document_part().unwrap().uri().clone();
+
+    let mut dst =
+        WordprocessingDocument::create_in_memory(WordprocessingDocumentType::Document).unwrap();
+    // empty dest package — import styles subtree from source
+    let styles = src
+        .package()
+        .opc()
+        .part_uris()
+        .into_iter()
+        .find(|u| u.as_str().contains("styles"))
+        .expect("styles");
+    let map = dst
+        .package_mut()
+        .copy_part_from(
+            src.package(),
+            &styles,
+            &PackUri::new("/word/styles.xml"),
+            CopyPartOptions {
+                recursive: false,
+                include_external_rels: false,
+            },
+        )
+        .unwrap();
+    assert_eq!(map.len(), 1);
+    assert!(dst.package().opc().has_part(&PackUri::new("/word/styles.xml")));
+
+    // recursive: copy main document + children into a fresh package
+    let mut bare = officexml::opc::OpcPackage::create();
+    let dest_doc = PackUri::new("/word/document.xml");
+    let map2 = bare
+        .copy_part_from(
+            src.package().opc(),
+            &src_main,
+            &dest_doc,
+            CopyPartOptions::default(),
+        )
+        .unwrap();
+    assert!(bare.has_part(&dest_doc));
+    assert!(map2.len() >= 2); // document + styles at least
+}
+
+
+#[test]
 fn delete_parts_and_strict_flag() {
     use officexml::opc::PackUri;
 

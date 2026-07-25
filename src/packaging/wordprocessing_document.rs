@@ -13248,6 +13248,38 @@ impl WordprocessingDocument {
     /// Create an [`ExtendedPart`] under `udata/` with auto URI (C# `ExtendedPart` defaults).
     ///
     /// Returns `(relationship_id, ExtendedPart handle)`.
+    /// Copy a part (and optionally its relationship subgraph) from another package
+    /// into this document's package (C# cross-package `AddPart` shell).
+    pub fn copy_part_from_package(
+        &mut self,
+        source: &WordprocessingDocument,
+        source_uri: &PackUri,
+        dest_uri: &PackUri,
+        opts: crate::opc::CopyPartOptions,
+    ) -> Result<std::collections::HashMap<PackUri, PackUri>> {
+        self.package
+            .copy_part_from(source.package(), source_uri, dest_uri, opts)
+    }
+
+    /// Create a relationship from the main document part to an existing part
+    /// in this package (C# `CreateRelationshipToPart` same-package).
+    pub fn create_relationship_to_part(
+        &mut self,
+        target: &PackUri,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> Result<String> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?
+            .uri()
+            .clone();
+        self.package
+            .opc_mut()
+            .add_part_relationship_to_existing(&main, target, relationship_type, id)
+    }
+
     pub fn create_extended_part(
         &mut self,
         content_type_str: &str,
