@@ -907,6 +907,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PackageRelationshipBuilder` with_id/target helpers; `FeatureCollectionDebugView`
 - [x] `enable_uri_handling` registers malformed-external relationship filter
 
+- [x] `PartUriHelper::reserve_uri` / package `reserve_part_uri` (C# `ReserveUri`)
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

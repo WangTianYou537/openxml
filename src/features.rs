@@ -1226,6 +1226,19 @@ impl PartUriFeature {
         self.helper.reserve(uri);
     }
 
+    /// Reserve URI and advance content-type sequence (C# `ReserveUri`).
+    pub fn reserve_uri(&mut self, content_type: &str, uri: &crate::opc::PackUri) {
+        self.helper.reserve_uri(content_type, uri);
+    }
+
+    pub fn reserved_count(&self) -> usize {
+        self.helper.reserved_count()
+    }
+
+    pub fn clear_reserved(&mut self) {
+        self.helper.clear();
+    }
+
     pub fn is_reserved(&self, uri: &crate::opc::PackUri) -> bool {
         self.helper.is_reserved(uri)
     }

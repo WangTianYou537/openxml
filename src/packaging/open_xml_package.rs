@@ -2272,6 +2272,20 @@ impl OpenXmlPackage {
         )
     }
 
+    /// Reserve an existing part URI in the PartUri feature (C# `ReserveUri`).
+    pub fn reserve_part_uri(
+        &mut self,
+        content_type: &str,
+        uri: &crate::opc::PackUri,
+    ) {
+        self.part_uri_feature().reserve_uri(content_type, uri);
+    }
+
+    /// Whether `uri` is reserved by the PartUri feature.
+    pub fn is_part_uri_reserved(&mut self, uri: &crate::opc::PackUri) -> bool {
+        self.part_uri_feature().is_reserved(uri)
+    }
+
     /// Create an empty part using [`PartTypeInfo`] (C# part create with content type + extension).
     pub fn create_part_from_type_info(
         &mut self,

@@ -77,8 +77,26 @@ impl PartUriHelper {
         self.reserved.insert(normalize(uri.as_str()));
     }
 
+    /// Reserve a URI and advance the content-type sequence counter
+    /// (C# `IPartUriFeature.ReserveUri`).
+    pub fn reserve_uri(&mut self, content_type: &str, uri: &PackUri) {
+        let _ = self.next_sequence_number(content_type);
+        self.reserve(uri);
+    }
+
     pub fn is_reserved(&self, uri: &PackUri) -> bool {
         self.reserved.contains(&normalize(uri.as_str()))
+    }
+
+    /// Number of reserved URIs.
+    pub fn reserved_count(&self) -> usize {
+        self.reserved.len()
+    }
+
+    /// Clear reserved URIs and sequence counters.
+    pub fn clear(&mut self) {
+        self.reserved.clear();
+        self.sequence_numbers.clear();
     }
 
     /// Create a unique part URI under `parent`.
@@ -501,5 +519,30 @@ mod get_all_parts_tests {
         assert_eq!(all[0], doc);
         assert!(all.contains(&styles));
         assert!(all.contains(&theme));
+    }
+}
+
+#[cfg(test)]
+mod reserve_uri_tests {
+    use super::*;
+    use crate::opc::OpcPackage;
+
+    #[test]
+    fn reserve_uri_advances_sequence() {
+        let mut h = PartUriHelper::new();
+        let u = PackUri::new("/word/media/image1.png");
+        h.reserve_uri("image/png", &u);
+        assert!(h.is_reserved(&u));
+        assert_eq!(h.reserved_count(), 1);
+        let parent = PackUri::new("/word/document.xml");
+        let next = h
+            .create_part_uri("image/png", &parent, "media", "image", ".png", true)
+            .unwrap();
+        // sequence advanced once by reserve_uri, so next unique should not collide
+        assert!(h.is_reserved(&next));
+        assert_ne!(next.as_str(), u.as_str());
+        h.clear();
+        assert_eq!(h.reserved_count(), 0);
+        let _ = OpcPackage::create();
     }
 }
