@@ -22778,7 +22778,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
     /// Write package core properties.
     pub fn set_package_properties(&mut self, props: &PackageProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_package_properties(props)
     }
 
     /// Read extended properties (`docProps/app.xml`).
@@ -22788,7 +22788,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
     /// Write extended properties.
     pub fn set_extended_properties(&mut self, props: &ExtendedProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_extended_properties(props)
     }
 
     /// Read custom properties.
@@ -22798,7 +22798,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
     /// Write custom properties.
     pub fn set_custom_properties(&mut self, props: &CustomProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_custom_properties(props)
     }
 
     /// Whether a core properties part exists.

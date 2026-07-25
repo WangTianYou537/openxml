@@ -68,9 +68,10 @@ pub use error::{Error, Result};
 pub use features::{
     AnnotationsFeature, ApplicationType, ContainerDisposableFeature, ContentTypeFeature,
     DataPartsFeature, DisposableFeature, DocumentTypeFeature, ElementEventsFeature,
-    FeatureCollection, FeatureEventArgs, FeatureEventHub, KnownDataPartFeature, LockFeature,
-    MainPartFeature, OpenXmlNamespaceResolverFeature, PackageCapabilities, PackageEvent,
-    PackageEventType, PackageEvents, PackageFactoryFeature, PackageFeature,
+    DefaultFeatures, ElementMetadata, ElementMetadataFactoryFeature, FeatureCollection,
+    FeatureEventArgs, FeatureEventHub, FilePackageFeature, KnownDataPartFeature, LockFeature,
+    MainPartFeature, OpenXmlNamespaceResolverFeature, OpenXmlSchemaType, PackageCapabilities,
+    PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageFeature,
     PackageInitializerFeature, PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature,
     ParagraphIdCollectionFeature, ParagraphIdGenerator, PartElementEvent, PartEvents,
     PartFactoryFeature, PartRelationshipsFeature, PartRootEvents, PartsFeature, PartUriFeature,

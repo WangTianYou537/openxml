@@ -196,6 +196,28 @@ impl OpenXmlPackage {
                 }
             }
         }
+        // Seed package/file/stream feature shells (C# FilePackageFeature / StreamPackageFeature / IPackageFeature).
+        {
+            let mut f = crate::features::PackageFeature::with_capabilities(pkg.package_capabilities());
+            if let Some(p) = pkg.opc.path() {
+                let path_str = p.display().to_string();
+                f.path = Some(path_str.clone());
+                pkg.features.set(crate::features::FilePackageFeature::new(
+                    path_str,
+                    pkg.opc.mode(),
+                ));
+            }
+            pkg.features.set(f);
+        }
+        if !pkg
+            .features
+            .contains::<crate::features::PackageStreamFeature>()
+        {
+            pkg.features
+                .set(crate::features::PackageStreamFeature::new());
+        }
+        // Parent default features (C# DefaultFeatures.Shared).
+        crate::features::DefaultFeatures::shared().ensure_on(&mut pkg.features);
         pkg
     }
 
@@ -1177,6 +1199,170 @@ impl OpenXmlPackage {
         self.features
             .get_mut::<crate::features::PackageFeature>()
             .expect("just inserted")
+    }
+
+    /// File package path metadata when opened from disk (C# `FilePackageFeature` shell).
+    pub fn file_package_feature(&self) -> Option<&crate::features::FilePackageFeature> {
+        self.features.get::<crate::features::FilePackageFeature>()
+    }
+
+    /// Shared default features (C# `DefaultFeatures.Shared`).
+    pub fn default_features(&self) -> &'static crate::features::DefaultFeatures {
+        crate::features::DefaultFeatures::shared()
+    }
+
+    /// Element metadata factory on this package (C# `IElementMetadataFactoryFeature`).
+    pub fn element_metadata_factory(
+        &mut self,
+    ) -> &mut crate::features::ElementMetadataFactoryFeature {
+        if !self
+            .features
+            .contains::<crate::features::ElementMetadataFactoryFeature>()
+        {
+            self.features
+                .set(crate::features::ElementMetadataFactoryFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::ElementMetadataFactoryFeature>()
+            .expect("just inserted")
+    }
+
+    /// Replace all relationships for `source` with `rels`, keeping part/ref feature bags
+    /// in sync (feature-aware alternative to raw `part_relationships_mut` assignment).
+    pub fn replace_part_relationships(
+        &mut self,
+        source: &crate::opc::PackUri,
+        rels: crate::opc::Relationships,
+    ) {
+        // Drop prior feature entries for this source's relationship ids.
+        if let Some(old) = self.opc.part_relationships(source) {
+            let ids: Vec<String> = old.iter().map(|r| r.id.clone()).collect();
+            let pr = self.part_relationships_feature();
+            for id in &ids {
+                pr.remove(id);
+            }
+            let rr = self.reference_relationships_feature();
+            for id in &ids {
+                rr.remove(id);
+            }
+        }
+        let snapshot: Vec<(String, String, String, crate::opc::RelationshipTargetMode)> = rels
+            .iter()
+            .map(|r| {
+                (
+                    r.id.clone(),
+                    r.relationship_type.clone(),
+                    r.target.clone(),
+                    r.target_mode,
+                )
+            })
+            .collect();
+        *self.opc.part_relationships_mut(source) = rels;
+        for (id, rel_type, target, mode) in snapshot {
+            match mode {
+                crate::opc::RelationshipTargetMode::Internal => {
+                    // Resolve relative targets against source for feature bag absolute URIs when possible.
+                    let abs = crate::opc::PackUri::new(if target.starts_with('/') {
+                        target.clone()
+                    } else if let Ok(u) = crate::opc::resolve_uri(source, &target) {
+                        u.to_string()
+                    } else {
+                        target.clone()
+                    });
+                    self.part_relationships_feature().add(&id, abs.as_str());
+                    self.reference_relationships_feature().add(
+                        &id,
+                        &rel_type,
+                        abs.as_str(),
+                        false,
+                    );
+                }
+                crate::opc::RelationshipTargetMode::External => {
+                    self.reference_relationships_feature().add(
+                        &id,
+                        &rel_type,
+                        &target,
+                        true,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Write core properties via feature-aware `set_part` + package relationships
+    /// (C# package properties path that updates part events / feature bags).
+    pub fn set_package_properties(
+        &mut self,
+        props: &crate::opc::PackageProperties,
+    ) -> crate::error::Result<()> {
+        use crate::namespace::{content_type, rel};
+        use crate::opc::RelationshipTargetMode;
+        let xml = crate::element::write_element(&props.to_element())?;
+        let uri = crate::opc::PackUri::new("/docProps/core.xml");
+        self.set_part(uri.clone(), content_type::CORE_PROPERTIES, xml);
+        let has_rel = self
+            .opc
+            .package_relationships()
+            .get_by_type(rel::CORE_PROPERTIES)
+            .is_some();
+        if !has_rel {
+            self.add_package_relationship(
+                rel::CORE_PROPERTIES,
+                &uri,
+                RelationshipTargetMode::Internal,
+            );
+        }
+        Ok(())
+    }
+
+    /// Write extended properties via feature-aware package APIs.
+    pub fn set_extended_properties(
+        &mut self,
+        props: &crate::opc::ExtendedProperties,
+    ) -> crate::error::Result<()> {
+        use crate::namespace::{content_type, rel};
+        use crate::opc::RelationshipTargetMode;
+        let xml = crate::element::write_element(&props.to_element())?;
+        let uri = crate::opc::PackUri::new("/docProps/app.xml");
+        self.set_part(uri.clone(), content_type::EXTENDED_PROPERTIES, xml);
+        let has_rel = self
+            .opc
+            .package_relationships()
+            .get_by_type(rel::EXTENDED_PROPERTIES)
+            .is_some();
+        if !has_rel {
+            self.add_package_relationship(
+                rel::EXTENDED_PROPERTIES,
+                &uri,
+                RelationshipTargetMode::Internal,
+            );
+        }
+        Ok(())
+    }
+
+    /// Write custom properties via feature-aware package APIs.
+    pub fn set_custom_properties(
+        &mut self,
+        props: &crate::opc::CustomProperties,
+    ) -> crate::error::Result<()> {
+        use crate::namespace::{content_type, rel};
+        use crate::opc::RelationshipTargetMode;
+        let xml = crate::element::write_element(&props.to_element())?;
+        let uri = crate::opc::PackUri::new("/docProps/custom.xml");
+        self.set_part(uri.clone(), content_type::CUSTOM_PROPERTIES, xml);
+        let has_rel = self
+            .opc
+            .package_relationships()
+            .get_by_type(rel::CUSTOM_PROPERTIES)
+            .is_some();
+        if !has_rel {
+            self.add_package_relationship(
+                rel::CUSTOM_PROPERTIES,
+                &uri,
+                RelationshipTargetMode::Internal,
+            );
+        }
+        Ok(())
     }
 
     /// Namespace resolver (C# `IOpenXmlNamespaceResolver`).
@@ -2408,5 +2594,120 @@ mod part_events_tests {
             .expect("media");
         assert!(part.uri.as_str().ends_with(".cmx"));
         assert!(pkg.data_parts_feature().contains(part.uri.as_str()));
+    }
+
+    #[test]
+    fn from_opc_seeds_default_features_and_package_feature() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        assert!(pkg
+            .features()
+            .contains::<crate::features::OpenXmlNamespaceResolverFeature>());
+        assert!(pkg
+            .features()
+            .contains::<crate::features::ElementMetadataFactoryFeature>());
+        assert!(pkg.features().contains::<crate::features::PackageFeature>());
+        assert!(pkg
+            .features()
+            .contains::<crate::features::PackageStreamFeature>());
+        assert!(pkg.file_package_feature().is_none()); // in-memory create
+
+        let meta = pkg.element_metadata_factory().get_or_create("Run", || {
+            crate::features::ElementMetadata::with_type(crate::features::OpenXmlSchemaType::new(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "r",
+            ))
+        });
+        assert_eq!(meta.schema_type.name, "r");
+    }
+
+    #[test]
+    fn from_opc_seeds_file_package_feature_from_path() {
+        let dir = std::env::temp_dir().join(format!(
+            "officexml-file-feature-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("seed.docx");
+        // Minimal empty package saved to path then reopened.
+        {
+            let mut opc = crate::opc::OpcPackage::create_file(&path);
+            opc.set_part(
+                crate::opc::PackUri::new("/word/document.xml"),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+                b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"/>".to_vec(),
+            );
+            opc.save().expect("save");
+        }
+        let opc = crate::opc::OpcPackage::open(&path).expect("open");
+        let pkg = OpenXmlPackage::from_opc(opc, OpenSettings::default());
+        let file = pkg.file_package_feature().expect("file feature");
+        assert!(file.path.as_ref().unwrap().contains("seed.docx"));
+        assert!(pkg
+            .features()
+            .get::<crate::features::PackageFeature>()
+            .and_then(|f| f.path.as_ref())
+            .map(|s| s.contains("seed.docx"))
+            .unwrap_or(false));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn replace_part_relationships_tracks_feature_bags() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let src = crate::opc::PackUri::new("/ppt/slideLayouts/slideLayout1.xml");
+        let master = crate::opc::PackUri::new("/ppt/slideMasters/slideMaster1.xml");
+        pkg.set_part(src.clone(), "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml", b"<p/>");
+        pkg.set_part(master.clone(), "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml", b"<p/>");
+        let mut rels = crate::opc::Relationships::new();
+        rels.add_with_id(
+            "rId1",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+            "../slideMasters/slideMaster1.xml",
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        pkg.replace_part_relationships(&src, rels);
+        assert!(pkg.part_relationships_feature().contains_id("rId1"));
+        assert!(pkg
+            .part_relationships_feature()
+            .contains_uri("/ppt/slideMasters/slideMaster1.xml"));
+        assert_eq!(
+            pkg.opc()
+                .part_relationships(&src)
+                .map(|r| r.len()),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn set_package_properties_raises_part_events() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let hits = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let h = hits.clone();
+        pkg.part_events().subscribe(move |e| {
+            if e.part_uri.as_deref() == Some("/docProps/core.xml")
+                && matches!(
+                    e.event_type,
+                    crate::features::PackageEventType::Created
+                        | crate::features::PackageEventType::Added
+                )
+            {
+                h.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        });
+        let mut props = crate::opc::PackageProperties::new();
+        props.title = Some("T".into());
+        pkg.set_package_properties(&props).unwrap();
+        assert!(pkg.opc().has_part(&crate::opc::PackUri::new("/docProps/core.xml")));
+        assert!(pkg.parts_feature().contains("/docProps/core.xml"));
+        assert!(hits.load(std::sync::atomic::Ordering::SeqCst) >= 1);
+        // package relationship tracked
+        assert!(pkg
+            .opc()
+            .package_relationships()
+            .get_by_type(crate::namespace::rel::CORE_PROPERTIES)
+            .is_some());
     }
 }

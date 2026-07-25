@@ -1715,6 +1715,227 @@ impl<TArg: Clone + Send + Sync + 'static> FeatureEventHub<TArg> {
     }
 }
 
+/// Schema type key shell (C# `OpenXmlSchemaType`: namespace + name).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct OpenXmlSchemaType {
+    pub namespace_uri: String,
+    pub name: String,
+}
+
+impl OpenXmlSchemaType {
+    pub fn new(namespace_uri: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            namespace_uri: namespace_uri.into(),
+            name: name.into(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.namespace_uri.is_empty() && self.name.is_empty()
+    }
+}
+
+/// Element metadata shell (C# `IElementMetadata` / `ElementMetadata` subset).
+///
+/// Full particle/validator compilation remains on the validation path; this
+/// captures type identity, Office availability, and registered attribute/child names.
+#[derive(Debug, Clone)]
+pub struct ElementMetadata {
+    pub schema_type: OpenXmlSchemaType,
+    pub availability: crate::file_format::FileFormatVersions,
+    /// Local attribute names (or `prefix:local`) registered for the element type.
+    pub attributes: Vec<String>,
+    /// Child element local names (or type keys) known for the element type.
+    pub children: Vec<String>,
+}
+
+impl Default for ElementMetadata {
+    fn default() -> Self {
+        Self {
+            schema_type: OpenXmlSchemaType::default(),
+            availability: crate::file_format::FileFormatVersions::OFFICE2007,
+            attributes: Vec::new(),
+            children: Vec::new(),
+        }
+    }
+}
+
+impl ElementMetadata {
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    pub fn with_type(schema_type: OpenXmlSchemaType) -> Self {
+        Self {
+            schema_type,
+            ..Self::default()
+        }
+    }
+
+    pub fn with_availability(mut self, availability: crate::file_format::FileFormatVersions) -> Self {
+        self.availability = availability;
+        self
+    }
+
+    pub fn add_attribute(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        if !self.attributes.iter().any(|a| a == &name) {
+            self.attributes.push(name);
+        }
+    }
+
+    pub fn add_child(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        if !self.children.iter().any(|c| c == &name) {
+            self.children.push(name);
+        }
+    }
+}
+
+/// Element metadata factory with type-name cache (C# `ElementMetadataFactoryFeature`).
+#[derive(Debug, Default)]
+pub struct ElementMetadataFactoryFeature {
+    lookup: Mutex<HashMap<String, ElementMetadata>>,
+}
+
+impl ElementMetadataFactoryFeature {
+    pub fn new() -> Self {
+        let mut f = Self::default();
+        f.lookup
+            .lock()
+            .expect("metadata lock")
+            .insert("OpenXmlUnknownElement".into(), ElementMetadata::none());
+        f.lookup
+            .lock()
+            .expect("metadata lock")
+            .insert("OpenXmlMiscNode".into(), ElementMetadata::none());
+        f
+    }
+
+    /// Cached metadata for a Rust type name (or other stable key).
+    pub fn get_or_create(
+        &self,
+        type_name: &str,
+        create: impl FnOnce() -> ElementMetadata,
+    ) -> ElementMetadata {
+        if let Ok(g) = self.lookup.lock() {
+            if let Some(m) = g.get(type_name) {
+                return m.clone();
+            }
+        }
+        let metadata = create();
+        if let Ok(mut g) = self.lookup.lock() {
+            g.entry(type_name.to_string())
+                .or_insert_with(|| metadata.clone());
+        }
+        metadata
+    }
+
+    pub fn get(&self, type_name: &str) -> Option<ElementMetadata> {
+        self.lookup
+            .lock()
+            .ok()
+            .and_then(|g| g.get(type_name).cloned())
+    }
+
+    pub fn insert(&self, type_name: impl Into<String>, metadata: ElementMetadata) {
+        if let Ok(mut g) = self.lookup.lock() {
+            g.insert(type_name.into(), metadata);
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.lookup.lock().map(|g| g.len()).unwrap_or(0)
+    }
+
+    pub fn contains(&self, type_name: &str) -> bool {
+        self.lookup
+            .lock()
+            .map(|g| g.contains_key(type_name))
+            .unwrap_or(false)
+    }
+}
+
+/// Shared default feature providers (C# `DefaultFeatures` / `DefaultFeatures.Shared`).
+///
+/// Lazily exposes the namespace resolver and element-metadata factory that C#
+/// registers on every package/element feature bag as the parent defaults.
+#[derive(Debug)]
+pub struct DefaultFeatures {
+    resolver: OpenXmlNamespaceResolverFeature,
+    metadata_factory: ElementMetadataFactoryFeature,
+}
+
+impl Default for DefaultFeatures {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DefaultFeatures {
+    pub fn new() -> Self {
+        Self {
+            resolver: OpenXmlNamespaceResolverFeature::with_defaults(),
+            metadata_factory: ElementMetadataFactoryFeature::new(),
+        }
+    }
+
+    /// Process-wide shared instance (C# `DefaultFeatures.Shared`).
+    pub fn shared() -> &'static DefaultFeatures {
+        use std::sync::OnceLock;
+        static SHARED: OnceLock<DefaultFeatures> = OnceLock::new();
+        SHARED.get_or_init(DefaultFeatures::new)
+    }
+
+    pub fn namespace_resolver(&self) -> &OpenXmlNamespaceResolverFeature {
+        &self.resolver
+    }
+
+    pub fn metadata_factory(&self) -> &ElementMetadataFactoryFeature {
+        &self.metadata_factory
+    }
+
+    /// Copy default services into a feature bag when missing (C# parent lookup shell).
+    pub fn ensure_on(&self, bag: &mut FeatureCollection) {
+        if !bag.contains::<OpenXmlNamespaceResolverFeature>() {
+            bag.set(self.resolver.clone());
+        }
+        if !bag.contains::<ElementMetadataFactoryFeature>() {
+            bag.set(ElementMetadataFactoryFeature::new());
+        }
+    }
+}
+
+/// File-backed package identity (C# `FilePackageFeature` path metadata shell).
+#[derive(Debug, Clone)]
+pub struct FilePackageFeature {
+    pub path: Option<String>,
+    pub mode: crate::opc::PackageMode,
+}
+
+impl Default for FilePackageFeature {
+    fn default() -> Self {
+        Self {
+            path: None,
+            mode: crate::opc::PackageMode::ReadWrite,
+        }
+    }
+}
+
+impl FilePackageFeature {
+    pub fn new(path: impl Into<String>, mode: crate::opc::PackageMode) -> Self {
+        Self {
+            path: Some(path.into()),
+            mode,
+        }
+    }
+
+    pub fn with_path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+}
+
 /// Application host type flags (C# `ApplicationType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ApplicationType {
@@ -2308,7 +2529,46 @@ mod tests {
     }
 
     #[test]
-    fn feature_event_hub_on_change() {
+    fn default_features_and_element_metadata_factory() {
+        let shared = DefaultFeatures::shared();
+        assert!(shared
+            .namespace_resolver()
+            .try_get_extended_namespace(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/3/main"
+            )
+            .is_some());
+        assert!(shared.metadata_factory().contains("OpenXmlUnknownElement"));
+        assert!(shared.metadata_factory().contains("OpenXmlMiscNode"));
+
+        let factory = ElementMetadataFactoryFeature::new();
+        let meta = factory.get_or_create("Paragraph", || {
+            let mut m = ElementMetadata::with_type(OpenXmlSchemaType::new(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "p",
+            ));
+            m.add_attribute("rsidR");
+            m.add_child("r");
+            m
+        });
+        assert_eq!(meta.schema_type.name, "p");
+        assert!(meta.attributes.iter().any(|a| a == "rsidR"));
+        assert_eq!(factory.get("Paragraph").map(|m| m.schema_type.name), Some("p".into()));
+        // second call hits cache
+        let again = factory.get_or_create("Paragraph", || ElementMetadata::none());
+        assert_eq!(again.schema_type.name, "p");
+
+        let mut bag = FeatureCollection::new();
+        shared.ensure_on(&mut bag);
+        assert!(bag.contains::<OpenXmlNamespaceResolverFeature>());
+        assert!(bag.contains::<ElementMetadataFactoryFeature>());
+
+        let file = FilePackageFeature::new("/tmp/doc.docx", crate::opc::PackageMode::ReadWrite);
+        assert_eq!(file.path.as_deref(), Some("/tmp/doc.docx"));
+        assert_eq!(file.mode, crate::opc::PackageMode::ReadWrite);
+    }
+
+    #[test]
+        fn feature_event_hub_on_change() {
         let hub = FeatureEventHub::<String>::new();
         let hits = Arc::new(AtomicUsize::new(0));
         let last = Arc::new(Mutex::new(String::new()));

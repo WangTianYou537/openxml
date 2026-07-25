@@ -345,7 +345,7 @@ impl WordprocessingDocument {
 
     /// Write package core properties.
     pub fn set_package_properties(&mut self, props: &PackageProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_package_properties(props)
     }
 
     /// Read extended properties (`docProps/app.xml`).
@@ -355,7 +355,7 @@ impl WordprocessingDocument {
 
     /// Write extended properties (`docProps/app.xml`).
     pub fn set_extended_properties(&mut self, props: &ExtendedProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_extended_properties(props)
     }
 
     /// Read custom properties (`docProps/custom.xml`).
@@ -365,7 +365,7 @@ impl WordprocessingDocument {
 
     /// Write custom properties (`docProps/custom.xml`).
     pub fn set_custom_properties(&mut self, props: &CustomProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_custom_properties(props)
     }
 
     /// Whether a core properties part exists.

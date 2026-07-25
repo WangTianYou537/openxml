@@ -850,6 +850,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Media data-part create consults package `PartExtensionProvider` when extension is omitted
 - [x] `OpenXmlPackage::delete_reference_relationships` bulk helper; Word/Excel/PPT bulk rel id removes route through it
 - [x] Document packages route `remove_part` → `delete_part` and most single/bulk relationship removes through feature-aware package APIs
+- [x] `DefaultFeatures` / `ElementMetadata` / `ElementMetadataFactoryFeature` / `OpenXmlSchemaType` shells (C# DefaultFeatures.Shared + IElementMetadataFactoryFeature)
+- [x] `FilePackageFeature` path metadata; `from_opc` seeds PackageFeature/FilePackageFeature/PackageStreamFeature + DefaultFeatures
+- [x] `OpenXmlPackage::{replace_part_relationships,set_package_properties,set_extended_properties,set_custom_properties}` feature-aware
+- [x] Word/Excel/PPT property setters route through package APIs; PPT layout/master template rels use `replace_part_relationships`
 
 **Still intentionally deferred / partial:**
 

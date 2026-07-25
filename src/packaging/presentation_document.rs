@@ -410,7 +410,7 @@ impl PresentationDocument {
 
     /// Write package core properties.
     pub fn set_package_properties(&mut self, props: &PackageProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_package_properties(props)
     }
 
     /// Read extended properties (`docProps/app.xml`).
@@ -420,7 +420,7 @@ impl PresentationDocument {
 
     /// Write extended properties.
     pub fn set_extended_properties(&mut self, props: &ExtendedProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_extended_properties(props)
     }
 
     /// Read custom properties.
@@ -430,7 +430,7 @@ impl PresentationDocument {
 
     /// Write custom properties.
     pub fn set_custom_properties(&mut self, props: &CustomProperties) -> Result<()> {
-        props.save_to(self.package.opc_mut())
+        self.package.set_custom_properties(props)
     }
 
     /// Whether a core properties part exists.
@@ -3874,7 +3874,8 @@ impl PresentationDocument {
                 let parsed = Relationships::parse(
                     include_str!("ppt_templates/slideLayout1.xml.rels").as_bytes(),
                 )?;
-                *self.package.opc_mut().part_relationships_mut(&layout_uri) = parsed;
+                self.package
+                    .replace_part_relationships(&layout_uri, parsed);
             }
         }
 
@@ -3890,12 +3891,18 @@ impl PresentationDocument {
         }
         // Master relationships: load Office template (rId1..rId11 layouts, rId12 theme)
         {
-            let master_rels = self.package.opc_mut().part_relationships_mut(&master_uri);
-            if master_rels.is_empty() {
+            let empty = self
+                .package
+                .opc()
+                .part_relationships(&master_uri)
+                .map(|r| r.is_empty())
+                .unwrap_or(true);
+            if empty {
                 let parsed = Relationships::parse(
                     include_str!("ppt_templates/slideMaster1.xml.rels").as_bytes(),
                 )?;
-                *master_rels = parsed;
+                self.package
+                    .replace_part_relationships(&master_uri, parsed);
             }
         }
 
