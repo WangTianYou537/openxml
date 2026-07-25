@@ -131,6 +131,63 @@ impl ValidationError {
         }
     }
 
+    /// Build from C#-style Id + Description (message becomes `Id: Description`).
+    pub fn with_id(
+        path: impl Into<String>,
+        id: &str,
+        description: impl AsRef<str>,
+    ) -> Self {
+        Self {
+            path: path.into(),
+            message: format!("{id}: {}", description.as_ref()),
+        }
+    }
+
+    /// Human-readable description (C# `ValidationErrorInfo.Description`).
+    ///
+    /// When `message` is `Id: detail`, returns the detail portion; otherwise the full message.
+    pub fn description(&self) -> &str {
+        match self.id() {
+            Some(id) => self
+                .message
+                .get(id.len()..)
+                .map(|rest| rest.trim_start_matches(':').trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or(self.message.as_str()),
+            None => self.message.as_str(),
+        }
+    }
+
+    /// XPath / part location as [`crate::element::XmlPath`] shell (C# `ValidationErrorInfo.Path`).
+    ///
+    /// Uses `path` as either an element XPath (when it starts with `/` and is not a package
+    /// part URI) or a part URI.
+    pub fn xml_path(&self) -> crate::element::XmlPath {
+        let p = self.path.as_str();
+        if p.starts_with('/') && p.contains(':') && !p.contains('.') {
+            // Heuristic: element XPath like `/w:document[1]/w:body[1]`
+            crate::element::XmlPath {
+                xpath: p.to_string(),
+                part_uri: None,
+                namespaces: Vec::new(),
+            }
+        } else if p.starts_with('/') {
+            crate::element::XmlPath::for_part(p)
+        } else if p.is_empty() {
+            crate::element::XmlPath {
+                xpath: String::new(),
+                part_uri: None,
+                namespaces: Vec::new(),
+            }
+        } else {
+            crate::element::XmlPath {
+                xpath: p.to_string(),
+                part_uri: None,
+                namespaces: Vec::new(),
+            }
+        }
+    }
+
     /// Stable error identifier when `message` begins with `Token:` (C# `ValidationErrorInfo.Id`).
     pub fn id(&self) -> Option<&str> {
         let head = self.message.split_once(':').map(|(h, _)| h.trim())?;

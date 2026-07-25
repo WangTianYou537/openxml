@@ -84,6 +84,11 @@ impl<'a> OpenXmlDomReader<'a> {
         self.current.map(|e| e.get_attributes()).unwrap_or(&[])
     }
 
+    /// Number of attributes on the current element.
+    pub fn attribute_count(&self) -> usize {
+        self.attributes().len()
+    }
+
     pub fn get_text(&self) -> Option<&str> {
         self.current.and_then(|e| e.text_value())
     }

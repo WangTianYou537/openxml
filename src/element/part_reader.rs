@@ -130,6 +130,14 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         &self.attributes
     }
 
+    /// Number of non-xmlns attributes on the current start element.
+    pub fn attribute_count(&self) -> usize {
+        self.attributes
+            .iter()
+            .filter(|(k, _)| !k.starts_with("xmlns"))
+            .count()
+    }
+
     /// Move to the next node (C# `Read`).
     pub fn read(&mut self) -> Result<bool> {
         if self.eof {
@@ -533,6 +541,7 @@ mod tests {
         assert!(decls.iter().any(|(p, _)| p == "r"), "{decls:?}");
         assert_eq!(r.get_attribute("rsidR"), Some("1"));
         assert!(r.has_attributes());
+        assert_eq!(r.attribute_count(), 1);
         r.close();
         assert!(r.is_eof());
     }

@@ -62,6 +62,12 @@ impl OpenXmlAttribute {
     }
 }
 
+impl std::fmt::Display for OpenXmlAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}=\"{}\"", self.qualified_name(), self.value)
+    }
+}
+
 /// Kind of non-element DOM node (mirrors C# `OpenXmlMiscNode` / `XmlNodeType`).
 ///
 /// Regular elements use [`OpenXmlMiscKind::None`]. Misc nodes are stored in the
@@ -1486,6 +1492,14 @@ mod element_api_parity_tests {
             dst.lookup_namespace("w"),
             Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
         );
+    }
+
+    #[test]
+    fn open_xml_attribute_display() {
+        let a = OpenXmlAttribute::with_ns("w", "http://schemas.openxmlformats.org/wordprocessingml/2006/main", "val", "1");
+        assert_eq!(a.to_string(), "w:val=\"1\"");
+        assert!(a.matches("val", "http://schemas.openxmlformats.org/wordprocessingml/2006/main"));
+        assert_eq!(a.xml_qualified_name().local_name, "val");
     }
 
     #[test]

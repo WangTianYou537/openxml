@@ -787,6 +787,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPartWriter` deferred start + WriteAttribute/WriteAttributeString/WriteNamespaceDeclaration
 - [x] Part/Dom reader `namespace_declarations` / `get_attribute` / `close`
 - [x] `OpenXmlAttribute::{xml_qualified_name,matches}`
+- [x] `ValidationError::{description,xml_path,with_id}` + `OpenXmlAttribute` Display + reader `attribute_count`
 
 **Still intentionally deferred / partial:**
 

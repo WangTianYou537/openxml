@@ -301,6 +301,7 @@ mod tests {
             message: "MC_ShallContainChoice: missing Choice".into(),
         };
         assert_eq!(e.id(), Some("MC_ShallContainChoice"));
+        assert_eq!(e.description(), "missing Choice");
         assert_eq!(
             e.error_type(),
             crate::validation::ValidationErrorType::MarkupCompatibility
@@ -312,6 +313,12 @@ mod tests {
         };
         assert_eq!(e.id(), Some("PartIsNotAllowed"));
         assert_eq!(e.error_type(), crate::validation::ValidationErrorType::Package);
+        assert_eq!(e.xml_path().part_uri.as_deref(), Some("/word"));
+
+        let e2 = ValidationError::with_id("/w:p[1]", "Sch_InvalidElementContent", "bad child");
+        assert_eq!(e2.id(), Some("Sch_InvalidElementContent"));
+        assert_eq!(e2.description(), "bad child");
+        assert!(e2.xml_path().xpath.contains("w:p"), "{:?}", e2.xml_path());
     }
 
     #[test]
