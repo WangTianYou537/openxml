@@ -1035,6 +1035,32 @@ impl OpenXmlElement {
         Some(cur)
     }
 
+    /// Document-order comparison under a common ancestor (C# `IsBefore` / `GetOrder`).
+    ///
+    /// Paths are zero-based child-index sequences from `root` (empty = root itself).
+    /// Returns `None` when either path is invalid under `root`.
+    pub fn order_at_paths(root: &OpenXmlElement, a: &[usize], b: &[usize]) -> Option<std::cmp::Ordering> {
+        let _ = root.get_at_path(a)?;
+        let _ = root.get_at_path(b)?;
+        Some(a.cmp(b))
+    }
+
+    /// Whether the node at `self_path` appears before `other_path` under `root` (C# `IsBefore`).
+    pub fn is_before_at(root: &OpenXmlElement, self_path: &[usize], other_path: &[usize]) -> bool {
+        matches!(
+            Self::order_at_paths(root, self_path, other_path),
+            Some(std::cmp::Ordering::Less)
+        )
+    }
+
+    /// Whether the node at `self_path` appears after `other_path` under `root` (C# `IsAfter`).
+    pub fn is_after_at(root: &OpenXmlElement, self_path: &[usize], other_path: &[usize]) -> bool {
+        matches!(
+            Self::order_at_paths(root, self_path, other_path),
+            Some(std::cmp::Ordering::Greater)
+        )
+    }
+
     pub fn get_at_path_mut(&mut self, path: &[usize]) -> Option<&mut OpenXmlElement> {
         let mut cur = self;
         for &i in path {
@@ -1696,5 +1722,23 @@ mod element_api_parity_tests {
         let b = OpenXmlAttribute::from_parts("r", "id", "http://ns", "rId1");
         assert_eq!(b.qualified_name(), "r:id");
         assert_eq!(b.value, "rId1");
+    }
+
+    #[test]
+    fn document_order_at_paths() {
+        let root = OpenXmlElement::w("body")
+            .with_child(OpenXmlElement::w("p1"))
+            .with_child(
+                OpenXmlElement::w("p2").with_child(OpenXmlElement::w("r")),
+            );
+        assert!(OpenXmlElement::is_before_at(&root, &[0], &[1]));
+        assert!(OpenXmlElement::is_after_at(&root, &[1], &[0]));
+        // p1 before r inside p2
+        assert!(OpenXmlElement::is_before_at(&root, &[0], &[1, 0]));
+        assert!(OpenXmlElement::is_after_at(&root, &[1, 0], &[0]));
+        assert_eq!(
+            OpenXmlElement::order_at_paths(&root, &[1], &[1]),
+            Some(std::cmp::Ordering::Equal)
+        );
     }
 }

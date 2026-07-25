@@ -801,6 +801,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationError` Node/RelatedNode/RelatedPart path shells
 - [x] `OpenXmlAttribute::{from_qualified_name,from_parts,namespace_uri_str,prefix_str}`
 - [x] Reader `get_attribute_at` / `get_attribute_ns` + `element_type_name` shell
+- [x] Document-order `order_at_paths` / `is_before_at` / `is_after_at`
+- [x] `PackageCapabilities` + OpenXmlPackage::package_capabilities
+- [x] `ValidationContext` shell (settings/cache/errors/expected children)
 
 **Still intentionally deferred / partial:**
 

@@ -362,6 +362,61 @@ impl AnnotationsFeature {
     }
 }
 
+/// Package capability flags (C# `PackageCapabilities`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PackageCapabilities {
+    bits: u32,
+}
+
+impl PackageCapabilities {
+    pub const NONE: Self = Self { bits: 0 };
+    pub const SAVE: Self = Self { bits: 1 };
+    pub const RELOAD: Self = Self { bits: 1 << 1 };
+    pub const CACHED: Self = Self { bits: 1 << 2 };
+    pub const LARGE_PART_STREAMS: Self = Self { bits: 1 << 3 };
+    pub const MALFORMED_URI: Self = Self { bits: 1 << 4 };
+
+    pub const fn empty() -> Self {
+        Self::NONE
+    }
+
+    pub const fn union(self, other: Self) -> Self {
+        Self {
+            bits: self.bits | other.bits,
+        }
+    }
+
+    pub const fn contains(self, other: Self) -> bool {
+        (self.bits & other.bits) == other.bits
+    }
+
+    pub const fn intersects(self, other: Self) -> bool {
+        (self.bits & other.bits) != 0
+    }
+
+    pub fn insert(&mut self, other: Self) {
+        self.bits |= other.bits;
+    }
+
+    /// Default in-memory package capabilities: Save | Cached.
+    pub fn memory_default() -> Self {
+        Self::SAVE.union(Self::CACHED)
+    }
+}
+
+impl std::ops::BitOr for PackageCapabilities {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        self.union(rhs)
+    }
+}
+
+impl std::ops::BitOrAssign for PackageCapabilities {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.insert(rhs);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -446,5 +501,16 @@ mod tests {
     fn get_required_panics() {
         let f = FeatureCollection::new();
         let _ = f.get_required::<ParagraphIdGenerator>();
+    }
+
+    #[test]
+    fn package_capabilities_flags() {
+        let mut c = PackageCapabilities::memory_default();
+        assert!(c.contains(PackageCapabilities::SAVE));
+        assert!(c.contains(PackageCapabilities::CACHED));
+        assert!(!c.contains(PackageCapabilities::RELOAD));
+        c |= PackageCapabilities::RELOAD;
+        assert!(c.contains(PackageCapabilities::RELOAD));
+        assert!(c.intersects(PackageCapabilities::SAVE | PackageCapabilities::MALFORMED_URI));
     }
 }

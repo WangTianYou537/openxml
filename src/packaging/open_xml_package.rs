@@ -487,6 +487,18 @@ impl OpenXmlPackage {
         )
     }
 
+    /// Package capability flags (C# `IPackageFeature.Capabilities` shell).
+    pub fn package_capabilities(&self) -> crate::features::PackageCapabilities {
+        use crate::features::PackageCapabilities;
+        let mut c = PackageCapabilities::CACHED;
+        if self.can_save() {
+            c |= PackageCapabilities::SAVE;
+        }
+        // In-memory/lazy open always allows reload from bytes/path when path known.
+        c |= PackageCapabilities::RELOAD;
+        c
+    }
+
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
     pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()
