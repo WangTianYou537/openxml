@@ -106,6 +106,12 @@ pub enum XmlEvent {
     },
     /// Character data (decoded, unescaped).
     Text(String),
+    /// XML comment (`<!-- … -->`).
+    Comment(String),
+    /// Processing instruction (`<?target data?>`).
+    ProcessingInstruction { target: String, data: String },
+    /// CDATA section (kept distinct from ordinary text for misc-node parity).
+    CData(String),
 }
 
 /// Forward-only reader over an XML byte stream.
@@ -195,14 +201,27 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
                     }
                     self.event_line = mark_line;
                     self.event_column = mark_col;
-                    return Ok(Some(XmlEvent::Text(text)));
+                    return Ok(Some(XmlEvent::CData(text)));
+                }
+                Event::Comment(c) => {
+                    let text = String::from_utf8_lossy(&c).into_owned();
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
+                    return Ok(Some(XmlEvent::Comment(text)));
+                }
+                Event::PI(p) => {
+                    let target = String::from_utf8_lossy(p.target()).into_owned();
+                    let data = String::from_utf8_lossy(p.content()).trim().to_string();
+                    self.event_line = mark_line;
+                    self.event_column = mark_col;
+                    return Ok(Some(XmlEvent::ProcessingInstruction { target, data }));
                 }
                 Event::Eof => {
                     self.event_line = 0;
                     self.event_column = 0;
                     return Ok(None);
                 }
-                // Skip declarations, comments, PIs, doc types (bytes already counted).
+                // Skip declarations / doc types (bytes already counted).
                 _ => continue,
             }
         }
@@ -247,6 +266,7 @@ impl<R: BufRead> OpenXmlStreamReader<R> {
                     }
                 }
                 XmlEvent::Text(t) if capturing => buf.push_str(&t),
+                XmlEvent::CData(t) if capturing => buf.push_str(&t),
                 _ => {}
             }
         }
@@ -349,6 +369,26 @@ pub fn write_xml_events(events: &[XmlEvent]) -> Result<Vec<u8>> {
             XmlEvent::Text(t) => {
                 writer
                     .write_event(QEvent::Text(BytesText::new(t)))
+                    .map_err(|e| Error::Xml(e.to_string()))?;
+            }
+            XmlEvent::CData(t) => {
+                writer
+                    .write_event(QEvent::CData(quick_xml::events::BytesCData::new(t)))
+                    .map_err(|e| Error::Xml(e.to_string()))?;
+            }
+            XmlEvent::Comment(t) => {
+                writer
+                    .write_event(QEvent::Comment(BytesText::new(t)))
+                    .map_err(|e| Error::Xml(e.to_string()))?;
+            }
+            XmlEvent::ProcessingInstruction { target, data } => {
+                let content = if data.is_empty() {
+                    target.clone()
+                } else {
+                    format!("{target} {data}")
+                };
+                writer
+                    .write_event(QEvent::PI(quick_xml::events::BytesPI::new(content)))
                     .map_err(|e| Error::Xml(e.to_string()))?;
             }
         }

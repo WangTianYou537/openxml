@@ -48,6 +48,14 @@ pub enum Error {
     #[error("validation error: {0}")]
     Validation(String),
 
+    /// Markup Compatibility content error (C# `InvalidMCContentException`).
+    #[error("invalid markup compatibility content: {0}")]
+    InvalidMcContent(String),
+
+    /// MustUnderstand / unknown namespace (C# `NamespaceNotUnderstandException`).
+    #[error("namespace not understood: {0}")]
+    NamespaceNotUnderstand(String),
+
     #[error("{0}")]
     Other(String),
 }

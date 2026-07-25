@@ -184,6 +184,11 @@ impl<R: BufRead> OpenXmlPartReader<R> {
         self.state == ElementState::End
     }
 
+    /// Whether the current node is a miscellaneous node (C# `IsMiscNode`).
+    pub fn is_misc_node(&self) -> bool {
+        self.state == ElementState::Misc
+    }
+
     pub fn is_eof(&self) -> bool {
         self.eof || self.state == ElementState::EOF
     }
@@ -339,6 +344,49 @@ impl<R: BufRead> OpenXmlPartReader<R> {
                     self.prefix = None;
                     self.attributes.clear();
                     self.state = ElementState::LeafText;
+                    return Ok(true);
+                }
+                Some(XmlEvent::CData(t)) => {
+                    if !self.read_misc_nodes {
+                        // Fold CDATA into text when misc nodes are not requested.
+                        self.check_max_characters()?;
+                        self.text = t;
+                        self.local_name.clear();
+                        self.prefix = None;
+                        self.attributes.clear();
+                        self.state = ElementState::LeafText;
+                        return Ok(true);
+                    }
+                    self.check_max_characters()?;
+                    self.text = t;
+                    self.local_name = "#cdata-section".into();
+                    self.prefix = None;
+                    self.attributes.clear();
+                    self.state = ElementState::Misc;
+                    return Ok(true);
+                }
+                Some(XmlEvent::Comment(t)) => {
+                    if !self.read_misc_nodes {
+                        continue;
+                    }
+                    self.check_max_characters()?;
+                    self.text = t;
+                    self.local_name = "#comment".into();
+                    self.prefix = None;
+                    self.attributes.clear();
+                    self.state = ElementState::Misc;
+                    return Ok(true);
+                }
+                Some(XmlEvent::ProcessingInstruction { target, data }) => {
+                    if !self.read_misc_nodes {
+                        continue;
+                    }
+                    self.check_max_characters()?;
+                    self.text = data;
+                    self.local_name = target;
+                    self.prefix = None;
+                    self.attributes.clear();
+                    self.state = ElementState::Misc;
                     return Ok(true);
                 }
             }
@@ -770,5 +818,37 @@ mod tests {
             }
         }
         assert!(hit_limit, "expected MaxCharactersInPart error");
+    }
+
+    #[test]
+    fn part_reader_misc_nodes_when_enabled() {
+        let xml = b"<root><!--c--><?pi data?><![CDATA[x]]><t>y</t></root>";
+        let mut r = OpenXmlPartReader::create_with_misc(xml, true);
+        assert!(r.read().unwrap()); // root
+        assert!(r.is_start_element());
+        assert!(r.read().unwrap());
+        assert!(r.is_misc_node());
+        assert_eq!(r.local_name(), "#comment");
+        assert_eq!(r.get_text(), "c");
+        assert!(r.read().unwrap());
+        assert!(r.is_misc_node());
+        assert_eq!(r.local_name(), "pi");
+        assert_eq!(r.get_text(), "data");
+        assert!(r.read().unwrap());
+        assert!(r.is_misc_node());
+        assert_eq!(r.local_name(), "#cdata-section");
+        assert_eq!(r.get_text(), "x");
+        assert!(r.read().unwrap()); // t
+        assert!(r.is_start_element());
+    }
+
+    #[test]
+    fn part_reader_skips_misc_by_default() {
+        let xml = b"<root><!--c--><t>y</t></root>";
+        let mut r = OpenXmlPartReader::from_bytes(xml);
+        assert!(r.read().unwrap()); // root
+        assert!(r.read().unwrap()); // t (comment skipped)
+        assert_eq!(r.local_name(), "t");
+        assert!(!r.is_misc_node());
     }
 }

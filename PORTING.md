@@ -806,6 +806,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationContext` shell (settings/cache/errors/expected children)
 - [x] `OpenXmlPartWriterSettings` + `with_settings` / `create_with_encoding` / encoding+standalone declaration
 - [x] Public `McContext` push/pop shell (`AttributeAction` / `ElementAction` / `McQualifiedName`)
+- [x] `Error::{InvalidMcContent,NamespaceNotUnderstand}`; McContext hard-fail parse paths
+- [x] Stream `XmlEvent::{Comment,ProcessingInstruction,CData}`; PartReader `is_misc_node` + ReadMiscellaneousNodes
+- [x] `OpenXmlElement::{create_from_text,create_from_cdata,create_from_significant_whitespace}`
 
 **Still intentionally deferred / partial:**
 

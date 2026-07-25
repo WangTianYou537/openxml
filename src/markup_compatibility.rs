@@ -532,20 +532,28 @@ impl McContext {
     }
 
     /// Resolve prefix list to namespace URIs via `lookup` (C# `ParsePrefixList`).
+    ///
+    /// When constructed with `with_exception_on_error(true)` and a lookup is provided,
+    /// unknown prefixes yield [`Error::InvalidMcContent`](crate::error::Error::InvalidMcContent).
     pub fn parse_prefix_list(
         &self,
         value: &str,
         lookup: Option<&dyn Fn(&str) -> Option<String>>,
-    ) -> Vec<String> {
+    ) -> crate::error::Result<Vec<String>> {
         let mut out = Vec::new();
         for prefix in Self::get_prefixes(Some(value)) {
             match lookup.and_then(|f| f(&prefix)) {
                 Some(uri) if !uri.is_empty() => out.push(uri),
+                _ if lookup.is_none() => out.push(prefix),
                 _ if self.no_exception_on_error => continue,
-                _ => continue, // soft-skip; full InvalidMCContentException not ported
+                _ => {
+                    return Err(crate::error::Error::InvalidMcContent(format!(
+                        "unknown MC prefix '{prefix}' in '{value}'"
+                    )));
+                }
             }
         }
-        out
+        Ok(out)
     }
 
     /// Parse `pfx:local` / `pfx:*` list into [`McQualifiedName`]s (C# `ParseQNameList`).
@@ -553,7 +561,7 @@ impl McContext {
         &self,
         value: &str,
         lookup: Option<&dyn Fn(&str) -> Option<String>>,
-    ) -> Vec<McQualifiedName> {
+    ) -> crate::error::Result<Vec<McQualifiedName>> {
         let mut out = Vec::new();
         for token in Self::get_prefixes(Some(value)) {
             let parts: Vec<&str> = token.splitn(2, ':').collect();
@@ -561,7 +569,9 @@ impl McContext {
                 if self.no_exception_on_error {
                     continue;
                 }
-                continue;
+                return Err(crate::error::Error::InvalidMcContent(format!(
+                    "invalid MC QName '{token}' in '{value}'"
+                )));
             }
             let (prefix, local) = (parts[0], parts[1]);
             let uri = match lookup.and_then(|f| f(prefix)) {
@@ -569,11 +579,15 @@ impl McContext {
                 // Without lookup, keep the prefix as a stand-in namespace key.
                 _ if lookup.is_none() => prefix.to_string(),
                 _ if self.no_exception_on_error => continue,
-                _ => continue,
+                _ => {
+                    return Err(crate::error::Error::InvalidMcContent(format!(
+                        "unknown MC prefix '{prefix}' in '{value}'"
+                    )));
+                }
             };
             out.push(McQualifiedName::new(uri, local));
         }
-        out
+        Ok(out)
     }
 
     /// Attribute action for an ignorable-aware read (simplified C# `GetAttributeAction`).
@@ -631,19 +645,14 @@ impl McContext {
         let Some(v) = value.filter(|s| !s.is_empty()) else {
             return 0;
         };
-        let mut n = 0;
-        for prefix in Self::get_prefixes(Some(v)) {
-            let uri = match lookup.and_then(|f| f(&prefix)) {
-                Some(u) if !u.is_empty() => u,
-                // Without lookup, treat token as URI/prefix key (prefix-based processing).
-                _ if lookup.is_none() => prefix.clone(),
-                _ if self.no_exception_on_error => continue,
-                _ => continue,
-            };
-            self.ignorable.push(uri);
-            n += 1;
+        match self.parse_prefix_list(v, lookup) {
+            Ok(uris) => {
+                let n = uris.len();
+                self.ignorable.extend(uris);
+                n
+            }
+            Err(_) => 0,
         }
-        n
     }
 
     fn push_qnames(
@@ -655,7 +664,10 @@ impl McContext {
         let Some(v) = value.filter(|s| !s.is_empty()) else {
             return 0;
         };
-        let names = self.parse_qname_list(v, lookup);
+        let names = match self.parse_qname_list(v, lookup) {
+            Ok(n) => n,
+            Err(_) => return 0,
+        };
         let n = names.len();
         for q in names {
             push(self, q);
@@ -1371,9 +1383,29 @@ mod mc_context_tests {
             McContext::get_prefixes(Some("  a  b ")),
             vec!["a".to_string(), "b".to_string()]
         );
-        let qnames = ctx.parse_qname_list("w14:docId w15:*", None);
+        let qnames = ctx.parse_qname_list("w14:docId w15:*", None).unwrap();
         assert_eq!(qnames.len(), 2);
         assert!(qnames[0].matches("w14", "docId"));
         assert!(qnames[1].matches("w15", "anything"));
+    }
+
+    #[test]
+    fn parse_qname_list_hard_fail() {
+        let ctx = McContext::with_exception_on_error(true);
+        let lookup = |_: &str| None;
+        let err = ctx
+            .parse_qname_list("w14:docId", Some(&lookup))
+            .unwrap_err();
+        assert!(matches!(err, crate::error::Error::InvalidMcContent(_)));
+    }
+
+    #[test]
+    fn parse_qname_list_soft_skip() {
+        let ctx = McContext::with_exception_on_error(false);
+        let lookup = |_: &str| None;
+        let qnames = ctx
+            .parse_qname_list("w14:docId", Some(&lookup))
+            .unwrap();
+        assert!(qnames.is_empty());
     }
 }

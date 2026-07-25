@@ -348,6 +348,43 @@ impl OpenXmlElement {
         }
     }
 
+    /// C# `OpenXmlMiscNode.CreateFromText` — significant text misc node shell.
+    pub fn create_from_text(text: impl Into<String>) -> Self {
+        Self {
+            prefix: String::new(),
+            namespace_uri: String::new(),
+            local_name: "#text".into(),
+            attributes: Vec::new(),
+            namespace_declarations: Vec::new(),
+            children: Vec::new(),
+            text: Some(text.into()),
+            raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::None,
+            annotations: Vec::new(),
+        }
+    }
+
+    /// C# `OpenXmlMiscNode.CreateFromCdata`.
+    pub fn create_from_cdata(value: impl Into<String>) -> Self {
+        Self::cdata(value)
+    }
+
+    /// C# `OpenXmlMiscNode.CreateFromSignificantWhitespace`.
+    pub fn create_from_significant_whitespace(whitespace: impl Into<String>) -> Self {
+        Self {
+            prefix: String::new(),
+            namespace_uri: String::new(),
+            local_name: "#significant-whitespace".into(),
+            attributes: Vec::new(),
+            namespace_declarations: Vec::new(),
+            children: Vec::new(),
+            text: Some(whitespace.into()),
+            raw_outer_xml: None,
+            misc_kind: OpenXmlMiscKind::None,
+            annotations: Vec::new(),
+        }
+    }
+
     /// Whether this node is a non-element misc node (comment / PI / CDATA).
     pub fn is_misc_node(&self) -> bool {
         self.misc_kind != OpenXmlMiscKind::None
@@ -1740,5 +1777,18 @@ mod element_api_parity_tests {
             OpenXmlElement::order_at_paths(&root, &[1], &[1]),
             Some(std::cmp::Ordering::Equal)
         );
+    }
+
+    #[test]
+    fn misc_node_create_from_factories() {
+        let t = OpenXmlElement::create_from_text("hi");
+        assert_eq!(t.local_name, "#text");
+        assert_eq!(t.text.as_deref(), Some("hi"));
+        let c = OpenXmlElement::create_from_cdata("x");
+        assert!(c.is_misc_node());
+        assert_eq!(c.misc_kind(), OpenXmlMiscKind::CData);
+        let w = OpenXmlElement::create_from_significant_whitespace("  ");
+        assert_eq!(w.local_name, "#significant-whitespace");
+        assert_eq!(w.text.as_deref(), Some("  "));
     }
 }
