@@ -1261,7 +1261,6 @@ impl PresentationDocument {
     /// Write/replace raw part bytes and content type.
     pub fn set_part_bytes(&mut self, uri: &str, content_type: &str, data: impl Into<Vec<u8>>) {
         self.package
-            .opc_mut()
             .set_part(PackUri::new(uri), content_type, data);
     }
 
@@ -1296,7 +1295,6 @@ impl PresentationDocument {
     ) -> Result<String> {
         let uri = PackUri::new(format!("/docProps/thumbnail.{extension}"));
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, image_bytes.into());
         if let Some(existing) = self
             .package
@@ -1354,13 +1352,10 @@ impl PresentationDocument {
             .get_by_type(rel::THUMBNAIL)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&rel_id);
+            let _ = self.package.delete_reference_relationship(None, &rel_id);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -1471,13 +1466,10 @@ impl PresentationDocument {
             .get_by_type(rel::DIGITAL_SIGNATURE_ORIGIN)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -1585,11 +1577,8 @@ impl PresentationDocument {
             }
             crate::opc::resolve_uri(&pres_uri, &rel_entry.target)?
         };
-        self.package
-            .opc_mut()
-            .part_relationships_mut(&pres_uri)
-            .remove(relationship_id);
-        self.package.opc_mut().remove_part(&target);
+        let _ = self.package.delete_reference_relationship(Some(&pres_uri), relationship_id);
+        self.package.delete_part(&target);
         Ok(true)
     }
 
@@ -1622,7 +1611,6 @@ impl PresentationDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &pres_uri,
@@ -1731,7 +1719,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -1741,7 +1729,6 @@ impl PresentationDocument {
         let pres_uri = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT)?;
         let uri = PackUri::new("/ppt/vbaProject.bin");
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::VBA_PROJECT, data.into());
         if let Some(existing) = self
             .package
@@ -1835,7 +1822,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -1917,14 +1904,11 @@ impl PresentationDocument {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package
-                    .opc_mut()
-                    .package_relationships_mut()
-                    .remove(&id);
+                let _ = self.package.delete_reference_relationship(None, &id);
             }
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -2006,7 +1990,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -2016,7 +2000,6 @@ impl PresentationDocument {
         let pres_uri = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT)?;
         let uri = PackUri::new("/ppt/attachedToolbars.bin");
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::ATTACHED_TOOLBARS, data.into());
         if let Some(existing) = self
             .package
@@ -2067,14 +2050,11 @@ impl PresentationDocument {
                 })
             {
                 had_rel = true;
-                self.package
-                    .opc_mut()
-                    .part_relationships_mut(&pres_uri)
-                    .remove(&id);
+                let _ = self.package.delete_reference_relationship(Some(&pres_uri), &id);
             }
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(had_part || had_rel)
     }
@@ -2147,13 +2127,10 @@ impl PresentationDocument {
             .get_by_type(rel::QAT)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -2225,13 +2202,10 @@ impl PresentationDocument {
             .get_by_type(rel::LABEL_INFO)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -2358,10 +2332,7 @@ impl PresentationDocument {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package
-                    .opc_mut()
-                    .package_relationships_mut()
-                    .remove(&id);
+                let _ = self.package.delete_reference_relationship(None, &id);
             }
         }
         if let Ok(pres_uri) = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT) {
@@ -2384,7 +2355,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -2448,7 +2419,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -2530,8 +2501,7 @@ impl PresentationDocument {
             (&drawing_uri, content_type::DIAGRAM_PERSIST_LAYOUT, drawing),
         ] {
             self.package
-                .opc_mut()
-                .set_part(uri.clone(), ct, crate::element::write_element(&el)?);
+            .set_part(uri.clone(), ct, crate::element::write_element(&el)?);
         }
         // Relate four core diagram parts from main document
         for (uri, rel_ty) in [
@@ -2633,7 +2603,6 @@ impl PresentationDocument {
             .content_types_mut()
             .set_default(ext, ct);
         self.package
-            .opc_mut()
             .set_part(uri.clone(), ct, data.into());
         let rid = self.package.add_part_relationship(
             &main_uri,
@@ -2717,7 +2686,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&part_uri), &ids);
         }
         for uri in images {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -3250,7 +3219,6 @@ impl PresentationDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &main,
@@ -3336,7 +3304,6 @@ impl PresentationDocument {
             format!("/{uri}")
         });
         self.package
-            .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &pres_uri,
@@ -3395,7 +3362,6 @@ impl PresentationDocument {
         let pres = presentation(kids);
         let xml = write_element(&pres)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -3436,7 +3402,6 @@ impl PresentationDocument {
         root.set_attribute("type", layout_type);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -3468,7 +3433,6 @@ impl PresentationDocument {
         root.set_attribute("preserve", if preserve { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -3507,7 +3471,6 @@ impl PresentationDocument {
         root.set_attribute("matchingName", name);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -3681,7 +3644,6 @@ impl PresentationDocument {
         root.set_attribute("userDrawn", if user_drawn { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -3716,7 +3678,6 @@ impl PresentationDocument {
         root.set_attribute("preserve", if preserve { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(master.uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
         Ok(())
     }
@@ -3782,8 +3743,7 @@ impl PresentationDocument {
             let uri = PackUri::new(path);
             if !self.package.opc().has_part(&uri) {
                 self.package
-                    .opc_mut()
-                    .set_part(uri.clone(), ct, xml.as_bytes().to_vec());
+            .set_part(uri.clone(), ct, xml.as_bytes().to_vec());
             }
             if self
                 .package
@@ -4176,8 +4136,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4232,8 +4191,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4455,8 +4413,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4506,8 +4463,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4612,8 +4568,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4723,8 +4678,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4836,8 +4790,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4887,8 +4840,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -4998,8 +4950,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5116,8 +5067,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5167,8 +5117,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5232,8 +5181,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5315,8 +5263,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5367,8 +5314,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5450,8 +5396,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5506,8 +5451,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5593,8 +5537,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5676,8 +5619,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5750,8 +5692,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5846,8 +5787,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5898,8 +5838,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -5981,8 +5920,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6033,8 +5971,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6116,8 +6053,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6172,8 +6108,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6267,8 +6202,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6362,8 +6296,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6453,8 +6386,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6544,8 +6476,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6700,8 +6631,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6795,8 +6725,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6895,8 +6824,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -6995,8 +6923,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7107,8 +7034,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7230,8 +7156,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7385,8 +7310,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7446,8 +7370,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7579,8 +7502,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7680,8 +7602,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7739,8 +7660,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7813,8 +7733,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -7902,8 +7821,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8012,8 +7930,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8120,8 +8037,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8168,8 +8084,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8274,8 +8189,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8320,8 +8234,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8459,8 +8372,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8569,8 +8481,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8615,8 +8526,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -8681,8 +8591,7 @@ impl PresentationDocument {
         if count > 0 {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(count)
     }
@@ -8874,7 +8783,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(notes_uri, content_type::PRESENTATION_NOTES_SLIDE, xml);
         Ok(())
     }
@@ -8954,7 +8862,6 @@ impl PresentationDocument {
         );
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(notes_uri, content_type::PRESENTATION_NOTES_SLIDE, xml);
         Ok(())
     }
@@ -8989,8 +8896,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(notes_uri, content_type::PRESENTATION_NOTES_SLIDE, xml);
+            .set_part(notes_uri, content_type::PRESENTATION_NOTES_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -9024,11 +8930,8 @@ impl PresentationDocument {
             let parent = base.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
             PackUri::new(format!("{}/{}", parent, target.trim_start_matches("./")))
         };
-        self.package.opc_mut().remove_part(&notes_uri);
-        self.package
-            .opc_mut()
-            .part_relationships_mut(&slide_info.uri)
-            .remove(&rid);
+        self.package.delete_part(&notes_uri);
+        let _ = self.package.delete_reference_relationship(Some(&slide_info.uri), &rid);
         Ok(true)
     }
 
@@ -9093,7 +8996,6 @@ impl PresentationDocument {
             .unwrap_or(content_type::THEME)
             .to_string();
         self.package
-            .opc_mut()
             .set_part(uri, &ct, write_element(&root)?);
         Ok(true)
     }
@@ -9137,7 +9039,6 @@ impl PresentationDocument {
             .unwrap_or(content_type::THEME)
             .to_string();
         self.package
-            .opc_mut()
             .set_part(uri, ct, write_element(&root)?);
         Ok(true)
     }
@@ -9169,7 +9070,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -9252,7 +9153,7 @@ impl PresentationDocument {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -9287,7 +9188,7 @@ impl PresentationDocument {
             }
         }
         for uri in media {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -9356,7 +9257,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&parent), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -9417,7 +9318,7 @@ impl PresentationDocument {
             }
         }
         for uri in charts {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -9559,7 +9460,7 @@ impl PresentationDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -9901,7 +9802,7 @@ impl PresentationDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -9954,7 +9855,7 @@ impl PresentationDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -10000,7 +9901,7 @@ impl PresentationDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -10090,8 +9991,7 @@ impl PresentationDocument {
             root.children.insert(insert_at, list);
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(master_uri)
     }
@@ -10138,7 +10038,6 @@ impl PresentationDocument {
         );
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(master_uri, content_type::PRESENTATION_NOTES_MASTER, xml);
         Ok(())
     }
@@ -10180,8 +10079,7 @@ impl PresentationDocument {
             if root.children.len() < before {
                 let xml = write_element(&root)?;
                 self.package
-                    .opc_mut()
-                    .set_part(uri, content_type::PRESENTATION_NOTES_MASTER, xml);
+            .set_part(uri, content_type::PRESENTATION_NOTES_MASTER, xml);
                 n += 1;
             }
         }
@@ -10229,7 +10127,6 @@ impl PresentationDocument {
         );
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(master_uri, content_type::PRESENTATION_HANDOUT_MASTER, xml);
         Ok(())
     }
@@ -10313,7 +10210,6 @@ impl PresentationDocument {
         );
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(master_uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
         Ok(())
     }
@@ -10355,8 +10251,7 @@ impl PresentationDocument {
             if root.children.len() < before {
                 let xml = write_element(&root)?;
                 self.package
-                    .opc_mut()
-                    .set_part(uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
+            .set_part(uri, content_type::PRESENTATION_SLIDE_MASTER, xml);
                 n += 1;
             }
         }
@@ -10395,7 +10290,6 @@ impl PresentationDocument {
         );
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout_uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -10437,8 +10331,7 @@ impl PresentationDocument {
             if root.children.len() < before {
                 let xml = write_element(&root)?;
                 self.package
-                    .opc_mut()
-                    .set_part(uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
+            .set_part(uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
                 n += 1;
             }
         }
@@ -10512,8 +10405,7 @@ impl PresentationDocument {
             root.children.insert(insert_at, list);
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(master_uri)
     }
@@ -10622,7 +10514,6 @@ impl PresentationDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::MODEL_3D, glb_data.into());
         let rid = self.package.add_part_relationship(
             &slide_info.uri,
@@ -10831,7 +10722,6 @@ impl PresentationDocument {
             }
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &pres_uri,
@@ -10894,7 +10784,7 @@ impl PresentationDocument {
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -10982,7 +10872,7 @@ impl PresentationDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -11016,11 +10906,8 @@ impl PresentationDocument {
             return Ok(false);
         }
         for (id, uri) in targets {
-            self.package.opc_mut().remove_part(&uri);
-            self.package
-                .opc_mut()
-                .part_relationships_mut(&slide_info.uri)
-                .remove(&id);
+            self.package.delete_part(&uri);
+            let _ = self.package.delete_reference_relationship(Some(&slide_info.uri), &id);
         }
         Ok(true)
     }
@@ -11870,7 +11757,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(next_id)
     }
@@ -11975,8 +11861,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(found)
     }
@@ -12033,8 +11918,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(found)
     }
@@ -12095,8 +11979,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -12116,7 +11999,6 @@ impl PresentationDocument {
         root.children.retain(|c| c.local_name != "custShowLst");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(n)
     }
@@ -12387,7 +12269,7 @@ impl PresentationDocument {
             .filter(|u| u.as_str().contains("/ppt/styles"))
             .collect();
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
             removed = true;
         }
         Ok(removed)
@@ -12457,7 +12339,7 @@ impl PresentationDocument {
             self.package
                 .delete_reference_relationships(Some(&pres_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -13453,7 +13335,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::PRESENTATION_VIEW_PROPS, xml);
         Ok(true)
     }
@@ -13670,7 +13551,6 @@ impl PresentationDocument {
         // Rewrite theme root namespace is already DrawingML
         let xml = write_element(&theme)?;
         self.package
-            .opc_mut()
             .set_part(theme_uri.clone(), content_type::THEME, xml);
         if let Some(existing) = self
             .package
@@ -13701,12 +13581,8 @@ impl PresentationDocument {
         }
         let info = self.slides.remove(slide_index);
         let pres_uri = self.ensure_presentation()?;
-        let _ = self
-            .package
-            .opc_mut()
-            .part_relationships_mut(&pres_uri)
-            .remove(&info.relationship_id);
-        self.package.opc_mut().remove_part(&info.uri);
+        let _ = self.package.delete_reference_relationship(Some(&pres_uri), &info.relationship_id);
+        self.package.delete_part(&info.uri);
         self.rewrite_presentation()
     }
 
@@ -13742,7 +13618,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -13796,7 +13671,6 @@ impl PresentationDocument {
         root.set_attribute("showMasterSp", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -13832,7 +13706,6 @@ impl PresentationDocument {
         root.set_attribute("showMasterPhAnim", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -13912,7 +13785,6 @@ impl PresentationDocument {
         root.set_attribute("showMasterSp", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::PRESENTATION_NOTES_SLIDE, xml);
         Ok(true)
     }
@@ -13950,7 +13822,6 @@ impl PresentationDocument {
         root.set_attribute("showMasterSp", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -13989,7 +13860,6 @@ impl PresentationDocument {
         root.set_attribute("showMasterPhAnim", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(layout.uri, content_type::PRESENTATION_SLIDE_LAYOUT, xml);
         Ok(())
     }
@@ -14026,7 +13896,6 @@ impl PresentationDocument {
         root.set_attribute("showMasterPhAnim", if show { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::PRESENTATION_NOTES_SLIDE, xml);
         Ok(true)
     }
@@ -14307,7 +14176,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14384,8 +14252,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(found)
     }
@@ -14415,8 +14282,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(found)
     }
@@ -14444,8 +14310,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -14635,7 +14500,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(true)
     }
@@ -14659,8 +14523,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -14683,7 +14546,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14700,7 +14562,6 @@ impl PresentationDocument {
         root.set_attribute("firstSlideNum", num.to_string());
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14735,7 +14596,6 @@ impl PresentationDocument {
         root.attributes.retain(|a| a.local_name != "firstSlideNum");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -14752,7 +14612,6 @@ impl PresentationDocument {
         root.set_attribute("rtl", if rtl { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14781,7 +14640,6 @@ impl PresentationDocument {
         root.set_attribute(attr, if value { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14809,7 +14667,6 @@ impl PresentationDocument {
         root.set_attribute(attr, value);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14835,8 +14692,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -15058,8 +14914,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -15086,7 +14941,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -15115,7 +14969,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -15183,7 +15036,6 @@ impl PresentationDocument {
         root.children.push(dts);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -15214,8 +15066,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -15286,8 +15137,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -15359,7 +15209,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -15386,8 +15235,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -15412,7 +15260,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -15474,8 +15321,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -15542,7 +15388,6 @@ impl PresentationDocument {
         root.append_child(header_footer(show_date, show_footer, show_slide_number));
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -15625,7 +15470,6 @@ impl PresentationDocument {
         root.children.insert(insert_at, album);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -15677,8 +15521,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -15715,7 +15558,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -15776,7 +15618,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -15852,7 +15693,6 @@ impl PresentationDocument {
         root.children.push(k);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -15903,7 +15743,6 @@ impl PresentationDocument {
         root.children.push(mv);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -15932,7 +15771,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -16018,8 +15856,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -16170,7 +16007,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -16221,7 +16057,6 @@ impl PresentationDocument {
         root.children.retain(|c| c.local_name != "embeddedFontLst");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(n)
     }
@@ -16248,8 +16083,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -16274,7 +16108,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -16326,7 +16159,6 @@ impl PresentationDocument {
         root.children.retain(|c| c.local_name != "custDataLst");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(pres_uri, self.document_type.content_type(), xml);
         Ok(n)
     }
@@ -16355,8 +16187,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(pres_uri, self.document_type.content_type(), xml);
+            .set_part(pres_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -16397,8 +16228,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -16486,8 +16316,7 @@ impl PresentationDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -16577,7 +16406,6 @@ impl PresentationDocument {
         root.append_child(timing);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -16699,8 +16527,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -16741,8 +16568,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -16793,8 +16619,7 @@ impl PresentationDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(found)
     }
@@ -16888,8 +16713,7 @@ impl PresentationDocument {
             }
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(removed)
     }
@@ -16920,7 +16744,6 @@ impl PresentationDocument {
         root.append_child(slide_transition(effect, speed, true, advance_after_ms));
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -17052,10 +16875,11 @@ impl PresentationDocument {
                     continue;
                 }
                 if mode == RelationshipTargetMode::External {
-                    self.package
-                        .opc_mut()
-                        .part_relationships_mut(&new_info.uri)
-                        .add(&ty, &target, mode);
+                    let _ = self.package.add_external_relationship(
+                        Some(&new_info.uri),
+                        &ty,
+                        &target,
+                    );
                 } else {
                     // Resolve target relative to source, re-relativize to new slide
                     if let Ok(abs) = crate::opc::resolve_uri(&slide_info.uri, &target) {
@@ -17083,7 +16907,6 @@ impl PresentationDocument {
 
         let xml = write_element(&slide_root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri.clone(), content_type::PRESENTATION_SLIDE, xml);
 
         let slide_rel = self.package.add_part_relationship(
@@ -17143,7 +16966,6 @@ impl PresentationDocument {
             img_index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(image_uri.clone(), content_type_str, image_bytes.to_vec());
         let img_rel = self.package.add_part_relationship(
             &slide_uri,
@@ -17179,7 +17001,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok((image_uri, img_rel))
     }
@@ -17432,7 +17253,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(count)
     }
@@ -17524,7 +17344,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(svg_uri)
     }
@@ -17574,7 +17393,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(shape_id)
     }
@@ -17622,7 +17440,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(shape_id)
     }
@@ -17716,7 +17533,6 @@ impl PresentationDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(slide_uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(())
     }
@@ -17792,7 +17608,6 @@ impl PresentationDocument {
         let count = replace_slide_text(&mut root, from, to);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         Ok(count)
     }
@@ -17817,8 +17632,7 @@ impl PresentationDocument {
         if updated {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(updated)
     }
@@ -17868,8 +17682,7 @@ impl PresentationDocument {
         if updated {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
+            .set_part(info.uri, content_type::PRESENTATION_SLIDE, xml);
         }
         Ok(updated)
     }
@@ -17956,12 +17769,10 @@ impl PresentationDocument {
             .get(slide_index)
             .cloned()
             .ok_or_else(|| Error::Package(format!("slide index {slide_index} out of range")))?;
-        let rels = self
+        Ok(self
             .package
-            .opc_mut()
-            .part_relationships_mut(&slide_info.uri);
-        let removed = rels.remove(rid).is_some();
-        Ok(removed)
+            .delete_reference_relationship(Some(&slide_info.uri), rid)
+            .is_some())
     }
 
     /// Whether any slide has hyperlink relationships.

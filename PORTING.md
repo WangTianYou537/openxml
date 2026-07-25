@@ -849,6 +849,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `FeatureEventArgs` / `FeatureEventHub` (C# `FeatureEventArgs` / `IFeatureEvent` / `IRaiseFeatureEvent` shell)
 - [x] Media data-part create consults package `PartExtensionProvider` when extension is omitted
 - [x] `OpenXmlPackage::delete_reference_relationships` bulk helper; Word/Excel/PPT bulk rel id removes route through it
+- [x] Document packages route `remove_part` → `delete_part` and most single/bulk relationship removes through feature-aware package APIs
 
 **Still intentionally deferred / partial:**
 

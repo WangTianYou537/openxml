@@ -172,7 +172,6 @@ impl WordprocessingDocument {
             .map(|b| b.to_vec())
             .unwrap_or_default();
         self.package
-            .opc_mut()
             .set_part(uri, ct, data);
         main.part_mut().content_type = ct.to_string();
         self.document_type = new_type;
@@ -967,7 +966,6 @@ impl WordprocessingDocument {
         data: impl Into<Vec<u8>>,
     ) {
         self.package
-            .opc_mut()
             .set_part(PackUri::new(uri), content_type, data);
     }
 
@@ -1490,13 +1488,10 @@ impl WordprocessingDocument {
             .get_by_type(rel::THUMBNAIL)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&rel);
+            let _ = self.package.delete_reference_relationship(None, &rel);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -1587,7 +1582,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(styles_uri, content_type::WORD_STYLES, xml);
         Ok(true)
     }
@@ -1827,7 +1821,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -1972,7 +1965,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -2002,8 +1994,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(removed)
     }
@@ -2042,8 +2033,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(removed)
     }
@@ -2354,10 +2344,10 @@ impl WordprocessingDocument {
                 return Ok(false);
             }
             for u in extras {
-                self.package.opc_mut().remove_part(&u);
+                self.package.delete_part(&u);
             }
         } else {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
             let extras: Vec<PackUri> = self
                 .package
                 .opc()
@@ -2365,7 +2355,7 @@ impl WordprocessingDocument {
                 
                 .collect();
             for u in extras {
-                self.package.opc_mut().remove_part(&u);
+                self.package.delete_part(&u);
             }
         }
         if let Some(main) = self.main_document_part.as_ref() {
@@ -2430,11 +2420,8 @@ impl WordprocessingDocument {
             }
             crate::opc::resolve_uri(&main_uri, &rel.target)?
         };
-        self.package
-            .opc_mut()
-            .part_relationships_mut(&main_uri)
-            .remove(relationship_id);
-        self.package.opc_mut().remove_part(&target);
+        let _ = self.package.delete_reference_relationship(Some(&main_uri), relationship_id);
+        self.package.delete_part(&target);
         Ok(true)
     }
 
@@ -2881,7 +2868,6 @@ impl WordprocessingDocument {
         root.append_child(pr);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -5508,7 +5494,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -5558,7 +5543,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -5633,7 +5617,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -5657,7 +5640,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(n)
     }
@@ -6357,7 +6339,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -6741,7 +6722,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -6920,7 +6900,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7002,7 +6981,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -7036,7 +7014,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7084,7 +7061,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         let _ = M;
         Ok(true)
@@ -7114,7 +7090,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7138,7 +7113,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -7430,7 +7404,6 @@ impl WordprocessingDocument {
         root.append_child(rsids_el);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7549,7 +7522,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7587,8 +7559,7 @@ impl WordprocessingDocument {
         if n > 0 {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(n)
     }
@@ -7622,7 +7593,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7674,8 +7644,7 @@ impl WordprocessingDocument {
         if n > 0 {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(n)
     }
@@ -7714,7 +7683,6 @@ impl WordprocessingDocument {
         library.append_child(schema);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7818,7 +7786,6 @@ impl WordprocessingDocument {
         root.append_child(mm);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7874,7 +7841,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7924,7 +7890,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -7974,7 +7939,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8027,7 +7991,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8063,7 +8026,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8134,7 +8096,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8164,7 +8125,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8224,7 +8184,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8284,7 +8243,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8337,7 +8295,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8397,7 +8354,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8457,7 +8413,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8509,8 +8464,7 @@ impl WordprocessingDocument {
         if n > 0 {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(n)
     }
@@ -8556,7 +8510,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8645,8 +8598,7 @@ impl WordprocessingDocument {
         if removed > 0 {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(removed)
     }
@@ -8666,8 +8618,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
+            .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         }
         Ok(removed)
     }
@@ -8689,7 +8640,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -8713,7 +8663,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(true)
     }
@@ -8731,7 +8680,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8776,7 +8724,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8821,7 +8768,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8867,7 +8813,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8912,7 +8857,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8953,7 +8897,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -8993,7 +8936,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -9033,7 +8975,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -9078,7 +9019,6 @@ impl WordprocessingDocument {
         );
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(settings_uri, content_type::WORD_SETTINGS, xml);
         Ok(())
     }
@@ -9134,7 +9074,6 @@ impl WordprocessingDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &main_uri,
@@ -9162,7 +9101,6 @@ impl WordprocessingDocument {
         let root = glossary_document(doc_part_name, body_paragraphs);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::WORD_GLOSSARY, xml);
         if let Some(existing) = self
             .package
@@ -9263,7 +9201,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::WORD_GLOSSARY, xml);
         Ok(())
     }
@@ -9296,8 +9233,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_GLOSSARY, xml);
+            .set_part(uri, content_type::WORD_GLOSSARY, xml);
         }
         Ok(removed)
     }
@@ -10376,8 +10312,7 @@ impl WordprocessingDocument {
             root.append_child(footnote(id, None, body_text));
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_FOOTNOTES, xml);
+            .set_part(uri, content_type::WORD_FOOTNOTES, xml);
             // existing relationship id if any
             let main = self
                 .main_document_part
@@ -10438,8 +10373,7 @@ impl WordprocessingDocument {
             root.append_child(endnote(id, None, body_text));
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_ENDNOTES, xml);
+            .set_part(uri, content_type::WORD_ENDNOTES, xml);
             let main = self
                 .main_document_part
                 .as_ref()
@@ -10709,7 +10643,6 @@ impl WordprocessingDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &main_uri,
@@ -10769,7 +10702,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -10865,7 +10798,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(drawing_uri);
+        self.package.delete_part(drawing_uri);
         Ok(true)
     }
 
@@ -10896,7 +10829,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -10958,7 +10891,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(chart_uri);
+        self.package.delete_part(chart_uri);
         Ok(true)
     }
 
@@ -10999,7 +10932,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -11455,7 +11388,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::DOCUMENT_TASKS, xml);
         if let Some(existing) = self
             .package
@@ -11532,7 +11464,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::WORD_PEOPLE, xml);
         if let Some(existing) = self
             .package
@@ -11600,7 +11531,6 @@ impl WordprocessingDocument {
         let main_uri = main.part().uri.clone();
         let uri = PackUri::new("/word/vbaProject.bin");
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::VBA_PROJECT, data.into());
         if let Some(existing) = self
             .package
@@ -11781,13 +11711,10 @@ impl WordprocessingDocument {
             .get_by_type(rel::DIGITAL_SIGNATURE_ORIGIN)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -13286,7 +13213,6 @@ impl WordprocessingDocument {
             format!("/{uri}")
         });
         self.package
-            .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &main_uri,
@@ -13374,7 +13300,6 @@ impl WordprocessingDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &main,
@@ -16335,7 +16260,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -16566,7 +16491,7 @@ impl WordprocessingDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -16661,7 +16586,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -16694,7 +16619,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -16755,7 +16680,6 @@ impl WordprocessingDocument {
             .unwrap_or(content_type::THEME)
             .to_string();
         self.package
-            .opc_mut()
             .set_part(uri, &ct, crate::element::write_element(&root)?);
         Ok(true)
     }
@@ -16798,7 +16722,6 @@ impl WordprocessingDocument {
             .unwrap_or(content_type::THEME)
             .to_string();
         self.package
-            .opc_mut()
             .set_part(uri, ct, crate::element::write_element(&root)?);
         Ok(true)
     }
@@ -16831,7 +16754,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -16961,7 +16884,6 @@ impl WordprocessingDocument {
         root.append_child(font);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::WORD_FONT_TABLE, xml);
         Ok(())
     }
@@ -17019,8 +16941,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_FONT_TABLE, xml);
+            .set_part(uri, content_type::WORD_FONT_TABLE, xml);
         }
         Ok(removed)
     }
@@ -17047,7 +16968,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -17166,7 +17087,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -17217,7 +17138,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in images {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -17299,7 +17220,6 @@ impl WordprocessingDocument {
         let root = header(vec![paragraph(vec![run(vec![text(content)])])]);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::WORD_HEADER, xml);
         Ok(true)
     }
@@ -17313,7 +17233,6 @@ impl WordprocessingDocument {
         let root = footer(vec![paragraph(vec![run(vec![text(content)])])]);
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::WORD_FOOTER, xml);
         Ok(true)
     }
@@ -17375,12 +17294,8 @@ impl WordprocessingDocument {
         } else {
             PackUri::new(format!("/word/{}", target.trim_start_matches("./")))
         };
-        let _ = self
-            .package
-            .opc_mut()
-            .part_relationships_mut(&main_uri)
-            .remove(&rid);
-        self.package.opc_mut().remove_part(&uri);
+        let _ = self.package.delete_reference_relationship(Some(&main_uri), &rid);
+        self.package.delete_part(&uri);
         // Drop matching sectPr headerReference/footerReference entries for this rId.
         if relationship_type == rel::HEADER || relationship_type == rel::FOOTER {
             let _ = self.remove_sect_pr_reference_by_id(&rid);
@@ -17525,12 +17440,8 @@ impl WordprocessingDocument {
         } else {
             PackUri::new(format!("/word/{}", target.trim_start_matches("./")))
         };
-        let _ = self
-            .package
-            .opc_mut()
-            .part_relationships_mut(&main_uri)
-            .remove(rid);
-        self.package.opc_mut().remove_part(&uri);
+        let _ = self.package.delete_reference_relationship(Some(&main_uri), rid);
+        self.package.delete_part(&uri);
         let _ = self.remove_sect_pr_reference_by_id(rid)?;
         Ok(true)
     }
@@ -17556,7 +17467,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -17679,8 +17590,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_COMMENTS, xml);
+            .set_part(uri, content_type::WORD_COMMENTS, xml);
         }
         Ok(found)
     }
@@ -17714,8 +17624,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_COMMENTS, xml);
+            .set_part(uri, content_type::WORD_COMMENTS, xml);
         }
         Ok(found)
     }
@@ -17742,8 +17651,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_COMMENTS, xml);
+            .set_part(uri, content_type::WORD_COMMENTS, xml);
         }
         Ok(removed)
     }
@@ -17780,7 +17688,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -17938,8 +17846,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(removed)
     }
@@ -18099,8 +18006,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18135,8 +18041,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18174,8 +18079,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18317,8 +18221,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18352,8 +18255,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18419,8 +18321,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18457,8 +18358,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_STYLES, xml);
+            .set_part(uri, content_type::WORD_STYLES, xml);
         }
         Ok(found)
     }
@@ -18725,8 +18625,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_FOOTNOTES, xml);
+            .set_part(uri, content_type::WORD_FOOTNOTES, xml);
         }
         Ok(found)
     }
@@ -18760,8 +18659,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_ENDNOTES, xml);
+            .set_part(uri, content_type::WORD_ENDNOTES, xml);
         }
         Ok(found)
     }
@@ -18788,8 +18686,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_FOOTNOTES, xml);
+            .set_part(uri, content_type::WORD_FOOTNOTES, xml);
         }
         Ok(removed)
     }
@@ -18816,8 +18713,7 @@ impl WordprocessingDocument {
         if removed {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_ENDNOTES, xml);
+            .set_part(uri, content_type::WORD_ENDNOTES, xml);
         }
         Ok(removed)
     }
@@ -19004,7 +18900,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::WORD_NUMBERING, xml);
         Ok(true)
     }
@@ -19034,7 +18929,6 @@ impl WordprocessingDocument {
         }
         let xml = crate::element::write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::WORD_NUMBERING, xml);
         Ok(true)
     }
@@ -19151,8 +19045,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_NUMBERING, xml);
+            .set_part(uri, content_type::WORD_NUMBERING, xml);
         }
         Ok(found)
     }
@@ -19194,8 +19087,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_NUMBERING, xml);
+            .set_part(uri, content_type::WORD_NUMBERING, xml);
         }
         Ok(found)
     }
@@ -19314,7 +19206,7 @@ impl WordprocessingDocument {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package.opc_mut().package_relationships_mut().remove(&id);
+                let _ = self.package.delete_reference_relationship(None, &id);
             }
         }
         if let Some(main) = self.main_document_part.as_ref() {
@@ -19338,7 +19230,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -19391,10 +19283,10 @@ impl WordprocessingDocument {
             .get_by_type(rel::QAT)
             .map(|r| r.id.clone())
         {
-            self.package.opc_mut().package_relationships_mut().remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -19426,10 +19318,10 @@ impl WordprocessingDocument {
             .get_by_type(rel::LABEL_INFO)
             .map(|r| r.id.clone())
         {
-            self.package.opc_mut().package_relationships_mut().remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -19520,7 +19412,7 @@ impl WordprocessingDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -19582,7 +19474,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -19615,7 +19507,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -19647,11 +19539,11 @@ impl WordprocessingDocument {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package.opc_mut().package_relationships_mut().remove(&id);
+                let _ = self.package.delete_reference_relationship(None, &id);
             }
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -19821,8 +19713,7 @@ impl WordprocessingDocument {
         if found {
             let xml = crate::element::write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::WORD_PEOPLE, xml);
+            .set_part(uri, content_type::WORD_PEOPLE, xml);
         }
         Ok(found)
     }
@@ -19952,7 +19843,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -20001,7 +19892,7 @@ impl WordprocessingDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -20028,7 +19919,7 @@ impl WordprocessingDocument {
             self.package
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -20063,7 +19954,7 @@ impl WordprocessingDocument {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }

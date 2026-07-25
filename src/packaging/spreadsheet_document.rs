@@ -526,7 +526,7 @@ impl SpreadsheetDocument {
         }
         // also drop any leftover table parts
         for uri in self.list_tables() {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -591,8 +591,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(found)
     }
@@ -1397,7 +1396,6 @@ impl SpreadsheetDocument {
         root.set_attribute("id", id.to_string());
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1485,7 +1483,6 @@ impl SpreadsheetDocument {
         root.append_child(info);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1506,7 +1503,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1548,7 +1544,6 @@ impl SpreadsheetDocument {
         root.set_attribute("totalsRowCount", if enabled { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1617,7 +1612,6 @@ impl SpreadsheetDocument {
         );
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1638,7 +1632,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1655,7 +1648,6 @@ impl SpreadsheetDocument {
         root.set_attribute("displayName", new_name);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1675,7 +1667,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1692,7 +1683,6 @@ impl SpreadsheetDocument {
         root.set_attribute("headerRowCount", count.to_string());
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1756,7 +1746,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1795,8 +1784,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
+            .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         }
         Ok(found)
     }
@@ -1861,7 +1849,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -1899,8 +1886,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
+            .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         }
         Ok(found)
     }
@@ -1969,7 +1955,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2011,8 +1996,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
+            .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         }
         Ok(found)
     }
@@ -2057,7 +2041,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2122,7 +2105,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2160,8 +2142,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
+            .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         }
         Ok(found)
     }
@@ -2222,7 +2203,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2281,7 +2261,6 @@ impl SpreadsheetDocument {
 
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2336,7 +2315,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2374,8 +2352,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
+            .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         }
         Ok(found)
     }
@@ -2453,7 +2430,6 @@ impl SpreadsheetDocument {
         root.set_attribute("comment", comment);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2494,7 +2470,6 @@ impl SpreadsheetDocument {
         root.attributes.retain(|a| a.local_name != attr);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2514,7 +2489,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2531,7 +2505,6 @@ impl SpreadsheetDocument {
         root.set_attribute("insertRow", if enabled { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2568,7 +2541,6 @@ impl SpreadsheetDocument {
         root.set_attribute("insertRowShift", if enabled { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2619,7 +2591,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2645,7 +2616,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2682,7 +2652,6 @@ impl SpreadsheetDocument {
         root.set_attribute("totalsRowShown", if shown { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2719,7 +2688,6 @@ impl SpreadsheetDocument {
         root.set_attribute("published", if published { "1" } else { "0" });
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2756,7 +2724,6 @@ impl SpreadsheetDocument {
         root.set_attribute("tableType", table_type);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2795,7 +2762,6 @@ impl SpreadsheetDocument {
         root.set_attribute("connectionId", id.to_string());
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2840,7 +2806,6 @@ impl SpreadsheetDocument {
         root.set_attribute("displayName", display_name);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2903,7 +2868,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2929,7 +2893,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -2980,7 +2943,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_TABLE, xml);
         Ok(true)
     }
@@ -3052,12 +3014,9 @@ impl SpreadsheetDocument {
                     let _ = self.save_sheet_root(&sheet_uri, &root);
                 }
             }
-            self.package
-                .opc_mut()
-                .part_relationships_mut(&sheet_uri)
-                .remove(&rid);
+            let _ = self.package.delete_reference_relationship(Some(&sheet_uri), &rid);
         }
-        self.package.opc_mut().remove_part(&table_uri);
+        self.package.delete_part(&table_uri);
         Ok(true)
     }
 
@@ -3078,7 +3037,7 @@ impl SpreadsheetDocument {
         }
         // Drop any orphan table parts still present
         for uri in self.list_tables() {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -3148,7 +3107,7 @@ impl SpreadsheetDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -3365,7 +3324,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -3468,7 +3427,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -3733,7 +3692,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -3909,7 +3868,7 @@ impl SpreadsheetDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -4047,7 +4006,7 @@ impl SpreadsheetDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -4102,7 +4061,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -4141,7 +4100,7 @@ impl SpreadsheetDocument {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -4221,7 +4180,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -6745,7 +6704,6 @@ impl SpreadsheetDocument {
         root.children.retain(|c| c.local_name != "bookViews");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(n)
     }
@@ -7012,17 +6970,11 @@ impl SpreadsheetDocument {
         use crate::spreadsheet::{sheet_hyperlink, sheet_hyperlinks};
         let sheet_uri = self.sheet_uri(sheet_name)?;
         // External relationship from the worksheet
-        let rid = self
-            .package
-            .opc_mut()
-            .part_relationships_mut(&sheet_uri)
-            .add(
-                rel::HYPERLINK,
-                url,
-                RelationshipTargetMode::External,
-            )
-            .id
-            .clone();
+        let rid = self.package.add_external_relationship(
+            Some(&sheet_uri),
+            rel::HYPERLINK,
+            url,
+        );
         let mut root = self.load_sheet_root(&sheet_uri)?;
         let link = sheet_hyperlink(cell_ref, &rid, display);
         if let Some(hl) = root.child_mut("hyperlinks") {
@@ -7611,7 +7563,6 @@ impl SpreadsheetDocument {
         fonts.set_attribute("count", fonts.children_by_name("font").count().to_string());
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(uri, content_type::SPREADSHEET_STYLES, xml);
         Ok(removed)
     }
@@ -7944,7 +7895,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -7982,7 +7933,7 @@ impl SpreadsheetDocument {
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -8054,7 +8005,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -8063,7 +8014,7 @@ impl SpreadsheetDocument {
         let media = self.list_media();
         let n = media.len();
         for uri in media {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -8151,10 +8102,8 @@ impl SpreadsheetDocument {
                 })
                 .unwrap_or_default();
             if !ids.is_empty() {
-                let rels = self.package.opc_mut().part_relationships_mut(&sheet_uri);
-                for id in &ids {
-                    rels.remove(id);
-                }
+                self.package
+                    .delete_reference_relationships(Some(&sheet_uri), &ids);
                 if let Ok(mut root) = self.load_sheet_root(&sheet_uri) {
                     root.children.retain(|c| c.local_name != "drawing");
                     let _ = self.save_sheet_root(&sheet_uri, &root);
@@ -8162,7 +8111,7 @@ impl SpreadsheetDocument {
             }
         }
         for uri in drawings {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -8197,18 +8146,14 @@ impl SpreadsheetDocument {
             if ids.is_empty() {
                 continue;
             }
-            {
-                let rels = self.package.opc_mut().part_relationships_mut(&sheet_uri);
-                for id in &ids {
-                    rels.remove(id);
-                }
-            }
+            self.package
+                .delete_reference_relationships(Some(&sheet_uri), &ids);
             if let Ok(mut root) = self.load_sheet_root(&sheet_uri) {
                 root.children.retain(|c| c.local_name != "drawing");
                 let _ = self.save_sheet_root(&sheet_uri, &root);
             }
         }
-        self.package.opc_mut().remove_part(drawing_uri);
+        self.package.delete_part(drawing_uri);
         Ok(true)
     }
 
@@ -8289,7 +8234,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(chart_uri);
+        self.package.delete_part(chart_uri);
         Ok(true)
     }
 
@@ -8377,8 +8322,7 @@ impl SpreadsheetDocument {
                 .unwrap_or(content_type::DRAWINGML_CHART)
                 .to_string();
             self.package
-                .opc_mut()
-                .set_part(chart_uri.clone(), &ct, write_element(&root)?);
+            .set_part(chart_uri.clone(), &ct, write_element(&root)?);
         }
         Ok(found)
     }
@@ -8432,8 +8376,7 @@ impl SpreadsheetDocument {
                 .unwrap_or(content_type::DRAWINGML_CHART)
                 .to_string();
             self.package
-                .opc_mut()
-                .set_part(chart_uri.clone(), &ct, xml);
+            .set_part(chart_uri.clone(), &ct, xml);
         }
         Ok(found)
     }
@@ -8484,8 +8427,7 @@ impl SpreadsheetDocument {
                 .unwrap_or(content_type::DRAWINGML_CHART)
                 .to_string();
             self.package
-                .opc_mut()
-                .set_part(chart_uri.clone(), &ct, xml);
+            .set_part(chart_uri.clone(), &ct, xml);
         }
         Ok(changed)
     }
@@ -8612,8 +8554,7 @@ impl SpreadsheetDocument {
                 .unwrap_or(content_type::DRAWINGML_CHART)
                 .to_string();
             self.package
-                .opc_mut()
-                .set_part(chart_uri.clone(), &ct, xml);
+            .set_part(chart_uri.clone(), &ct, xml);
         }
         Ok(found)
     }
@@ -8652,8 +8593,7 @@ impl SpreadsheetDocument {
                 .unwrap_or(content_type::DRAWINGML_CHART)
                 .to_string();
             self.package
-                .opc_mut()
-                .set_part(chart_uri.clone(), &ct, xml);
+            .set_part(chart_uri.clone(), &ct, xml);
         }
         Ok(n)
     }
@@ -8817,7 +8757,7 @@ impl SpreadsheetDocument {
                 self.package
                     .delete_reference_relationships(Some(&wb_uri), &ids);
             }
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         self.sst = None;
         Ok(true)
@@ -8850,7 +8790,7 @@ impl SpreadsheetDocument {
                 self.package
                     .delete_reference_relationships(Some(&wb_uri), &ids);
             }
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         self.sst = None;
         Ok(true)
@@ -8884,7 +8824,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
-        self.package.opc_mut().remove_part(&chain_uri);
+        self.package.delete_part(&chain_uri);
         Ok(true)
     }
 
@@ -10739,7 +10679,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -10793,7 +10732,6 @@ impl SpreadsheetDocument {
             .retain(|c| c.local_name != "customWorkbookViews");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(n)
     }
@@ -10872,8 +10810,7 @@ impl SpreadsheetDocument {
         if found {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(found)
     }
@@ -10901,8 +10838,7 @@ impl SpreadsheetDocument {
             }
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -11591,7 +11527,6 @@ impl SpreadsheetDocument {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &wb_uri,
@@ -11650,7 +11585,7 @@ impl SpreadsheetDocument {
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -12232,7 +12167,7 @@ impl SpreadsheetDocument {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -12308,8 +12243,7 @@ impl SpreadsheetDocument {
                 updated += n;
                 let xml = write_element(&root)?;
                 self.package
-                    .opc_mut()
-                    .set_part(uri, content_type::SLICER, xml);
+            .set_part(uri, content_type::SLICER, xml);
             }
         }
         Ok(updated)
@@ -12355,8 +12289,7 @@ impl SpreadsheetDocument {
                     .unwrap_or("application/vnd.ms-excel.slicer+xml")
                     .to_string();
                 self.package
-                    .opc_mut()
-                    .set_part(uri, ct, write_element(&root)?);
+            .set_part(uri, ct, write_element(&root)?);
             }
         }
         Ok(updated)
@@ -12399,8 +12332,7 @@ impl SpreadsheetDocument {
                 removed += n;
                 let xml = write_element(&root)?;
                 self.package
-                    .opc_mut()
-                    .set_part(uri, content_type::SLICER, xml);
+            .set_part(uri, content_type::SLICER, xml);
             }
         }
         Ok(removed)
@@ -12413,7 +12345,6 @@ impl SpreadsheetDocument {
         let theme = crate::wordprocessing::default_theme("Office Theme");
         let xml = write_element(&theme)?;
         self.package
-            .opc_mut()
             .set_part(theme_uri.clone(), content_type::THEME, xml);
         if let Some(existing) = self
             .package
@@ -12471,10 +12402,10 @@ impl SpreadsheetDocument {
             xml,
         );
         // External relationship from the link part to the target workbook path/url
-        self.package.opc_mut().part_relationships_mut(&link_uri).add(
+        let _ = self.package.add_external_relationship(
+            Some(&link_uri),
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath",
             target_workbook,
-            RelationshipTargetMode::External,
         );
         let rid = self.package.add_part_relationship(
             &wb_uri,
@@ -12559,12 +12490,8 @@ impl SpreadsheetDocument {
                     .collect()
             })
             .unwrap_or_default();
-        {
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in &ids {
-                rels.remove(id);
-            }
-        }
+        self.package
+            .delete_reference_relationships(Some(&wb_uri), &ids);
         if let Some(data) = self.package.opc().get_part(&wb_uri).map(|d| d.to_vec()) {
             if let Ok(mut root) = parse_element(&data) {
                 root.children
@@ -12578,7 +12505,7 @@ impl SpreadsheetDocument {
             }
         }
         for uri in links {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -12606,12 +12533,8 @@ impl SpreadsheetDocument {
                     .collect()
             })
             .unwrap_or_default();
-        {
-            let rels = self.package.opc_mut().part_relationships_mut(&wb_uri);
-            for id in &ids {
-                rels.remove(id);
-            }
-        }
+        self.package
+            .delete_reference_relationships(Some(&wb_uri), &ids);
         // If no external links remain, drop externalReferences element
         let remaining = self
             .package
@@ -12633,7 +12556,7 @@ impl SpreadsheetDocument {
                 }
             }
         }
-        self.package.opc_mut().remove_part(link_uri);
+        self.package.delete_part(link_uri);
         Ok(true)
     }
 
@@ -12749,8 +12672,7 @@ impl SpreadsheetDocument {
             pr.attributes.retain(|a| a.local_name != "codeName");
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
             return Ok(true);
         }
         Ok(false)
@@ -12810,7 +12732,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -12842,7 +12763,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -12928,7 +12848,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -12989,7 +12908,6 @@ impl SpreadsheetDocument {
         root.children.insert(0, fv);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -13030,8 +12948,7 @@ impl SpreadsheetDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -13067,7 +12984,6 @@ impl SpreadsheetDocument {
         root.children.insert(insert_at, fs);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -13109,8 +13025,7 @@ impl SpreadsheetDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -13136,7 +13051,6 @@ impl SpreadsheetDocument {
         root.children.insert(insert_at, el);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -13166,8 +13080,7 @@ impl SpreadsheetDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -13202,7 +13115,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -13247,7 +13159,6 @@ impl SpreadsheetDocument {
         root.children.retain(|c| c.local_name != "functionGroups");
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(n)
     }
@@ -13712,7 +13623,6 @@ impl SpreadsheetDocument {
         cp.set_attribute(attr, value);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -13744,7 +13654,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -13808,8 +13717,7 @@ impl SpreadsheetDocument {
             cp.attributes.retain(|a| a.local_name != "calcMode");
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
             return Ok(true);
         }
         Ok(false)
@@ -14046,8 +13954,7 @@ impl SpreadsheetDocument {
         if removed {
             let xml = write_element(&root)?;
             self.package
-                .opc_mut()
-                .set_part(wb_uri, self.document_type.content_type(), xml);
+            .set_part(wb_uri, self.document_type.content_type(), xml);
         }
         Ok(removed)
     }
@@ -14132,7 +14039,6 @@ impl SpreadsheetDocument {
         view.set_attribute(attr, value);
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14194,7 +14100,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -14243,7 +14148,6 @@ impl SpreadsheetDocument {
         view.set_attribute("windowHeight", height.to_string());
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(())
     }
@@ -14286,7 +14190,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -14321,7 +14224,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -14459,7 +14361,6 @@ impl SpreadsheetDocument {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(wb_uri, self.document_type.content_type(), xml);
         Ok(true)
     }
@@ -19222,12 +19123,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         let info = self.sheets.remove(pos);
         // Drop workbook → sheet relationship
         let wb_uri = self.ensure_workbook()?;
-        let _ = self
-            .package
-            .opc_mut()
-            .part_relationships_mut(&wb_uri)
-            .remove(&info.relationship_id);
-        self.package.opc_mut().remove_part(&info.uri);
+        let _ = self.package.delete_reference_relationship(Some(&wb_uri), &info.relationship_id);
+        self.package.delete_part(&info.uri);
         self.rewrite_workbook()
     }
 
@@ -19477,7 +19374,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(sheet_uri, content_type::SPREADSHEET_WORKSHEET, xml);
         Ok(())
     }
@@ -20562,7 +20458,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(sheet_uri, content_type::SPREADSHEET_WORKSHEET, xml);
         Ok(())
     }
@@ -20983,7 +20878,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             format!("/{uri}")
         });
         self.package
-            .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &wb_uri,
@@ -21169,7 +21063,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .content_types_mut()
             .set_default(extension, content_type);
         self.package
-            .opc_mut()
             .set_part(image_uri.clone(), content_type, image_bytes.to_vec());
 
         // Drawing part
@@ -21324,7 +21217,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -21650,11 +21543,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             return Ok(false);
         }
         for (id, uri) in targets {
-            self.package.opc_mut().remove_part(&uri);
-            self.package
-                .opc_mut()
-                .part_relationships_mut(&sheet_uri)
-                .remove(&id);
+            self.package.delete_part(&uri);
+            let _ = self.package.delete_reference_relationship(Some(&sheet_uri), &id);
         }
         Ok(true)
     }
@@ -21717,7 +21607,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(sheet_uri, content_type::SPREADSHEET_WORKSHEET, xml);
         Ok(())
     }
@@ -22076,7 +21965,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         }
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(sheet_uri, content_type::SPREADSHEET_WORKSHEET, xml);
         Ok(())
     }
@@ -22449,7 +22337,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
 
         let xml = write_element(&root)?;
         self.package
-            .opc_mut()
             .set_part(sheet_uri, content_type::SPREADSHEET_WORKSHEET, xml);
         Ok(())
     }
@@ -23565,7 +23452,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         data: impl Into<Vec<u8>>,
     ) {
         self.package
-            .opc_mut()
             .set_part(PackUri::new(uri), content_type, data);
     }
 
@@ -23659,13 +23545,10 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .get_by_type(rel::THUMBNAIL)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&rel_id);
+            let _ = self.package.delete_reference_relationship(None, &rel_id);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -23773,13 +23656,10 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .get_by_type(rel::DIGITAL_SIGNATURE_ORIGIN)
             .map(|r| r.id.clone())
         {
-            self.package
-                .opc_mut()
-                .package_relationships_mut()
-                .remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -23888,11 +23768,8 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             crate::opc::resolve_uri(&wb_uri, &rel_entry.target)?
         };
-        self.package
-            .opc_mut()
-            .part_relationships_mut(&wb_uri)
-            .remove(relationship_id);
-        self.package.opc_mut().remove_part(&target);
+        let _ = self.package.delete_reference_relationship(Some(&wb_uri), relationship_id);
+        self.package.delete_part(&target);
         Ok(true)
     }
 
@@ -23926,7 +23803,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &wb_uri,
@@ -24029,7 +23905,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             self.package
                 .delete_reference_relationships(Some(&src), &ids);
         }
-        self.package.opc_mut().remove_part(&uri);
+        self.package.delete_part(&uri);
         Ok(true)
     }
 
@@ -24061,7 +23937,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -24071,7 +23947,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         let wb_uri = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT)?;
         let uri = PackUri::new("/xl/vbaProject.bin");
         self.package
-            .opc_mut()
             .set_part(uri.clone(), content_type::VBA_PROJECT, data.into());
         if let Some(existing) = self
             .package
@@ -24162,7 +24037,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -24247,11 +24122,11 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package.opc_mut().package_relationships_mut().remove(&id);
+                let _ = self.package.delete_reference_relationship(None, &id);
             }
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -24332,7 +24207,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -24405,10 +24280,10 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .get_by_type(rel::QAT)
             .map(|r| r.id.clone())
         {
-            self.package.opc_mut().package_relationships_mut().remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -24480,10 +24355,10 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .get_by_type(rel::LABEL_INFO)
             .map(|r| r.id.clone())
         {
-            self.package.opc_mut().package_relationships_mut().remove(&id);
+            let _ = self.package.delete_reference_relationship(None, &id);
         }
         if had_part {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(true)
     }
@@ -24603,7 +24478,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .get_by_type(ty)
                 .map(|r| r.id.clone())
             {
-                self.package.opc_mut().package_relationships_mut().remove(&id);
+                let _ = self.package.delete_reference_relationship(None, &id);
             }
         }
         if let Ok(wb_uri) = self.package.opc().main_part_uri(rel::OFFICE_DOCUMENT) {
@@ -24626,7 +24501,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .delete_reference_relationships(Some(&wb_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -24686,7 +24561,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .delete_reference_relationships(Some(&main_uri), &ids);
         }
         for uri in uris {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -24877,7 +24752,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .content_types_mut()
             .set_default(ext, ct);
         self.package
-            .opc_mut()
             .set_part(uri.clone(), ct, data.into());
         let rid = self.package.add_part_relationship(
             &main_uri,
@@ -24960,7 +24834,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
                 .delete_reference_relationships(Some(&part_uri), &ids);
         }
         for uri in images {
-            self.package.opc_mut().remove_part(&uri);
+            self.package.delete_part(&uri);
         }
         Ok(n)
     }
@@ -25713,7 +25587,6 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             index += 1;
         };
         self.package
-            .opc_mut()
             .set_part(part_uri.clone(), content_type_str, data.into());
         let rid = self.package.add_part_relationship(
             &main,
