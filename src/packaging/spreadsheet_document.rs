@@ -21058,10 +21058,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             }
             index += 1;
         };
-        self.package
-            .opc_mut()
-            .content_types_mut()
-            .set_default(extension, content_type);
+        self.package.set_content_type_default(extension, content_type);
         self.package
             .set_part(image_uri.clone(), content_type, image_bytes.to_vec());
 
@@ -24747,10 +24744,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             index += 1;
         };
         let ct = format.content_type();
-        self.package
-            .opc_mut()
-            .content_types_mut()
-            .set_default(ext, ct);
+        self.package.set_content_type_default(ext, ct);
         self.package
             .set_part(uri.clone(), ct, data.into());
         let rid = self.package.add_part_relationship(

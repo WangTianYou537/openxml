@@ -273,9 +273,7 @@ pub fn delete_typed_part_by_id(
     parent: &PackUri,
     relationship_id: &str,
 ) -> bool {
-    package
-        .opc_mut()
-        .delete_part_by_id(Some(parent), relationship_id)
+    package.delete_part_by_id(Some(parent), relationship_id)
 }
 
 #[cfg(test)]

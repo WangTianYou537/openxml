@@ -2598,10 +2598,7 @@ impl PresentationDocument {
             index += 1;
         };
         let ct = format.content_type();
-        self.package
-            .opc_mut()
-            .content_types_mut()
-            .set_default(ext, ct);
+        self.package.set_content_type_default(ext, ct);
         self.package
             .set_part(uri.clone(), ct, data.into());
         let rid = self.package.add_part_relationship(
@@ -17117,9 +17114,7 @@ impl PresentationDocument {
                     codepoints.insert(c);
                 }
                 self.package
-                    .opc_mut()
-                    .content_types_mut()
-                    .set_default("fntdata", content_type::FONT_DATA);
+                    .set_content_type_default("fntdata", content_type::FONT_DATA);
                 let mut embedded_any = false;
                 let full = matches!(options.font_embed, SvgFontEmbedMode::Full);
                 for uf in &conv.used_fonts {
@@ -17293,17 +17288,13 @@ impl PresentationDocument {
         };
         // Office registers SVG via Default Extension only (no Override for media).
         self.package
-            .opc_mut()
-            .content_types_mut()
-            .set_default("svg", content_type::IMAGE_SVG);
+            .set_content_type_default("svg", content_type::IMAGE_SVG);
         {
             // Insert media part without creating a content-type Override.
-            let opc = self.package.opc_mut();
             // set_part always overrides; strip the override afterward so Default applies.
-            opc.set_part(svg_uri.clone(), content_type::IMAGE_SVG, svg_bytes.to_vec());
-            opc.content_types_mut()
-                .overrides
-                .shift_remove(svg_uri.as_str());
+            self.package
+                .set_part(svg_uri.clone(), content_type::IMAGE_SVG, svg_bytes.to_vec());
+            self.package.clear_content_type_override(&svg_uri);
         }
         let svg_rel = self.package.add_part_relationship(
             &slide_uri,
@@ -17464,8 +17455,7 @@ impl PresentationDocument {
             .get(slide_index)
             .cloned()
             .ok_or_else(|| Error::Package(format!("slide index {slide_index} out of range")))?;
-        crate::opc::add_media_part(
-            self.package.opc_mut(),
+        self.package.add_media_part(
             &slide_info.uri,
             crate::opc::MediaKind::Audio,
             data,
@@ -17487,8 +17477,7 @@ impl PresentationDocument {
             .get(slide_index)
             .cloned()
             .ok_or_else(|| Error::Package(format!("slide index {slide_index} out of range")))?;
-        crate::opc::add_media_part(
-            self.package.opc_mut(),
+        self.package.add_media_part(
             &slide_info.uri,
             crate::opc::MediaKind::Video,
             data,

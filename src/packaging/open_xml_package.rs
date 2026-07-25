@@ -281,6 +281,60 @@ impl OpenXmlPackage {
             .to_string()
     }
 
+    /// Register a content-type default by extension (C# content types map default entry).
+    pub fn set_content_type_default(
+        &mut self,
+        extension: impl Into<String>,
+        content_type: impl Into<String>,
+    ) {
+        self.opc
+            .content_types_mut()
+            .set_default(extension, content_type);
+    }
+
+    /// Remove a content-type override for `part_uri` (leave extension defaults).
+    pub fn clear_content_type_override(&mut self, part_uri: &crate::opc::PackUri) {
+        self.opc
+            .content_types_mut()
+            .overrides
+            .shift_remove(part_uri.as_str());
+    }
+
+    /// Add a media/data part related from `source_part` (C# media attach shell) using
+    /// feature-aware set_part + relationship create.
+    pub fn add_media_part(
+        &mut self,
+        source_part: &crate::opc::PackUri,
+        kind: crate::opc::MediaKind,
+        data: impl Into<Vec<u8>>,
+        content_type: &str,
+        extension: &str,
+    ) -> crate::error::Result<crate::opc::MediaPartInfo> {
+        let mut index = 1u32;
+        let uri = loop {
+            let candidate =
+                crate::opc::PackUri::new(format!("/media/media{index}.{extension}"));
+            if !self.opc.has_part(&candidate) {
+                break candidate;
+            }
+            index += 1;
+        };
+        self.set_content_type_default(extension, content_type);
+        self.set_part(uri.clone(), content_type, data.into());
+        let rid = self.add_part_relationship(
+            source_part,
+            kind.relationship_type(),
+            &uri,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        Ok(crate::opc::MediaPartInfo {
+            uri,
+            relationship_id: rid,
+            content_type: content_type.to_string(),
+            kind,
+        })
+    }
+
     /// All parts reachable from package relationships, BFS order
     /// (C# `OpenXmlPackageExtensions.GetAllParts`).
     pub fn get_all_parts(&self) -> Vec<(crate::opc::PackUri, String)> {
@@ -2709,5 +2763,39 @@ mod part_events_tests {
             .package_relationships()
             .get_by_type(crate::namespace::rel::CORE_PROPERTIES)
             .is_some());
+    }
+
+    #[test]
+    fn add_media_part_tracks_parts_feature() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let slide = crate::opc::PackUri::new("/ppt/slides/slide1.xml");
+        pkg.set_part(
+            slide.clone(),
+            "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+            b"<p/>",
+        );
+        let info = pkg
+            .add_media_part(
+                &slide,
+                crate::opc::MediaKind::Audio,
+                b"ID3fake",
+                "audio/mpeg",
+                "mp3",
+            )
+            .expect("media");
+        assert!(info.uri.as_str().ends_with(".mp3"));
+        assert!(pkg.parts_feature().contains(info.uri.as_str()));
+        assert!(pkg
+            .part_relationships_feature()
+            .contains_id(&info.relationship_id));
+        assert_eq!(
+            pkg.opc()
+                .content_types()
+                .defaults
+                .get("mp3")
+                .map(|s| s.as_str()),
+            Some("audio/mpeg")
+        );
     }
 }

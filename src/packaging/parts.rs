@@ -218,9 +218,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let xml = write_element(&styles)?;
         let uri = PackUri::new(StyleDefinitionsPart::URI);
-        package
-            .opc_mut()
-            .set_part(uri.clone(), StyleDefinitionsPart::CONTENT_TYPE, xml);
+        package.set_part(uri.clone(), StyleDefinitionsPart::CONTENT_TYPE, xml);
         // Avoid duplicate relationships of the same type when re-adding.
         if let Some(existing) = package
             .opc()
@@ -252,9 +250,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let xml = write_element(&settings)?;
         let uri = PackUri::new(DocumentSettingsPart::URI);
-        package
-            .opc_mut()
-            .set_part(uri.clone(), DocumentSettingsPart::CONTENT_TYPE, xml);
+        package.set_part(uri.clone(), DocumentSettingsPart::CONTENT_TYPE, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -295,15 +291,10 @@ impl MainDocumentPart {
         };
 
         let content_type = format.content_type().to_string();
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type.clone(), data.into());
+        package.set_part(uri.clone(), content_type.clone(), data.into());
 
         // Content types for images are usually defaults by extension
-        package
-            .opc_mut()
-            .content_types_mut()
-            .set_default(format.extension(), content_type.clone());
+        package.set_content_type_default(format.extension(), content_type.clone());
 
         let relationship_id =
             self.add_part_relationship(package, rel::IMAGE, &uri);
@@ -330,9 +321,7 @@ impl MainDocumentPart {
             index += 1;
         };
         let xml = write_element(&content)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_HEADER, xml);
+        package.set_part(uri.clone(), content_type::WORD_HEADER, xml);
         let rid = self.add_part_relationship(package, rel::HEADER, &uri);
         Ok((rid, uri))
     }
@@ -352,9 +341,7 @@ impl MainDocumentPart {
             index += 1;
         };
         let xml = write_element(&content)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_FOOTER, xml);
+        package.set_part(uri.clone(), content_type::WORD_FOOTER, xml);
         let rid = self.add_part_relationship(package, rel::FOOTER, &uri);
         Ok((rid, uri))
     }
@@ -376,9 +363,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/comments.xml");
         let xml = write_element(&comments_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_COMMENTS, xml);
+        package.set_part(uri.clone(), content_type::WORD_COMMENTS, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -397,9 +382,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/numbering.xml");
         let xml = write_element(&numbering_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_NUMBERING, xml);
+        package.set_part(uri.clone(), content_type::WORD_NUMBERING, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -418,9 +401,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/theme/theme1.xml");
         let xml = write_element(&theme_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::THEME, xml);
+        package.set_part(uri.clone(), content_type::THEME, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -439,9 +420,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/footnotes.xml");
         let xml = write_element(&footnotes_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_FOOTNOTES, xml);
+        package.set_part(uri.clone(), content_type::WORD_FOOTNOTES, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -460,9 +439,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/endnotes.xml");
         let xml = write_element(&endnotes_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_ENDNOTES, xml);
+        package.set_part(uri.clone(), content_type::WORD_ENDNOTES, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -481,9 +458,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/fontTable.xml");
         let xml = write_element(&fonts_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_FONT_TABLE, xml);
+        package.set_part(uri.clone(), content_type::WORD_FONT_TABLE, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -502,9 +477,7 @@ impl MainDocumentPart {
     ) -> Result<String> {
         let uri = PackUri::new("/word/webSettings.xml");
         let xml = write_element(&web_settings_root)?;
-        package
-            .opc_mut()
-            .set_part(uri.clone(), content_type::WORD_WEB_SETTINGS, xml);
+        package.set_part(uri.clone(), content_type::WORD_WEB_SETTINGS, xml);
         if let Some(existing) = package
             .opc()
             .part_relationships(self.uri())
@@ -531,14 +504,9 @@ impl MainDocumentPart {
             }
             index += 1;
         };
-        package
-            .opc_mut()
-            .set_part(uri.clone(), format.content_type(), data.into());
+        package.set_part(uri.clone(), format.content_type(), data.into());
         // Prefer default by extension for non-xml types
-        package
-            .opc_mut()
-            .content_types_mut()
-            .set_default(format.extension(), format.content_type());
+        package.set_content_type_default(format.extension(), format.content_type());
         let rid = self.add_part_relationship(package, rel::AF_CHUNK, &uri);
         Ok((rid, uri))
     }
