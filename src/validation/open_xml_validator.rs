@@ -28,6 +28,9 @@ impl ValidationSettings {
     pub const DEFAULT_MAX_ERRORS: usize = 1000;
 
     pub fn new(file_format: FileFormatVersions) -> Self {
+        // C# ValidationSettings ctor throws if format unsupported; we ignore empty quietly
+        // but callers can use ensure_supported explicitly.
+        let _ = file_format.ensure_supported();
         Self {
             file_format,
             max_number_of_errors: Self::DEFAULT_MAX_ERRORS,

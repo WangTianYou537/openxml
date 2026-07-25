@@ -833,9 +833,14 @@ impl OpenXmlElement {
         self.children.len()
     }
 
-    /// Whether this element has any children.
+    /// Whether this element has any children (C# `HasChildren`).
     pub fn has_children(&self) -> bool {
         !self.children.is_empty()
+    }
+
+    /// Direct children slice (C# `ChildElements` collection shell).
+    pub fn child_elements(&self) -> &[OpenXmlElement] {
+        &self.children
     }
 
     /// Index of the first direct child with `local_name`, if any.

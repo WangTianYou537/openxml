@@ -181,6 +181,34 @@ impl FileFormatVersions {
         self != Self::NONE && self.intersects(Self::ALL)
     }
 
+    /// C# `FileFormatVersions.Any()` — at least one version flag is set.
+    pub fn any(self) -> bool {
+        self.0 != 0 && self.intersects(Self::ALL)
+    }
+
+    /// Validate that this is a supported non-empty format (C# `ThrowExceptionIfFileFormatNotSupported`).
+    pub fn ensure_supported(self) -> Result<(), String> {
+        if self.any() {
+            Ok(())
+        } else {
+            Err(format!("FileFormatNotSupported: {self}"))
+        }
+    }
+
+    /// Office year label for a single-flag version (`"2007"`, `"2010"`, …).
+    pub fn office_year(self) -> Option<&'static str> {
+        match self.0 {
+            x if x == Self::OFFICE2007.0 => Some("2007"),
+            x if x == Self::OFFICE2010.0 => Some("2010"),
+            x if x == Self::OFFICE2013.0 => Some("2013"),
+            x if x == Self::OFFICE2016.0 => Some("2016"),
+            x if x == Self::OFFICE2019.0 => Some("2019"),
+            x if x == Self::OFFICE2021.0 => Some("2021"),
+            x if x == Self::MICROSOFT365.0 => Some("Microsoft365"),
+            _ => None,
+        }
+    }
+
     /// Whether content introduced in `intro` is available when targeting `self`.
     pub fn includes_introduction(self, intro: Self) -> bool {
         // Target is a single version or a set; content is available if target
@@ -341,5 +369,18 @@ mod version_ext_tests {
         assert!(early.contains(FileFormatVersions::OFFICE2013));
         assert!(!early.contains(FileFormatVersions::OFFICE2016));
         assert!(FileFormatVersions::OFFICE2010.and_later().contains(FileFormatVersions::OFFICE2021));
+    }
+
+    #[test]
+    fn any_and_ensure_supported() {
+        assert!(!FileFormatVersions::NONE.any());
+        assert!(FileFormatVersions::OFFICE2007.any());
+        assert!(FileFormatVersions::OFFICE2007.ensure_supported().is_ok());
+        assert!(FileFormatVersions::NONE.ensure_supported().is_err());
+        assert_eq!(
+            FileFormatVersions::OFFICE2016.office_year(),
+            Some("2016")
+        );
+        assert_eq!(FileFormatVersions::NONE.office_year(), None);
     }
 }
