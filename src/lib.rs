@@ -83,6 +83,6 @@ pub use packaging::{
     DocumentSettingsPart, ExtendedPart, ImageFormat, ImagePart, MainDocumentPart,
     MarkupCompatibilityProcessMode, MarkupCompatibilityProcessSettings, OpenSettings,
     OpenXmlPackage, PresentationDocument, PresentationDocumentType, SlideInfo, SlideLayoutInfo,
-    SlideMasterInfo, SpreadsheetDocument, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart,
+    SlideMasterInfo, SpreadsheetDocument, SpreadsheetDocumentType, StyleDefinitionsPart, TypedPart, PartConstraintFeature, PartConstraintRule, constraints_for,
     WordprocessingDocument, WordprocessingDocumentType, WorksheetInfo,
 };

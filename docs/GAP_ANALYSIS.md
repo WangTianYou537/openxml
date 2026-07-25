@@ -37,12 +37,12 @@
 | Schema particle 校验 | 完整 particle validators | Sequence/Choice/Group/All/Element/Any | 🟡 引擎有，覆盖面/XSD 限制不全 |
 | Semantic 校验 | 21 约束类 + **948** Schematron 规则 | ✅ 可抽取子集 ~942 条：63 rel + 115 unique + 236 range + 184 length + 15 pattern + 37 enum + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count + 17 fixed-val + 7 fixed-ne + 12 multi-ne + 9 both-present + 7 finite + 5 required-attr（`validate_schematron` / `validate_schematron_constraints`）；其余 XPath/跨部件规则未执行 | 🟡 |
 | Package 级校验 | `PackageValidator` / `OpenXmlValidator` | 文档级 `validate` / `validate_full` | 🟡 |
-| Features DI / 事件 | 大量 `I*Feature` | 轻量 `FeatureCollection` + `ParagraphIdGenerator`；无事件总线 | 🟡 |
-| 流式 Reader/Writer | `OpenXmlReader`/`Writer`/`PartReader` | ✅ `OpenXmlStreamReader` + event writer（非完整 SAX 对等） | 🟡 |
+| Features DI / 事件 | 大量 `I*Feature` | ✅ FeatureCollection + PackageEvents + ElementContext + PartConstraintFeature | 🟡 |
+| 流式 Reader/Writer | `OpenXmlReader`/`Writer`/`PartReader` | ✅ StreamReader + PartReader + DomReader + PartWriter | 🟡 |
 | 加密 Office 文件 | `IsEncryptedOfficeFile` 检测 | ✅ 检测 + `Error::EncryptedPackage`（不加解密） | 🟡 |
 | 数字签名部件 API | `DigitalSignatureOriginPart` 等 | ✅ origin/sig + Reference digests + RSA-SHA256 sign/verify (simplified C14N) | 🟡 |
 | Linq-to-OpenXml | `DocumentFormat.OpenXml.Linq` | ✅ 轻量 `element::linq`（query/descendants_of） | 🟡 非 XName 全表 |
-| Equality 比较器 | `OpenXmlElementEqualityComparer` | ✅ `elements_equal` / `EqualityOptions` | 🟡 |
+| Equality 比较器 | `OpenXmlElementEqualityComparer` | ✅ EqualityOptions/hash/ElementComparer + package PackageDiff | ✅ |
 | ParagraphId / 注解 Features | Features 包 | `ParagraphIdGenerator` 壳 | 🟡 |
 
 ---

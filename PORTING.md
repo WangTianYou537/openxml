@@ -759,6 +759,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] FileFormatVersions::at_least / and_earlier; package compare_packages / PackageDiff
 - [x] Digsig packaging helpers: ensure origin, add/list/clear signature parts (no full crypto)
 - [x] OpenXmlDomReader DOM cursor (Read/Skip over element trees)
+- [x] PartConstraintFeature / PartConstraintRule (IPartConstraintFeature shell)
 
 **Still intentionally deferred / partial:**
 
