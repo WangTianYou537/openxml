@@ -38,7 +38,7 @@
 | Semantic 校验 | 21 约束类 + **948** Schematron 规则 | ✅ 可抽取子集 ~942 条：63 rel + 115 unique + 236 range + 184 length + 15 pattern + 37 enum + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count + 17 fixed-val + 7 fixed-ne + 12 multi-ne + 9 both-present + 7 finite + 5 required-attr（`validate_schematron` / `validate_schematron_constraints`）；其余 XPath/跨部件规则未执行 | 🟡 |
 | Package 级校验 | `PackageValidator` / `OpenXmlValidator` | ✅ `validate_package` + `validate_package_constraints` + **`OpenXmlValidator`** 门面 | 🟡 |
 | Features DI / 事件 | 大量 `I*Feature` | ✅ FeatureCollection + PackageEvents + **PartEvents** + PartRootEvents + ElementContext + PartConstraintFeature | 🟡 |
-| 流式 Reader/Writer | `OpenXmlReader`/`Writer`/`PartReader` | ✅ StreamReader + PartReader + DomReader + PartWriter | 🟡 |
+| 流式 Reader/Writer | `OpenXmlReader`/`Writer`/`PartReader` | ✅ Stream/Part/Dom Reader + PartWriter (WriteComment/CData/PI/Chars/entities) | 🟡 |
 | 加密 Office 文件 | `IsEncryptedOfficeFile` 检测 | ✅ 检测 + `Error::EncryptedPackage`（不加解密） | 🟡 |
 | 数字签名部件 API | `DigitalSignatureOriginPart` 等 | ✅ origin/sig + Reference digests + RSA-SHA256 sign/verify (simplified C14N) | 🟡 |
 | Linq-to-OpenXml | `DocumentFormat.OpenXml.Linq` | ✅ 轻量 `element::linq`（query/descendants_of） | 🟡 非 XName 全表 |
@@ -186,7 +186,7 @@ C# `SimpleTypes/` 多数已有对等（含 Base64/DateTime/List/TrueFalse* 等�
 | Attribute / XSD 类型限制 | `SchemaTypeValidator`, Restrictions | ✅ 常用 simple-type 属性校验 | 🟡 |
 | Semantic constraints | 21 约束类 + `data/schematrons.json`（**948** 条） | ✅ 可抽取子集 ~771（63 rel + 115 unique + 236 range + 184 length + 15 pattern + 37 enum + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count + 17 fixed-val + 7 fixed-ne + 12 multi-ne + 9 both-present + 7 finite + 5 required-attr + 25 ancestor-unique + 10 conditional + 3 guid + 6 attr-cmp + 8 fixed-bool + 23 cross-index + 53 cross-count） | 🟡 |
 | Package structure | `PackageValidator` | ✅ `validate_package`（main + rel 目标）+ `validate_package_constraints`（约束图） | 🟡 |
-| OpenXmlValidator 门面 | 统一入口 + settings + 错误事件 | ✅ `OpenXmlValidator` + **`on_validation_error`** + max errors | 🟡 |
+| OpenXmlValidator 门面 | 统一入口 + settings + 错误事件 | ✅ `OpenXmlValidator` + **`ValidationSettings`** + **`on_validation_error`** + max errors | 🟡 |
 | MC 校验 | `AlternateContentValidator`, compatibility attrs | ✅ `validate_alternate_content` + **`validate_mc_attributes`**（Ignorable/Preserve*/ProcessContent/MustUnderstand） | 🟡 |
 
 ---

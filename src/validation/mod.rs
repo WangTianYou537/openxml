@@ -35,7 +35,7 @@ pub use package_validator::{
     message_id as package_constraint_message_id, validate_package_constraints,
     validate_part_constraints,
 };
-pub use open_xml_validator::OpenXmlValidator;
+pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
 pub use particle::{validate_particle, validate_word_particles, Occurs, Particle};
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,

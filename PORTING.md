@@ -779,6 +779,11 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlDomReader::{read_first_child,read_next_sibling,load_current_element}`
 - [x] `OpenXmlPartReader::{read_first_child,read_next_sibling,has_attributes}`
 - [x] `OpenXmlPartWriter` WriteStartElement overloads + WriteStartDocument(standalone) + from Part/Dom reader
+- [x] `ValidationSettings` + `OpenXmlValidator::{settings,with_settings,set_file_format}`
+- [x] `OpenXmlElement::{remove_attribute_ns,get/set_open_xml_attribute,mc_attributes}`
+- [x] `OpenXmlPartWriter::{write_comment,write_cdata,write_processing_instruction,write_chars,write_char_entity,write_entity_ref}`
+- [x] `OpenXmlNamespace` URI value type + crate re-export
+- [x] `TypedPart::is_in_version` shell
 
 **Still intentionally deferred / partial:**
 

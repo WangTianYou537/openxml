@@ -15,11 +15,40 @@ use crate::packaging::{
     PresentationDocument, SpreadsheetDocument, WordprocessingDocument,
 };
 
+/// Settings for validation (C# `ValidationSettings`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValidationSettings {
+    /// Target file format for version-aware rules.
+    pub file_format: FileFormatVersions,
+    /// Maximum errors to return. `0` means no limit (C# default is 1000).
+    pub max_number_of_errors: usize,
+}
+
+impl ValidationSettings {
+    pub const DEFAULT_MAX_ERRORS: usize = 1000;
+
+    pub fn new(file_format: FileFormatVersions) -> Self {
+        Self {
+            file_format,
+            max_number_of_errors: Self::DEFAULT_MAX_ERRORS,
+        }
+    }
+
+    pub fn with_max_number_of_errors(mut self, value: usize) -> Self {
+        self.max_number_of_errors = value;
+        self
+    }
+}
+
+impl Default for ValidationSettings {
+    fn default() -> Self {
+        Self::new(FileFormatVersions::OFFICE2007)
+    }
+}
+
 /// Settings / facade for package and element validation (C# `OpenXmlValidator`).
 pub struct OpenXmlValidator {
-    file_format: FileFormatVersions,
-    /// Maximum errors to return. `0` means no limit (C# default is 1000; `0` = unlimited).
-    max_number_of_errors: usize,
+    settings: ValidationSettings,
     /// Optional per-error callback (C# `ValidationErrorEventArgs` subscriber).
     error_callback: Option<Box<dyn FnMut(&ValidationError) + Send>>,
 }
@@ -27,8 +56,8 @@ pub struct OpenXmlValidator {
 impl std::fmt::Debug for OpenXmlValidator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OpenXmlValidator")
-            .field("file_format", &self.file_format)
-            .field("max_number_of_errors", &self.max_number_of_errors)
+            .field("file_format", &self.settings.file_format)
+            .field("max_number_of_errors", &self.settings.max_number_of_errors)
             .field("has_error_callback", &self.error_callback.is_some())
             .finish()
     }
@@ -44,35 +73,52 @@ impl OpenXmlValidator {
     /// Defaults to [`FileFormatVersions::OFFICE2007`] and max 1000 errors.
     pub fn new() -> Self {
         Self {
-            file_format: FileFormatVersions::OFFICE2007,
-            max_number_of_errors: 1000,
+            settings: ValidationSettings::default(),
             error_callback: None,
         }
     }
 
     pub fn with_file_format(file_format: FileFormatVersions) -> Self {
         Self {
-            file_format,
-            max_number_of_errors: 1000,
+            settings: ValidationSettings::new(file_format),
             error_callback: None,
         }
     }
 
+    pub fn with_settings(settings: ValidationSettings) -> Self {
+        Self {
+            settings,
+            error_callback: None,
+        }
+    }
+
+    pub fn settings(&self) -> ValidationSettings {
+        self.settings
+    }
+
+    pub fn set_settings(&mut self, settings: ValidationSettings) {
+        self.settings = settings;
+    }
+
     pub fn file_format(&self) -> FileFormatVersions {
-        self.file_format
+        self.settings.file_format
+    }
+
+    pub fn set_file_format(&mut self, file_format: FileFormatVersions) {
+        self.settings.file_format = file_format;
     }
 
     pub fn max_number_of_errors(&self) -> usize {
-        self.max_number_of_errors
+        self.settings.max_number_of_errors
     }
 
     /// Set max errors (`0` = unlimited).
     pub fn set_max_number_of_errors(&mut self, value: usize) {
-        self.max_number_of_errors = value;
+        self.settings.max_number_of_errors = value;
     }
 
     pub fn with_max_number_of_errors(mut self, value: usize) -> Self {
-        self.max_number_of_errors = value;
+        self.settings.max_number_of_errors = value;
         self
     }
 
@@ -92,8 +138,9 @@ impl OpenXmlValidator {
     }
 
     fn cap(&mut self, mut errors: Vec<ValidationError>) -> Vec<ValidationError> {
-        if self.max_number_of_errors > 0 && errors.len() > self.max_number_of_errors {
-            errors.truncate(self.max_number_of_errors);
+        let max = self.settings.max_number_of_errors;
+        if max > 0 && errors.len() > max {
+            errors.truncate(max);
         }
         if let Some(cb) = self.error_callback.as_mut() {
             for e in &errors {
@@ -107,7 +154,7 @@ impl OpenXmlValidator {
     /// Validate OPC structure + part constraints (no full DOM schema pass).
     pub fn validate_package(&mut self, package: &OpcPackage) -> Vec<ValidationError> {
         let errors = validate_package(package, true);
-        let _ = self.file_format;
+        let _ = self.settings.file_format;
         self.cap(errors)
     }
 
@@ -147,7 +194,7 @@ impl OpenXmlValidator {
         };
         errors.extend(validate_alternate_content(element));
         errors.extend(validate_mc_attributes(element));
-        let _ = self.file_format;
+        let _ = self.settings.file_format;
         Ok(self.cap(errors))
     }
 
@@ -265,5 +312,16 @@ mod tests {
         };
         assert_eq!(e.id(), Some("PartIsNotAllowed"));
         assert_eq!(e.error_type(), crate::validation::ValidationErrorType::Package);
+    }
+
+    #[test]
+    fn validation_settings_roundtrip() {
+        let s = ValidationSettings::new(FileFormatVersions::OFFICE2016)
+            .with_max_number_of_errors(42);
+        let mut v = OpenXmlValidator::with_settings(s);
+        assert_eq!(v.file_format(), FileFormatVersions::OFFICE2016);
+        assert_eq!(v.max_number_of_errors(), 42);
+        v.set_file_format(FileFormatVersions::OFFICE2010);
+        assert_eq!(v.settings().file_format, FileFormatVersions::OFFICE2010);
     }
 }

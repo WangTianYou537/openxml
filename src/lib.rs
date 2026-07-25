@@ -71,6 +71,7 @@ pub use features::{
     ParagraphIdGenerator, PartEvents, PartRootEvents,
 };
 pub use file_format::FileFormatVersions;
+pub use namespace::{Namespace, OpenXmlNamespace};
 pub use opc::{
     add_media_part, AudioReferenceRelationship, CompressionOption, CopyPartOptions, PackageDiff, PackageEqualityOptions, compare_packages, packages_equal, CustomProperties,
     DataPart, DataPartReferenceRelationship, IdPartPair,

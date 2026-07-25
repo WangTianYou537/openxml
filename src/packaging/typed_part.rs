@@ -52,6 +52,15 @@ impl TypedPart {
         self.info.root_element
     }
 
+    /// Whether this part is available in `version` (C# `OpenXmlPart.IsInVersion`).
+    ///
+    /// Generated metadata does not currently carry introduction versions, so the
+    /// default is `true` for all known parts (matching C# base `OpenXmlPart`).
+    /// Extended/unknown custom parts should override via application logic.
+    pub fn is_in_version(&self, _version: crate::file_format::FileFormatVersions) -> bool {
+        true
+    }
+
     /// Load and parse the part root element from the package.
     pub fn root(&self, package: &OpenXmlPackage) -> Result<OpenXmlElement> {
         let data = package
@@ -325,5 +334,15 @@ mod tests {
             b"<x:worksheet/>",
         );
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn is_in_version_default_true() {
+        use crate::file_format::FileFormatVersions;
+        use crate::generated::parts::part_by_name;
+        let info = part_by_name("MainDocumentPart").expect("MainDocumentPart");
+        let part = TypedPart::new(info, PackUri::new("/word/document.xml"));
+        assert!(part.is_in_version(FileFormatVersions::OFFICE2007));
+        assert!(part.is_in_version(FileFormatVersions::OFFICE2016));
     }
 }

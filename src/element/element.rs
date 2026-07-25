@@ -538,12 +538,93 @@ impl OpenXmlElement {
         self.attributes.iter()
     }
 
-        pub fn remove_attribute(&mut self, local_name: &str) -> Option<OpenXmlAttribute> {
+    /// Remove an attribute by local name (any prefix).
+    pub fn remove_attribute(&mut self, local_name: &str) -> Option<OpenXmlAttribute> {
         if let Some(i) = self.attributes.iter().position(|a| a.local_name == local_name) {
             Some(self.attributes.remove(i))
         } else {
             None
         }
+    }
+
+    /// Remove an attribute by local name + namespace URI (C# `RemoveAttribute(local, ns)`).
+    pub fn remove_attribute_ns(
+        &mut self,
+        local_name: &str,
+        namespace_uri: &str,
+    ) -> Option<OpenXmlAttribute> {
+        if let Some(i) = self.attributes.iter().position(|a| {
+            a.local_name == local_name
+                && a.namespace_uri.as_deref().unwrap_or("") == namespace_uri
+        }) {
+            Some(self.attributes.remove(i))
+        } else if namespace_uri.is_empty() {
+            self.remove_attribute(local_name)
+        } else {
+            None
+        }
+    }
+
+    /// Set an attribute from a full [`OpenXmlAttribute`] value (C# `SetAttribute`).
+    pub fn set_open_xml_attribute(&mut self, attr: OpenXmlAttribute) {
+        if attr.local_name.is_empty() {
+            return;
+        }
+        let local = attr.local_name.clone();
+        let ns = attr.namespace_uri.clone().unwrap_or_default();
+        // Prefer ns+local match; fall back to local-only when ns empty.
+        if let Some(i) = self.attributes.iter().position(|a| {
+            a.local_name == local && a.namespace_uri.as_deref().unwrap_or("") == ns.as_str()
+        }) {
+            self.attributes[i] = attr;
+        } else if ns.is_empty() {
+            if let Some(i) = self.attributes.iter().position(|a| a.local_name == local) {
+                self.attributes[i] = attr;
+            } else {
+                self.attributes.push(attr);
+            }
+        } else {
+            self.attributes.push(attr);
+        }
+    }
+
+    /// Get a full [`OpenXmlAttribute`] by local name + namespace URI
+    /// (C# `GetAttribute(local, ns)` returning the attribute object).
+    pub fn get_open_xml_attribute(
+        &self,
+        local_name: &str,
+        namespace_uri: &str,
+    ) -> Option<OpenXmlAttribute> {
+        self.attributes
+            .iter()
+            .find(|a| {
+                a.local_name == local_name
+                    && a.namespace_uri.as_deref().unwrap_or("") == namespace_uri
+            })
+            .cloned()
+            .or_else(|| {
+                if namespace_uri.is_empty() {
+                    self.attributes
+                        .iter()
+                        .find(|a| a.local_name == local_name)
+                        .cloned()
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Markup Compatibility attribute bag for this element (C# `MCAttributes` shell).
+    pub fn mc_attributes(&self) -> crate::markup_compatibility::MarkupCompatibilityAttributes {
+        crate::markup_compatibility::MarkupCompatibilityAttributes::from_element(self)
+    }
+
+    /// Apply a Markup Compatibility attribute bag (C# set `MCAttributes`).
+    pub fn set_mc_attributes(
+        &mut self,
+        attrs: &crate::markup_compatibility::MarkupCompatibilityAttributes,
+    ) {
+        attrs.apply_to(self);
     }
 
     /// Builder-style attribute set by local name.
@@ -1391,6 +1472,66 @@ mod element_api_parity_tests {
             dst.lookup_namespace("w"),
             Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
         );
+    }
+
+    #[test]
+    fn attribute_ns_and_open_xml_attribute() {
+        let mut el = OpenXmlElement::w("p");
+        el.set_attribute_ns(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "rsidR",
+            "00AB",
+        );
+        el.set_attribute("plain", "1");
+        let full = el
+            .get_open_xml_attribute(
+                "rsidR",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            )
+            .expect("rsidR");
+        assert_eq!(full.value, "00AB");
+        assert_eq!(full.prefix.as_deref(), Some("w"));
+
+        el.set_open_xml_attribute(OpenXmlAttribute::with_ns(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "rsidR",
+            "FF",
+        ));
+        assert_eq!(
+            el.get_attribute_ns(
+                "rsidR",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            ),
+            Some("FF")
+        );
+        assert!(el
+            .remove_attribute_ns(
+                "rsidR",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            )
+            .is_some());
+        assert!(el
+            .get_attribute_ns(
+                "rsidR",
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            )
+            .is_none());
+        assert_eq!(el.get_attribute("plain"), Some("1"));
+    }
+
+    #[test]
+    fn mc_attributes_accessor() {
+        use crate::markup_compatibility::MarkupCompatibilityAttributes;
+        let mut el = OpenXmlElement::w("p");
+        let bag = MarkupCompatibilityAttributes {
+            ignorable: Some("w14".into()),
+            ..Default::default()
+        };
+        el.set_mc_attributes(&bag);
+        let got = el.mc_attributes();
+        assert_eq!(got.ignorable.as_deref(), Some("w14"));
     }
 
     #[test]

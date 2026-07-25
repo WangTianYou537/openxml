@@ -15,6 +15,88 @@ impl Namespace {
     }
 }
 
+/// Lightweight namespace URI value (C# `OpenXmlNamespace` struct shell).
+///
+/// Distinct from [`Namespace`], which pairs a conventional prefix with a static URI.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub struct OpenXmlNamespace {
+    uri: String,
+}
+
+impl OpenXmlNamespace {
+    pub fn new(uri: impl Into<String>) -> Self {
+        Self { uri: uri.into() }
+    }
+
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.uri.is_empty()
+    }
+
+    pub fn from_static(ns: Namespace) -> Self {
+        Self {
+            uri: ns.uri.to_string(),
+        }
+    }
+}
+
+impl From<&str> for OpenXmlNamespace {
+    fn from(uri: &str) -> Self {
+        Self::new(uri)
+    }
+}
+
+impl From<String> for OpenXmlNamespace {
+    fn from(uri: String) -> Self {
+        Self::new(uri)
+    }
+}
+
+impl From<Namespace> for OpenXmlNamespace {
+    fn from(ns: Namespace) -> Self {
+        Self::from_static(ns)
+    }
+}
+
+impl std::fmt::Display for OpenXmlNamespace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.uri)
+    }
+}
+
+impl PartialOrd for OpenXmlNamespace {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OpenXmlNamespace {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.uri.cmp(&other.uri)
+    }
+}
+
+#[cfg(test)]
+mod open_xml_namespace_tests {
+    use super::*;
+
+    #[test]
+    fn open_xml_namespace_basics() {
+        let ns = OpenXmlNamespace::new("http://example.com/ns");
+        assert_eq!(ns.uri(), "http://example.com/ns");
+        assert!(!ns.is_empty());
+        assert_eq!(ns.to_string(), "http://example.com/ns");
+        let empty = OpenXmlNamespace::default();
+        assert!(empty.is_empty());
+        let w = OpenXmlNamespace::from_static(ns::WORDPROCESSINGML);
+        assert_eq!(w.uri(), ns::WORDPROCESSINGML.uri);
+        assert!(OpenXmlNamespace::new("a") < OpenXmlNamespace::new("b"));
+    }
+}
+
 /// Common Open XML namespaces.
 pub mod ns {
     use super::Namespace;

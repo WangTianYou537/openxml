@@ -201,6 +201,69 @@ impl<W: Write> OpenXmlPartWriter<W> {
         write_escaped_text(&mut self.writer, text)
     }
 
+    /// Write a character slice (C# `WriteChars`).
+    pub fn write_chars(&mut self, chars: &[char]) -> Result<()> {
+        let s: String = chars.iter().collect();
+        self.write_string(&s)
+    }
+
+    /// Write a CDATA section (C# `WriteCData`).
+    pub fn write_cdata(&mut self, text: &str) -> Result<()> {
+        self.ensure_decl()?;
+        self.writer.write_all(b"<![CDATA[").map_err(Error::Io)?;
+        // Split `]]>` so the section stays well-formed.
+        for (i, chunk) in text.split("]]>").enumerate() {
+            if i > 0 {
+                self.writer
+                    .write_all(b"]]]]><![CDATA[>")
+                    .map_err(Error::Io)?;
+            }
+            self.writer.write_all(chunk.as_bytes()).map_err(Error::Io)?;
+        }
+        self.writer.write_all(b"]]>").map_err(Error::Io)?;
+        Ok(())
+    }
+
+    /// Write an XML comment (C# `WriteComment`).
+    pub fn write_comment(&mut self, text: &str) -> Result<()> {
+        self.ensure_decl()?;
+        self.writer.write_all(b"<!--").map_err(Error::Io)?;
+        self.writer.write_all(text.as_bytes()).map_err(Error::Io)?;
+        self.writer.write_all(b"-->").map_err(Error::Io)?;
+        Ok(())
+    }
+
+    /// Write a processing instruction (C# `WriteProcessingInstruction`).
+    pub fn write_processing_instruction(&mut self, target: &str, data: Option<&str>) -> Result<()> {
+        self.ensure_decl()?;
+        self.writer.write_all(b"<?").map_err(Error::Io)?;
+        self.writer.write_all(target.as_bytes()).map_err(Error::Io)?;
+        if let Some(d) = data {
+            if !d.is_empty() {
+                self.writer.write_all(b" ").map_err(Error::Io)?;
+                self.writer.write_all(d.as_bytes()).map_err(Error::Io)?;
+            }
+        }
+        self.writer.write_all(b"?>").map_err(Error::Io)?;
+        Ok(())
+    }
+
+    /// Write a character entity reference (C# `WriteCharEntity`), e.g. `&#xA0;`.
+    pub fn write_char_entity(&mut self, ch: char) -> Result<()> {
+        self.ensure_decl()?;
+        write!(self.writer, "&#x{:X};", ch as u32).map_err(Error::Io)?;
+        Ok(())
+    }
+
+    /// Write a named entity reference (C# `WriteEntityRef`), e.g. `&nbsp;`.
+    pub fn write_entity_ref(&mut self, name: &str) -> Result<()> {
+        self.ensure_decl()?;
+        self.writer.write_all(b"&").map_err(Error::Io)?;
+        self.writer.write_all(name.as_bytes()).map_err(Error::Io)?;
+        self.writer.write_all(b";").map_err(Error::Io)?;
+        Ok(())
+    }
+
     /// Write raw XML without escaping (C# `WriteRaw`).
     pub fn write_raw(&mut self, xml: &str) -> Result<()> {
         self.ensure_decl()?;
@@ -416,5 +479,29 @@ mod tests {
         let s = String::from_utf8(buf).unwrap();
         assert!(s.contains("p"), "{s}");
         assert!(s.contains("rsidR") || s.contains("w:p"), "{s}");
+    }
+
+    #[test]
+    fn write_misc_nodes() {
+        let mut buf = Vec::new();
+        {
+            let mut w = OpenXmlPartWriter::new(&mut buf).without_declaration();
+            w.write_comment(" hi ").unwrap();
+            w.write_processing_instruction("xml-stylesheet", Some("type=\"text/xsl\"")).unwrap();
+            w.write_start(None, "root", &[]).unwrap();
+            w.write_cdata("a]]>b").unwrap();
+            w.write_chars(&['x', '&', 'y']).unwrap();
+            w.write_char_entity('\u{A0}').unwrap();
+            w.write_entity_ref("amp").unwrap();
+            w.write_end_element().unwrap();
+            w.finish().unwrap();
+        }
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("<!-- hi -->"), "{s}");
+        assert!(s.contains("<?xml-stylesheet"), "{s}");
+        assert!(s.contains("<![CDATA["), "{s}");
+        assert!(s.contains("x&amp;y"), "{s}");
+        assert!(s.contains("&#xA0;"), "{s}");
+        assert!(s.contains("&amp;"), "{s}");
     }
 }
