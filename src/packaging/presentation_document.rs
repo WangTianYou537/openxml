@@ -2759,6 +2759,11 @@ impl PresentationDocument {
         crate::namespace_rewrite::rewrite_package_to_transitional(self.package.opc_mut())
     }
 
+    /// Normalize Transitional OOXML namespaces/relationships to Strict.
+    pub fn rewrite_transitional_to_strict(&mut self) -> Result<(usize, usize)> {
+        crate::namespace_rewrite::rewrite_package_to_strict(self.package.opc_mut())
+    }
+
     /// Access open settings.
     pub fn settings(&self) -> &OpenSettings {
         self.package.settings()

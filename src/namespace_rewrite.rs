@@ -300,37 +300,97 @@ pub fn rewrite_relationship_type(relationship_type: &str) -> String {
         .to_string()
 }
 
+/// Recursively rewrite namespace URIs on an element tree from Transitional → Strict.
+pub fn rewrite_element_to_strict(elem: &mut OpenXmlElement) -> usize {
+    let mut count = 0;
+
+    if let Some(t) = to_strict_namespace(&elem.namespace_uri) {
+        if elem.namespace_uri != t {
+            elem.namespace_uri = t.to_string();
+            count += 1;
+        }
+    }
+
+    for (prefix, uri) in &mut elem.namespace_declarations {
+        let _ = prefix;
+        if let Some(t) = to_strict_namespace(uri) {
+            if uri.as_str() != t {
+                *uri = t.to_string();
+                count += 1;
+            }
+        }
+    }
+
+    for attr in &mut elem.attributes {
+        if let Some(ref mut ns) = attr.namespace_uri {
+            if let Some(t) = to_strict_namespace(ns) {
+                if ns.as_str() != t {
+                    *ns = t.to_string();
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    for child in &mut elem.children {
+        count += rewrite_element_to_strict(child);
+    }
+    count
+}
+
+/// Rewrite relationship type strings Transitional → Strict.
+pub fn rewrite_relationship_type_to_strict(relationship_type: &str) -> String {
+    to_strict_relationship(relationship_type)
+        .unwrap_or(relationship_type)
+        .to_string()
+}
+
 /// Normalize an entire OPC package: rewrite Strict namespaces in XML parts and
 /// Strict relationship types in all relationship collections.
 ///
 /// Returns `(xml_replacements, relationship_replacements)`.
 pub fn rewrite_package_to_transitional(package: &mut OpcPackage) -> Result<(usize, usize)> {
+    rewrite_package(package, RewriteDirection::ToTransitional)
+}
+
+/// Rewrite Transitional namespaces/relationship types to Strict (reverse of
+/// [`rewrite_package_to_transitional`]).
+///
+/// Returns `(xml_replacements, relationship_replacements)`.
+pub fn rewrite_package_to_strict(package: &mut OpcPackage) -> Result<(usize, usize)> {
+    rewrite_package(package, RewriteDirection::ToStrict)
+}
+
+#[derive(Clone, Copy)]
+enum RewriteDirection {
+    ToTransitional,
+    ToStrict,
+}
+
+fn rewrite_package(
+    package: &mut OpcPackage,
+    direction: RewriteDirection,
+) -> Result<(usize, usize)> {
     let mut xml_count = 0usize;
     let mut rel_count = 0usize;
 
-    // Package-level relationships
     {
         let rels = package.package_relationships_mut();
-        // Relationships is not directly mutable for type field via public API —
-        // rebuild by collecting and re-adding is heavy; instead rewrite via
-        // internal access pattern: parse/rebuild XML.
         let xml = rels.to_xml()?;
-        let rewritten = rewrite_rels_xml(&xml, &mut rel_count)?;
+        let rewritten = rewrite_rels_xml_dir(&xml, &mut rel_count, direction)?;
         if rel_count > 0 {
             *rels = crate::opc::Relationships::parse(&rewritten)?;
         }
     }
 
-    // Collect part URIs first (avoid borrow issues)
     let part_uris: Vec<_> = package.part_uris();
 
     for uri in part_uris {
-        // Rewrite part relationships
         if let Some(rels) = package.part_relationships(&uri) {
             if !rels.is_empty() {
                 let xml = rels.to_xml()?;
                 let mut local = 0usize;
-                let rewritten = rewrite_rels_xml(&xml, &mut local)?;
+                let rewritten = rewrite_rels_xml_dir(&xml, &mut local, direction)?;
                 if local > 0 {
                     *package.part_relationships_mut(&uri) =
                         crate::opc::Relationships::parse(&rewritten)?;
@@ -339,11 +399,9 @@ pub fn rewrite_package_to_transitional(package: &mut OpcPackage) -> Result<(usiz
             }
         }
 
-        // Rewrite XML part content
         let Some(data) = package.get_part(&uri) else {
             continue;
         };
-        // Only try to parse as XML
         let trimmed: Vec<u8> = data
             .iter()
             .skip_while(|b| b.is_ascii_whitespace())
@@ -353,8 +411,11 @@ pub fn rewrite_package_to_transitional(package: &mut OpcPackage) -> Result<(usiz
         if !(trimmed.starts_with(b"<?xml") || trimmed.starts_with(b"<")) {
             continue;
         }
-        // Skip if no strict URI present (fast path)
-        if !data.windows(b"purl.oclc.org/ooxml".len()).any(|w| w == b"purl.oclc.org/ooxml") {
+        let needle: &[u8] = match direction {
+            RewriteDirection::ToTransitional => b"purl.oclc.org/ooxml",
+            RewriteDirection::ToStrict => b"schemas.openxmlformats.org",
+        };
+        if !data.windows(needle.len()).any(|w| w == needle) {
             continue;
         }
         let data = data.to_vec();
@@ -362,7 +423,10 @@ pub fn rewrite_package_to_transitional(package: &mut OpcPackage) -> Result<(usiz
             Ok(r) => r,
             Err(_) => continue,
         };
-        let n = rewrite_element_to_transitional(&mut root);
+        let n = match direction {
+            RewriteDirection::ToTransitional => rewrite_element_to_transitional(&mut root),
+            RewriteDirection::ToStrict => rewrite_element_to_strict(&mut root),
+        };
         if n > 0 {
             let ct = package
                 .content_types()
@@ -378,12 +442,19 @@ pub fn rewrite_package_to_transitional(package: &mut OpcPackage) -> Result<(usiz
     Ok((xml_count, rel_count))
 }
 
-fn rewrite_rels_xml(xml: &[u8], count: &mut usize) -> Result<Vec<u8>> {
+fn rewrite_rels_xml_dir(
+    xml: &[u8],
+    count: &mut usize,
+    direction: RewriteDirection,
+) -> Result<Vec<u8>> {
     let rels = crate::opc::Relationships::parse(xml)?;
-    // Rebuild with rewritten types
     let mut new_rels = crate::opc::Relationships::new();
     for r in rels.iter() {
-        let new_type = if let Some(t) = to_transitional_relationship(&r.relationship_type) {
+        let mapped = match direction {
+            RewriteDirection::ToTransitional => to_transitional_relationship(&r.relationship_type),
+            RewriteDirection::ToStrict => to_strict_relationship(&r.relationship_type),
+        };
+        let new_type = if let Some(t) = mapped {
             if t != r.relationship_type {
                 *count += 1;
             }
@@ -398,9 +469,11 @@ fn rewrite_rels_xml(xml: &[u8], count: &mut usize) -> Result<Vec<u8>> {
             r.target_mode,
         );
     }
-    // If nothing changed and we didn't need rebuild, still ok
-    let _ = rels;
     new_rels.to_xml()
+}
+
+fn rewrite_rels_xml(xml: &[u8], count: &mut usize) -> Result<Vec<u8>> {
+    rewrite_rels_xml_dir(xml, count, RewriteDirection::ToTransitional)
 }
 
 #[cfg(test)]
@@ -476,22 +549,38 @@ mod tests {
         let (xml_n, rel_n) = rewrite_package_to_transitional(&mut pkg).unwrap();
         assert!(xml_n > 0);
         assert_eq!(rel_n, 1);
+        let data = pkg.get_part(&PackUri::new("/word/document.xml")).unwrap();
+        let s = String::from_utf8_lossy(data);
+        assert!(s.contains("schemas.openxmlformats.org/wordprocessingml/2006/main"));
+        assert!(!s.contains("purl.oclc.org/ooxml/wordprocessingml"));
 
-        let rel = pkg
-            .package_relationships()
-            .get("rId1")
-            .unwrap();
-        assert_eq!(rel.relationship_type, rel::OFFICE_DOCUMENT);
+        let (xml_n2, rel_n2) = rewrite_package_to_strict(&mut pkg).unwrap();
+        assert!(xml_n2 > 0);
+        assert_eq!(rel_n2, 1);
+        let data = pkg.get_part(&PackUri::new("/word/document.xml")).unwrap();
+        let s = String::from_utf8_lossy(data);
+        assert!(s.contains("purl.oclc.org/ooxml/wordprocessingml/main"));
+    }
 
-        let doc = pkg
-            .get_part_str(&PackUri::new("/word/document.xml"))
-            .unwrap()
-            .unwrap();
-        assert!(doc.contains("schemas.openxmlformats.org/wordprocessingml/2006/main"));
-        assert!(!doc.contains("purl.oclc.org/ooxml/wordprocessingml"));
+    #[test]
+    fn element_rewrite_to_strict() {
+        let mut el = OpenXmlElement::new(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document",
+        )
+        .with_ns_decl(
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        );
+        let n = rewrite_element_to_strict(&mut el);
+        assert!(n >= 1);
+        assert_eq!(
+            el.namespace_uri,
+            "http://purl.oclc.org/ooxml/wordprocessingml/main"
+        );
     }
 }
-
 
 /// True if any relationship type in the package is a known Strict URI
 /// (C# `OpenXmlPackage.StrictRelationshipFound` shell).

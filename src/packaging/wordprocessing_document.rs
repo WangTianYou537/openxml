@@ -10341,6 +10341,16 @@ impl WordprocessingDocument {
         crate::namespace_rewrite::rewrite_package_to_transitional(self.package.opc_mut())
     }
 
+    /// Normalize Transitional OOXML namespaces/relationships to Strict.
+    pub fn rewrite_transitional_to_strict(&mut self) -> Result<(usize, usize)> {
+        self.flush_parts()?;
+        if let Some(main) = &mut self.main_document_part {
+            main.part_mut().root = None;
+            main.part_mut().dirty = false;
+        }
+        crate::namespace_rewrite::rewrite_package_to_strict(self.package.opc_mut())
+    }
+
     /// Access open settings.
     pub fn settings(&self) -> &OpenSettings {
         self.package.settings()

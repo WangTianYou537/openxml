@@ -224,6 +224,11 @@ impl OpenXmlPackage {
         crate::namespace_rewrite::rewrite_package_to_transitional(&mut self.opc)
     }
 
+    /// Normalize Transitional → Strict namespaces and relationship types.
+    pub fn rewrite_transitional_to_strict(&mut self) -> crate::error::Result<(usize, usize)> {
+        crate::namespace_rewrite::rewrite_package_to_strict(&mut self.opc)
+    }
+
     /// Delete multiple parts by URI (C# `DeleteParts`), raising part Removing/Removed events.
     pub fn delete_parts(&mut self, uris: &[crate::opc::PackUri]) -> usize {
         let mut n = 0;

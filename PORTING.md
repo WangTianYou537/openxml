@@ -837,12 +837,15 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Word/Excel/PPT hyperlink + data-part reference adds route through package APIs
 - [x] `OpenXmlPackage::delete_reference_relationship` updates part/ref feature bags; documents route through it
 - [x] Word/Excel/PPT document builders run `PackageInitializerFeature` after middleware
+- [x] Transitional → Strict package/element rewrite (`rewrite_package_to_strict` / `rewrite_transitional_to_strict`)
 
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
 2. VBA **bytecode execution** (CFB inventory only; intentional non-goal)  
 3. 1:1 API parity with every C# strongly-typed Part class method surface (generated `*Part` wrappers still thin / metadata-driven)  
+4. DomReader true line info (no source stream for pure DOM walks)  
+5. Full experimental IPackageFactory middleware DI graph (builders + initializer hooks covered)
 
 Regenerate Schematron tables / typed wrappers:
 
