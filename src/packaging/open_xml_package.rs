@@ -803,6 +803,74 @@ impl OpenXmlPackage {
             .unwrap_or_default()
     }
 
+    /// Per-part annotations feature (C# part `AnnotationsFeature` shell).
+    pub fn part_annotations_feature(&mut self) -> &mut crate::features::PartAnnotationsFeature {
+        if !self
+            .features
+            .contains::<crate::features::PartAnnotationsFeature>()
+        {
+            self.features
+                .set(crate::features::PartAnnotationsFeature::new());
+        }
+        self.features
+            .get_mut::<crate::features::PartAnnotationsFeature>()
+            .expect("PartAnnotationsFeature")
+    }
+
+    /// Add an annotation on a specific part URI.
+    pub fn add_part_annotation<T: std::any::Any + Send + Sync>(
+        &mut self,
+        part_uri: &crate::opc::PackUri,
+        value: T,
+    ) {
+        self.part_annotations_feature()
+            .for_part_mut(part_uri.as_str())
+            .add(value);
+    }
+
+    /// Annotations of type `T` stored on `part_uri`.
+    pub fn part_annotations<T: std::any::Any + Send + Sync>(
+        &self,
+        part_uri: &crate::opc::PackUri,
+    ) -> Vec<&T> {
+        self.features
+            .get::<crate::features::PartAnnotationsFeature>()
+            .and_then(|f| f.for_part(part_uri.as_str()))
+            .map(|a| a.get_all::<T>())
+            .unwrap_or_default()
+    }
+
+    /// Remove all annotations of type `T` from `part_uri`.
+    pub fn remove_part_annotations<T: std::any::Any + Send + Sync>(
+        &mut self,
+        part_uri: &crate::opc::PackUri,
+    ) {
+        if let Some(f) = self
+            .features
+            .get_mut::<crate::features::PartAnnotationsFeature>()
+        {
+            f.for_part_mut(part_uri.as_str()).remove::<T>();
+        }
+    }
+
+    /// Whether content types are constant for this package (C# `IContentTypeFeature.IsConstant`).
+    pub fn content_type_is_constant(&self) -> bool {
+        self.features
+            .get::<crate::features::ContentTypeFeature>()
+            .map(|f| f.is_constant())
+            .unwrap_or(false)
+    }
+
+    /// Set content-type constancy (C# `IContentTypeFeature`).
+    pub fn set_content_type_constant(&mut self, constant: bool) {
+        if let Some(f) = self.features.get_mut::<crate::features::ContentTypeFeature>() {
+            f.set_constant(constant);
+        } else {
+            self.features
+                .set(crate::features::ContentTypeFeature::new(constant));
+        }
+    }
+
     /// Create an empty media data part (C# `CreateMediaDataPart`).
     ///
     /// When `extension` is `None`, the package [`PartExtensionProvider`] is consulted

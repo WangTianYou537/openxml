@@ -712,6 +712,51 @@ impl ContentTypeFeature {
     pub fn constant() -> Self {
         Self { is_constant: true }
     }
+
+    pub fn is_constant(&self) -> bool {
+        self.is_constant
+    }
+
+    pub fn set_constant(&mut self, constant: bool) {
+        self.is_constant = constant;
+    }
+}
+
+/// Marker for parts whose content type is fixed (C# `IFixedContentTypePart` shell).
+pub trait FixedContentTypePart {
+    fn fixed_content_type(&self) -> &str;
+}
+
+/// Per-part annotations bag (C# part-level `AnnotationsFeature` via PartFeatureCollection).
+#[derive(Debug, Default)]
+pub struct PartAnnotationsFeature {
+    by_uri: std::collections::HashMap<String, AnnotationsFeature>,
+}
+
+impl PartAnnotationsFeature {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn for_part_mut(&mut self, uri: impl Into<String>) -> &mut AnnotationsFeature {
+        self.by_uri.entry(uri.into()).or_default()
+    }
+
+    pub fn for_part(&self, uri: &str) -> Option<&AnnotationsFeature> {
+        self.by_uri.get(uri)
+    }
+
+    pub fn remove_part(&mut self, uri: &str) -> Option<AnnotationsFeature> {
+        self.by_uri.remove(uri)
+    }
+
+    pub fn clear(&mut self) {
+        self.by_uri.clear();
+    }
+
+    pub fn part_count(&self) -> usize {
+        self.by_uri.len()
+    }
 }
 
 /// Package-level synchronization lock (C# `ILockFeature.SyncLock` shell).

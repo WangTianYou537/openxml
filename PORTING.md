@@ -889,6 +889,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPart` container helpers (Parts/GetPartById/AddExtendedPart/…)
 - [x] `TargetFeature::{with_extension,with_name}` (UpdatedExtensionTargetFeature shell)
 
+- [x] `PartAnnotationsFeature` + part/package annotation APIs; `FixedContentTypePart` marker
+- [x] `ContentTypeFeature` is_constant accessors on package
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

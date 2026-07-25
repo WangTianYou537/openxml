@@ -424,6 +424,32 @@ impl OpenXmlPart {
         self.dirty = false;
     }
 
+    /// Add a part-scoped annotation via the package feature bag
+    /// (C# part `AddAnnotation`).
+    pub fn add_annotation<T: std::any::Any + Send + Sync>(
+        &self,
+        package: &mut OpenXmlPackage,
+        value: T,
+    ) {
+        package.add_part_annotation(&self.uri, value);
+    }
+
+    /// Part-scoped annotations of type `T` (C# part `Annotations<T>`).
+    pub fn annotations<'a, T: std::any::Any + Send + Sync>(
+        &self,
+        package: &'a OpenXmlPackage,
+    ) -> Vec<&'a T> {
+        package.part_annotations::<T>(&self.uri)
+    }
+
+    /// Remove part-scoped annotations of type `T` (C# `RemoveAnnotations<T>`).
+    pub fn remove_annotations<T: std::any::Any + Send + Sync>(
+        &self,
+        package: &mut OpenXmlPackage,
+    ) {
+        package.remove_part_annotations::<T>(&self.uri);
+    }
+
     /// Default target feature for this part (C# `ITargetFeature` defaults: path `.`, ext `.xml`).
     pub fn default_target_feature(&self) -> crate::features::TargetFeature {
         let name = self
@@ -810,5 +836,11 @@ mod open_xml_part_container_tests {
         assert!(part.external_relationships(&pkg).is_empty());
         assert!(part.hyperlink_relationships(&pkg).is_empty());
         assert!(part.data_part_reference_relationships(&pkg).is_empty());
+        part.add_annotation(&mut pkg, 42u32);
+        assert_eq!(part.annotations::<u32>(&pkg), vec![&42u32]);
+        part.remove_annotations::<u32>(&mut pkg);
+        assert!(part.annotations::<u32>(&pkg).is_empty());
+        pkg.set_content_type_constant(true);
+        assert!(pkg.content_type_is_constant());
     }
 }

@@ -73,12 +73,13 @@ pub use features::{
     MainPartFeature, OpenXmlNamespaceResolverFeature, OpenXmlSchemaType, PackageCapabilities,
     PackageEvent, PackageEventType, PackageEvents, PackageFactoryFeature, PackageFeature,
     PackageInitializerFeature, PackagePartFeature, PackageRelationshipBuilder, PackageStreamFeature,
-    ParagraphIdCollectionFeature, ParagraphIdGenerator, PartElementEvent, PartEvents,
-    PartFactoryFeature, PartRelationshipsFeature, PartRootEvents, PartsFeature, PartUriFeature,
-    ProgrammaticIdentifierFeature, RandomNumberGeneratorFeature, ReferenceRelationshipsFeature,
-    RelationshipFilterFeature, RewrittenUri, RewrittenUriCollection, RootElementFeature,
-    MalformedUriHandlingFeature, SaveFeature, SchemaTrackingFeature, SharedFeatureRegistry,
-    StrictNamespaceFeature, SupportedRelationship, TargetFeature, TypedPartFactoryFeature,
+    ParagraphIdCollectionFeature, ParagraphIdGenerator, PartAnnotationsFeature, PartElementEvent,
+    PartEvents, PartFactoryFeature, PartRelationshipsFeature, PartRootEvents, PartsFeature,
+    PartUriFeature, ProgrammaticIdentifierFeature, RandomNumberGeneratorFeature,
+    ReferenceRelationshipsFeature, RelationshipFilterFeature, RewrittenUri, RewrittenUriCollection,
+    RootElementFeature, MalformedUriHandlingFeature, SaveFeature, SchemaTrackingFeature,
+    SharedFeatureRegistry, StrictNamespaceFeature, SupportedRelationship, FixedContentTypePart,
+    TargetFeature, TypedPartFactoryFeature,
 };
 pub use file_format::FileFormatVersions;
 pub use markup_compatibility::{
