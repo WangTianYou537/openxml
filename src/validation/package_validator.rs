@@ -60,6 +60,56 @@ impl OpenXmlPackageValidationResult {
             ..Default::default()
         }
     }
+
+    pub fn part_is_not_allowed(
+        part_uri: impl Into<String>,
+        relationship_type: impl Into<String>,
+    ) -> Self {
+        let relationship_type = relationship_type.into();
+        Self::new(message_id::PART_IS_NOT_ALLOWED, relationship_type.clone())
+            .with_part_uri(part_uri)
+            .with_relationship_type(relationship_type)
+    }
+
+    pub fn required_part_do_not_exist(
+        part_uri: impl Into<String>,
+        relationship_type: impl Into<String>,
+    ) -> Self {
+        let relationship_type = relationship_type.into();
+        Self::new(message_id::REQUIRED_PART_DO_NOT_EXIST, relationship_type.clone())
+            .with_part_uri(part_uri)
+            .with_relationship_type(relationship_type)
+    }
+
+    pub fn only_one_part_allowed(
+        part_uri: impl Into<String>,
+        relationship_type: impl Into<String>,
+    ) -> Self {
+        let relationship_type = relationship_type.into();
+        Self::new(message_id::ONLY_ONE_PART_ALLOWED, relationship_type.clone())
+            .with_part_uri(part_uri)
+            .with_relationship_type(relationship_type)
+    }
+
+    pub fn invalid_content_type_part(
+        part_uri: impl Into<String>,
+        detail: impl Into<String>,
+    ) -> Self {
+        Self::new(message_id::INVALID_CONTENT_TYPE_PART, detail).with_part_uri(part_uri)
+    }
+
+    pub fn data_part_reference_is_not_allowed(
+        part_uri: impl Into<String>,
+        relationship_type: impl Into<String>,
+    ) -> Self {
+        let relationship_type = relationship_type.into();
+        Self::new(
+            message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED,
+            relationship_type.clone(),
+        )
+        .with_part_uri(part_uri)
+        .with_relationship_type(relationship_type)
+    }
 }
 
 /// Message ids mirroring C# `OpenXmlPackageValidationResult.MessageId`.
@@ -539,5 +589,23 @@ mod tests {
         let f = PartConstraintFeature::new("SlidePart");
         assert!(f.is_data_part_reference_allowed(media_rel::VIDEO)
             || f.rules().iter().any(|r| r.is_data_part_reference));
+    }
+
+    #[test]
+    fn package_validation_result_factories() {
+        let r = OpenXmlPackageValidationResult::part_is_not_allowed(
+            "/word/document.xml",
+            "http://example/rel",
+        );
+        assert_eq!(r.message_id.as_deref(), Some(message_id::PART_IS_NOT_ALLOWED));
+        assert_eq!(r.part_uri.as_deref(), Some("/word/document.xml"));
+        let e = r.into_validation_error();
+        assert!(e.message.contains("PartIsNotAllowed"));
+        assert_eq!(
+            OpenXmlPackageValidationResult::required_part_do_not_exist("/a", "r")
+                .message_id
+                .as_deref(),
+            Some(message_id::REQUIRED_PART_DO_NOT_EXIST)
+        );
     }
 }

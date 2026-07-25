@@ -2437,7 +2437,95 @@ impl OpenXmlPackage {
         Ok(Self::from_opc(opc, self.settings.clone()))
     }
 
+    /// Clone with explicit open settings (C# `Clone(stream, isEditable, openSettings)` shell).
+    ///
+    /// The clone is always opened from in-memory bytes; `is_editable` maps to
+    /// [`PackageMode`] on the underlying OPC package when supported.
+    pub fn clone_package_with_settings(
+        &self,
+        settings: OpenSettings,
+        is_editable: bool,
+    ) -> crate::error::Result<Self> {
+        let bytes = self.to_bytes()?;
+        let opc = crate::opc::OpcPackage::open_bytes(bytes)?;
+        let mut pkg = Self::from_opc(opc, settings);
+        if !is_editable {
+            // Reflect read-only intent on the package feature path when present.
+            if let Some(f) = pkg.features.get_mut::<crate::features::PackageFeature>() {
+                // Drop SAVE capability for read-only clones.
+                f.capabilities = crate::features::PackageCapabilities::CACHED
+                    | crate::features::PackageCapabilities::RELOAD;
+            }
+        }
+        Ok(pkg)
+    }
 
+    /// Root / main part URI from [`MainPartFeature`] when registered
+    /// (C# `OpenXmlPackage.RootPart` shell).
+    pub fn root_part_uri(&self) -> Option<crate::opc::PackUri> {
+        self.main_part_feature()
+            .and_then(|m| m.part_uri.as_ref())
+            .map(|u| crate::opc::PackUri::new(u.as_str()))
+    }
+
+    /// Detect encrypted Office files (C# `OpenXmlPackage.IsEncryptedOfficeFile`).
+    pub fn is_encrypted_office_file(path: impl AsRef<Path>) -> crate::error::Result<bool> {
+        crate::opc::OpcPackage::is_encrypted_office_file(path)
+    }
+
+    /// Detect encrypted Office streams (C# `IsEncryptedOfficeFile(Stream)`).
+    pub fn is_encrypted_office_stream<R: std::io::Read + std::io::Seek>(
+        reader: &mut R,
+    ) -> crate::error::Result<bool> {
+        crate::opc::OpcPackage::is_encrypted_office_stream(reader)
+    }
+
+    /// Delete an external relationship by id under `source`
+    /// (C# `DeleteExternalRelationship`).
+    pub fn delete_external_relationship(
+        &mut self,
+        source: Option<&crate::opc::PackUri>,
+        id: &str,
+    ) -> Option<crate::opc::Relationship> {
+        let rel = match source {
+            Some(s) => self.opc.part_relationships(s)?.get(id).cloned(),
+            None => self.opc.package_relationships().get(id).cloned(),
+        }?;
+        if rel.target_mode != crate::opc::RelationshipTargetMode::External {
+            return None;
+        }
+        let removed = self.delete_reference_relationship(source, id)?;
+        Some(removed)
+    }
+
+    /// Child parts under `source` filtered by relationship type
+    /// (C# `GetPartsOfType` by relationship shell).
+    pub fn get_parts_of_relationship_type(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        relationship_type: &str,
+    ) -> Vec<crate::opc::RelatedPart> {
+        self.opc.parts_of_relationship_type(source, relationship_type)
+    }
+
+    /// Child parts under `source` filtered by content type.
+    pub fn get_related_parts_of_content_type(
+        &self,
+        source: Option<&crate::opc::PackUri>,
+        content_type: &str,
+    ) -> Vec<crate::opc::RelatedPart> {
+        self.opc.parts_of_content_type(source, content_type)
+    }
+
+    /// Whether the package can currently save (C# `CanSave`).
+    pub fn can_save_capability(&self) -> bool {
+        self.can_save()
+            && self
+                .features
+                .get::<crate::features::PackageFeature>()
+                .map(|f| f.has_capability(crate::features::PackageCapabilities::SAVE))
+                .unwrap_or(true)
+    }
 
     pub(crate) fn ensure_open(&self) -> Result<()> {
         if self.closed {
@@ -3399,5 +3487,51 @@ mod part_events_tests {
             crate::error::OpenXmlPackageException::error_content_type().message,
             "ErrorContentType"
         );
+    }
+
+    #[test]
+    fn clone_with_settings_root_part_and_delete_external() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            doc.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            b"<w:document/>",
+        );
+        pkg.set_main_part_feature(crate::features::MainPartFeature::new(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            Some(doc.as_str().to_string()),
+        ));
+        assert_eq!(pkg.root_part_uri(), Some(doc.clone()));
+        let eid = pkg.add_external_relationship(
+            Some(&doc),
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://example.com/x",
+        );
+        assert!(pkg
+            .delete_external_relationship(Some(&doc), &eid)
+            .is_some());
+        assert!(pkg
+            .delete_external_relationship(Some(&doc), &eid)
+            .is_none());
+        let mut settings = OpenSettings::default();
+        settings.auto_save = false;
+        let cloned = pkg
+            .clone_package_with_settings(settings, false)
+            .expect("clone settings");
+        assert!(!cloned.auto_save());
+        assert!(cloned.opc().has_part(&doc));
+        assert!(!cloned.can_save_capability() || !cloned
+            .features()
+            .get::<crate::features::PackageFeature>()
+            .unwrap()
+            .has_capability(crate::features::PackageCapabilities::SAVE));
+        // OLE CFB header is encrypted Office
+        let mut hdr = std::io::Cursor::new([0xD0u8, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+        assert!(OpenXmlPackage::is_encrypted_office_stream(&mut hdr).unwrap());
+        let related = pkg.get_parts_of_relationship_type(Some(&doc), "http://example");
+        assert!(related.is_empty());
     }
 }

@@ -882,6 +882,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Expanded `OpenXmlPackageException` ExceptionMessages helpers
 - [x] `SupportedRelationship<T>` marker trait; `PackageFeature` capability helpers
 
+- [x] `clone_package_with_settings` / `root_part_uri` / `is_encrypted_office_*` wrappers
+- [x] `delete_external_relationship` / `get_parts_of_relationship_type` / `can_save_capability`
+- [x] `OpenXmlPackageValidationResult` typed factory helpers
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  
