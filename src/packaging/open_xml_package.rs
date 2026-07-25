@@ -361,6 +361,26 @@ impl OpenXmlPackage {
         crate::namespace_rewrite::rewrite_package_to_strict(&mut self.opc)
     }
 
+    /// Serialize this package to Flat OPC XML bytes (C# `ToFlatOpc*`).
+    pub fn to_flat_opc(&self, progid: Option<&str>) -> crate::error::Result<Vec<u8>> {
+        crate::opc::to_flat_opc(self.opc(), progid)
+    }
+
+    /// Serialize this package to a Flat OPC XML string.
+    pub fn to_flat_opc_string(&self, progid: Option<&str>) -> crate::error::Result<String> {
+        let bytes = self.to_flat_opc(progid)?;
+        String::from_utf8(bytes).map_err(|e| crate::error::Error::Package(e.to_string()))
+    }
+
+    /// Open a package from Flat OPC XML (C# `FromFlatOpc*`) and seed features.
+    pub fn from_flat_opc(
+        xml: impl AsRef<[u8]>,
+        settings: OpenSettings,
+    ) -> crate::error::Result<Self> {
+        let opc = crate::opc::from_flat_opc(xml)?;
+        Ok(Self::from_opc(opc, settings))
+    }
+
     /// Delete multiple parts by URI (C# `DeleteParts`), raising part Removing/Removed events.
     pub fn delete_parts(&mut self, uris: &[crate::opc::PackUri]) -> usize {
         let mut n = 0;
@@ -748,6 +768,14 @@ impl OpenXmlPackage {
         if let Some(a) = self.features.get_mut::<crate::features::AnnotationsFeature>() {
             a.remove::<T>();
         }
+    }
+
+    /// All package-level annotations of type `T` (C# `Annotations<T>()`).
+    pub fn annotations<T: std::any::Any + Send + Sync>(&self) -> Vec<&T> {
+        self.features
+            .get::<crate::features::AnnotationsFeature>()
+            .map(|a| a.get_all::<T>())
+            .unwrap_or_default()
     }
 
     /// Create an empty media data part (C# `CreateMediaDataPart`).
@@ -2797,5 +2825,32 @@ mod part_events_tests {
                 .map(|s| s.as_str()),
             Some("audio/mpeg")
         );
+    }
+
+    #[test]
+    fn flat_opc_roundtrip_seeds_features() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = crate::opc::PackUri::new("/word/document.xml");
+        pkg.set_part(
+            doc.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            br#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#.to_vec(),
+        );
+        let _ = pkg.add_package_relationship(
+            crate::namespace::rel::OFFICE_DOCUMENT,
+            &doc,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        let flat = pkg.to_flat_opc(Some(crate::opc::progid::WORD)).expect("flat");
+        assert!(std::str::from_utf8(&flat).unwrap().contains("pkg:package"));
+        let mut opened =
+            OpenXmlPackage::from_flat_opc(&flat, OpenSettings::default()).expect("open");
+        assert!(opened.opc().has_part(&doc));
+        assert!(opened
+            .features()
+            .contains::<crate::features::OpenXmlNamespaceResolverFeature>());
+        assert!(opened.features().contains::<crate::features::PackageFeature>());
+        assert!(opened.parts_feature().contains(doc.as_str()));
     }
 }

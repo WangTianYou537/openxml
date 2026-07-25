@@ -10261,7 +10261,7 @@ impl WordprocessingDocument {
             main.part_mut().root = None;
             main.part_mut().dirty = false;
         }
-        crate::namespace_rewrite::rewrite_package_to_transitional(self.package.opc_mut())
+        self.package.rewrite_strict_to_transitional()
     }
 
     /// Normalize Transitional OOXML namespaces/relationships to Strict.
@@ -10271,7 +10271,7 @@ impl WordprocessingDocument {
             main.part_mut().root = None;
             main.part_mut().dirty = false;
         }
-        crate::namespace_rewrite::rewrite_package_to_strict(self.package.opc_mut())
+        self.package.rewrite_transitional_to_strict()
     }
 
     /// Access open settings.

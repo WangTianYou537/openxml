@@ -858,6 +858,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackage::{set_content_type_default,clear_content_type_override,add_media_part}` feature-aware media/content-type helpers
 - [x] Word `parts.rs` set_part paths + typed_part delete + PPT/Excel content-type defaults + PPT audio/video media attach route through package APIs
 
+- [x] Document rewrite_strict/transitional route through `OpenXmlPackage` helpers
+- [x] `OpenXmlPackage::{to_flat_opc,to_flat_opc_string,from_flat_opc}` + feature seed on open
+- [x] `AnnotationsFeature::{len,is_empty,clear}` + `OpenXmlPackage::annotations`
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

@@ -492,6 +492,18 @@ impl AnnotationsFeature {
             .iter()
             .any(|e| e.type_id == std::any::TypeId::of::<T>())
     }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
 }
 
 /// Package capability flags (C# `PackageCapabilities`).
@@ -2526,6 +2538,22 @@ mod tests {
         assert!(shared.contains("ParagraphId"));
         assert!(shared.remove("ParagraphId"));
         assert_eq!(shared.count(), 0);
+    }
+
+    #[test]
+    fn annotations_feature_multi_and_clear() {
+        let mut a = AnnotationsFeature::new();
+        a.add(1i32);
+        a.add(2i32);
+        a.add("x".to_string());
+        assert_eq!(a.get::<i32>(), Some(&1));
+        assert_eq!(a.get_all::<i32>(), vec![&1, &2]);
+        assert_eq!(a.len(), 3);
+        a.remove::<i32>();
+        assert_eq!(a.len(), 1);
+        assert!(a.contains::<String>());
+        a.clear();
+        assert!(a.is_empty());
     }
 
     #[test]

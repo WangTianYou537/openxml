@@ -24853,12 +24853,12 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
     ///
     /// Returns `(xml_replacements, relationship_replacements)`.
     pub fn rewrite_strict_to_transitional(&mut self) -> Result<(usize, usize)> {
-        crate::namespace_rewrite::rewrite_package_to_transitional(self.package.opc_mut())
+        self.package.rewrite_strict_to_transitional()
     }
 
     /// Normalize Transitional OOXML namespaces/relationships to Strict.
     pub fn rewrite_transitional_to_strict(&mut self) -> Result<(usize, usize)> {
-        crate::namespace_rewrite::rewrite_package_to_strict(self.package.opc_mut())
+        self.package.rewrite_transitional_to_strict()
     }
 
     /// Access open settings.
