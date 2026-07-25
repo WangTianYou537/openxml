@@ -1193,6 +1193,115 @@ impl OpenXmlPackage {
         id
     }
 
+    /// Add a data-part reference relationship (C# `AddDataPartReferenceRelationship`) and
+    /// track it on part/reference relationship feature shells.
+    pub fn add_data_part_reference_relationship(
+        &mut self,
+        source: &crate::opc::PackUri,
+        data_part: &crate::opc::DataPart,
+        relationship_type: &str,
+        id: Option<&str>,
+    ) -> crate::error::Result<crate::opc::DataPartReferenceRelationship> {
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            id.unwrap_or(""),
+            relationship_type,
+            data_part.uri.as_str(),
+        )
+        .with_target_mode("Internal")
+        .with_source_uri(source.as_str());
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let filtered_type = builder.relationship_type.clone();
+        let r = self.opc.add_data_part_reference_relationship(
+            source,
+            data_part,
+            &filtered_type,
+            if builder.id.is_empty() {
+                None
+            } else {
+                Some(builder.id.as_str())
+            },
+        )?;
+        let rid = r.id().to_string();
+        self.part_relationships_feature()
+            .add(&rid, data_part.uri.as_str());
+        self.reference_relationships_feature().add(
+            &rid,
+            &filtered_type,
+            data_part.uri.as_str(),
+            false,
+        );
+        self.data_parts_feature_mut().add(data_part.uri.as_str());
+        Ok(r)
+    }
+
+    /// Add a hyperlink relationship (C# `AddHyperlinkRelationship`) via filters +
+    /// `IReferenceRelationshipsFeature`.
+    pub fn add_hyperlink_relationship(
+        &mut self,
+        source: &crate::opc::PackUri,
+        target: &str,
+        is_external: bool,
+    ) -> String {
+        let mode = if is_external {
+            crate::opc::RelationshipTargetMode::External
+        } else {
+            crate::opc::RelationshipTargetMode::Internal
+        };
+        let mut builder = crate::features::PackageRelationshipBuilder::new(
+            "",
+            crate::namespace::rel::HYPERLINK,
+            target,
+        )
+        .with_target_mode(match mode {
+            crate::opc::RelationshipTargetMode::Internal => "Internal",
+            crate::opc::RelationshipTargetMode::External => "External",
+        })
+        .with_source_uri(source.as_str());
+        if let Some(f) = self
+            .features
+            .get::<crate::features::RelationshipFilterFeature>()
+        {
+            f.apply(&mut builder);
+        }
+        let mode = if builder.target_mode.eq_ignore_ascii_case("External") {
+            crate::opc::RelationshipTargetMode::External
+        } else {
+            crate::opc::RelationshipTargetMode::Internal
+        };
+        let id = self.opc.add_hyperlink_relationship(
+            source,
+            &builder.target,
+            mode == crate::opc::RelationshipTargetMode::External,
+        );
+        // Re-apply relationship type if a filter rewrote it (opc helper always uses HYPERLINK).
+        if builder.relationship_type != crate::namespace::rel::HYPERLINK {
+            // Best-effort: record filtered type on the reference feature only.
+        }
+        if mode == crate::opc::RelationshipTargetMode::External {
+            self.reference_relationships_feature().add(
+                &id,
+                &builder.relationship_type,
+                &builder.target,
+                true,
+            );
+        } else {
+            self.part_relationships_feature()
+                .add(&id, builder.target.as_str());
+            self.reference_relationships_feature().add(
+                &id,
+                &builder.relationship_type,
+                &builder.target,
+                false,
+            );
+        }
+        id
+    }
+
     /// File access mode (C# `OpenXmlPackage.FileOpenAccess`).
     pub fn file_open_access(&self) -> crate::opc::FileOpenAccess {
         self.opc.mode()
@@ -1641,5 +1750,44 @@ mod part_events_tests {
         assert!(pkg.paragraph_id_generator().contains(&id));
         pkg.shared_feature_registry().add("ParagraphId");
         assert_eq!(pkg.shared_feature_registry().count(), 1);
+    }
+
+    #[test]
+    fn add_hyperlink_relationship_tracks_reference_feature() {
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        pkg.relationship_filter().add_filter(|b| {
+            if b.relationship_type.contains("hyperlink") {
+                b.target = format!("{}?filtered=1", b.target);
+            }
+        });
+        let id = pkg.add_hyperlink_relationship(&doc, "https://example.com", true);
+        assert!(!id.is_empty());
+        let got = pkg.reference_relationships_feature().try_get(&id);
+        assert!(got.is_some());
+        assert_eq!(got.unwrap().1, "https://example.com?filtered=1");
+        let hls = pkg.opc().hyperlink_relationships(Some(&doc));
+        assert_eq!(hls.len(), 1);
+        assert_eq!(hls[0].target(), "https://example.com?filtered=1");
+    }
+
+    #[test]
+    fn add_data_part_reference_tracks_features() {
+        use crate::opc::media_rel;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        pkg.set_part(doc.clone(), content_type::WORD_DOCUMENT, b"<w:document/>".to_vec());
+        let media = pkg
+            .create_media_data_part("audio/mpeg", Some("mp3"))
+            .expect("media");
+        let r = pkg
+            .add_data_part_reference_relationship(&doc, &media, media_rel::AUDIO, None)
+            .expect("ref");
+        assert!(pkg.part_relationships_feature().contains_id(r.id()));
+        assert!(pkg.reference_relationships_feature().contains(r.id()));
+        assert!(pkg.data_parts_feature().contains(media.uri.as_str()));
     }
 }

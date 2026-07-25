@@ -833,6 +833,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Close path runs container disposable hooks
 - [x] `ParagraphIdCollectionFeature` / unique `ParagraphIdGenerator::create_unique_paragraph_id` / `SharedFeatureRegistry`
 - [x] Package accessors + `sync_paragraph_id_generator_from_collection`
+- [x] `OpenXmlPackage::{add_hyperlink_relationship,add_data_part_reference_relationship}` filtered + feature tracking
+- [x] Word/Excel/PPT hyperlink + data-part reference adds route through package APIs
 
 **Still intentionally deferred / partial:**
 

@@ -13248,7 +13248,7 @@ impl WordprocessingDocument {
             .ok_or_else(|| Error::Package("no main document part".into()))?
             .uri()
             .clone();
-        self.package.opc_mut().add_data_part_reference_relationship(
+        self.package.add_data_part_reference_relationship(
             &main,
             data_part,
             relationship_type,

@@ -365,16 +365,7 @@ impl MainDocumentPart {
         package: &mut OpenXmlPackage,
         target_url: &str,
     ) -> String {
-        package
-            .opc_mut()
-            .part_relationships_mut(self.uri())
-            .add(
-                rel::HYPERLINK,
-                target_url,
-                RelationshipTargetMode::External,
-            )
-            .id
-            .clone()
+        package.add_hyperlink_relationship(self.uri(), target_url, true)
     }
 
     /// Add or replace the comments part (`/word/comments.xml`).

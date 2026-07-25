@@ -3182,7 +3182,7 @@ impl PresentationDocument {
             .opc()
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .map_err(|_| Error::Package("no main part".into()))?;
-        self.package.opc_mut().add_data_part_reference_relationship(
+        self.package.add_data_part_reference_relationship(
             &main,
             data_part,
             relationship_type,
@@ -17945,11 +17945,7 @@ impl PresentationDocument {
             .ok_or_else(|| Error::Package(format!("slide index {slide_index} out of range")))?;
         let rid = self
             .package
-            .opc_mut()
-            .part_relationships_mut(&slide_info.uri)
-            .add(rel::HYPERLINK, url, RelationshipTargetMode::External)
-            .id
-            .clone();
+            .add_hyperlink_relationship(&slide_info.uri, url, true);
         Ok(rid)
     }
 

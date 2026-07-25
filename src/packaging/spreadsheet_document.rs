@@ -7105,11 +7105,7 @@ impl SpreadsheetDocument {
         let sheet_uri = self.sheet_uri(sheet_name)?;
         let rid = self
             .package
-            .opc_mut()
-            .part_relationships_mut(&sheet_uri)
-            .add(rel::HYPERLINK, url, RelationshipTargetMode::External)
-            .id
-            .clone();
+            .add_hyperlink_relationship(&sheet_uri, url, true);
         let mut root = self.load_sheet_root(&sheet_uri)?;
         let link = sheet_hyperlink_ex(cell_ref, Some(&rid), display, tooltip, None);
         if let Some(hl) = root.child_mut("hyperlinks") {
@@ -25679,7 +25675,7 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .opc()
             .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
             .map_err(|_| Error::Package("no main part".into()))?;
-        self.package.opc_mut().add_data_part_reference_relationship(
+        self.package.add_data_part_reference_relationship(
             &main,
             data_part,
             relationship_type,
