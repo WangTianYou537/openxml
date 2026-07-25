@@ -1,17 +1,60 @@
 //! Convert an SVG into native PowerPoint DrawingML shapes (no SVG media embed).
 //!
 //! Usage:
-//!   create_ppt_from_svg_shapes [out.pptx] [in.svg]
-//!   create_ppt_from_svg_shapes [in.svg] [out.pptx]
-//! Extensions decide which is which; defaults are slide-1.pptx / slide-1.svg.
+//!   create_ppt_from_svg_shapes [options] [out.pptx] [in.svg]
+//!   create_ppt_from_svg_shapes [options] [in.svg] [out.pptx]
+//!
+//! Options (mutually exclusive font modes; last one wins):
+//!   --font-shape         Outline glyphs as shapes (no text boxes, no font embed)
+//!   --embed-font         Editable text boxes + subset EOT of used fonts
+//!   --embed-font-fully   Editable text boxes + full EOT of used fonts
+//!
+//! Default (no flag): editable text boxes, no font embed (Windows system faces).
+//! Extensions decide which positional arg is which; defaults are slide-1.pptx / slide-1.svg.
 
-use openxml::packaging::{PresentationDocument, PresentationDocumentType};
+use openxml::packaging::{
+    PresentationDocument, PresentationDocumentType, SvgFontEmbedMode, SvgShapesOnSlideOptions,
+};
+
+fn print_usage() {
+    eprintln!(
+        "usage: create_ppt_from_svg_shapes [--font-shape|--embed-font|--embed-font-fully] [out.pptx] [in.svg]"
+    );
+}
 
 fn main() -> openxml::Result<()> {
-    let a1 = std::env::args().nth(1);
-    let a2 = std::env::args().nth(2);
+    let mut font_shape = false;
+    let mut embed_mode = SvgFontEmbedMode::None;
+    let mut positionals: Vec<String> = Vec::new();
 
-    let (out, svg_path) = match (a1.as_deref(), a2.as_deref()) {
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--font-shape" | "-font-shape" => {
+                font_shape = true;
+                embed_mode = SvgFontEmbedMode::None;
+            }
+            "--embed-font" | "-embed-font" => {
+                font_shape = false;
+                embed_mode = SvgFontEmbedMode::Subset;
+            }
+            "--embed-font-fully" | "-embed-font-fully" | "--embed-font-full" => {
+                font_shape = false;
+                embed_mode = SvgFontEmbedMode::Full;
+            }
+            "-h" | "--help" => {
+                print_usage();
+                return Ok(());
+            }
+            a if a.starts_with('-') => {
+                eprintln!("unknown option: {a}");
+                print_usage();
+                std::process::exit(2);
+            }
+            _ => positionals.push(arg),
+        }
+    }
+
+    let (out, svg_path) = match (positionals.get(0).map(String::as_str), positionals.get(1).map(String::as_str)) {
         (Some(x), Some(y)) if x.ends_with(".svg") && y.ends_with(".pptx") => {
             (y.to_string(), x.to_string())
         }
@@ -40,12 +83,30 @@ fn main() -> openxml::Result<()> {
     const SLIDE_CX: i64 = 12_192_000;
     const SLIDE_CY: i64 = 6_858_000;
 
-    let mut ppt =
-        PresentationDocument::create(&out, PresentationDocumentType::Presentation)?;
-    ppt.add_blank_slide()?;
-    let n = ppt.add_svg_shapes_on_slide(0, &svg_bytes, 0, 0, SLIDE_CX, SLIDE_CY)?;
+    let options = SvgShapesOnSlideOptions {
+        editable_text: !font_shape,
+        font_embed: if font_shape {
+            SvgFontEmbedMode::None
+        } else {
+            embed_mode
+        },
+    };
 
-    ppt.set_title("slide-1 (native shapes)")?;
+    let mut ppt = PresentationDocument::create(&out, PresentationDocumentType::Presentation)?;
+    ppt.add_blank_slide()?;
+    let n = ppt.add_svg_shapes_on_slide_ex(0, &svg_bytes, 0, 0, SLIDE_CX, SLIDE_CY, options)?;
+
+    let mode_label = if font_shape {
+        "font-shape"
+    } else {
+        match embed_mode {
+            SvgFontEmbedMode::None => "text-box (no embed)",
+            SvgFontEmbedMode::Subset => "embed-font (subset)",
+            SvgFontEmbedMode::Full => "embed-font-fully",
+        }
+    };
+
+    ppt.set_title(&format!("slide-1 ({mode_label})"))?;
     ppt.set_creator("openxml-rs")?;
     ppt.set_created("2026-07-22T00:00:00Z")?;
     ppt.set_modified("2026-07-22T00:00:00Z")?;
@@ -57,6 +118,7 @@ fn main() -> openxml::Result<()> {
 
     println!("wrote {out}");
     println!("  from svg: {svg_path}");
+    println!("  mode: {mode_label}");
     println!("  native shapes: {n}");
     println!(
         "  masters={} layouts={}",

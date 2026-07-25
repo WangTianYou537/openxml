@@ -118,6 +118,40 @@ impl FontDb {
                 "bold",
                 "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
             ),
+            // Liberation Serif ≈ Times New Roman metrics (default Latin when SVG omits font).
+            (
+                "liberation serif",
+                "regular",
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+            ),
+            (
+                "liberation serif",
+                "bold",
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+            ),
+            (
+                "liberation serif",
+                "regular",
+                "/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf",
+            ),
+            (
+                "liberation serif",
+                "bold",
+                "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf",
+            ),
+            // Bundled TrueType Noto Sans SC (Source Han Sans SC) for EOT embedding.
+            // Prefer these over system Noto CJK TTC/OTTO (MS PowerPoint rejects many
+            // CFF extracts) and over Droid (fsType=8 restricted embedding).
+            (
+                "noto sans sc",
+                "regular",
+                concat!(env!("CARGO_MANIFEST_DIR"), "/assets/fonts/NotoSansSC-Regular.ttf"),
+            ),
+            (
+                "noto sans sc",
+                "bold",
+                concat!(env!("CARGO_MANIFEST_DIR"), "/assets/fonts/NotoSansSC-Bold.ttf"),
+            ),
         ];
 
         for (family, style, path) in candidates {
@@ -138,30 +172,39 @@ impl FontDb {
             }
         }
 
-        // Font stack aliases. Prefer Liberation for Helvetica/Arial (Arial metrics;
-        // empirically better mixed Latin+CJK title alignment than DejaVu on LO).
+        // Font stack aliases for *measurement* (local faces). DrawingML typeface names
+        // come from `typeface_for` and may differ (e.g. Times New Roman / Microsoft YaHei).
         for (from, to) in [
             ("helvetica", "liberation sans"),
             ("helvetica neue", "liberation sans"),
             ("arial", "liberation sans"),
             ("sans-serif", "liberation sans"),
-            ("serif", "dejavu sans"),
+            // Default Latin when SVG omits font: Times New Roman → Liberation Serif metrics.
+            ("times new roman", "liberation serif"),
+            ("times", "liberation serif"),
+            ("times roman", "liberation serif"),
+            ("serif", "liberation serif"),
             ("monospace", "dejavu sans"),
-            // slide-1 fidelity: PingFang SC / YaHei alias → JP face was measured closer
-            // to Chrome raster on this fixture than SC (keep JP for those names).
+            // slide-1 fidelity: PingFang SC alias → JP face was measured closer to Chrome.
             ("pingfang sc", "noto sans cjk jp"),
-            ("microsoft yahei", "noto sans cjk jp"),
-            ("微软雅黑", "noto sans cjk jp"),
+            // Microsoft YaHei (default Chinese when SVG omits font) → SC metrics for measure.
+            ("microsoft yahei", "noto sans sc"),
+            ("微软雅黑", "noto sans sc"),
+            ("yahei", "noto sans sc"),
             // Explicit SC family names still map to SC.
             ("heiti sc", "noto sans cjk sc"),
             ("stheiti", "noto sans cjk sc"),
             ("hiragino sans gb", "noto sans cjk sc"),
             ("pingfang tc", "noto sans cjk jp"),
             ("noto sans cjk", "noto sans cjk sc"),
-            ("source han sans", "noto sans cjk sc"),
-            ("source han sans sc", "noto sans cjk sc"),
+            ("source han sans", "noto sans sc"),
+            ("source han sans sc", "noto sans sc"),
+            ("source han sans cn", "noto sans sc"),
+            ("思源黑体", "noto sans sc"),
+            ("noto sans sc", "noto sans sc"),
             ("dejavu sans", "dejavu sans"),
             ("liberation sans", "liberation sans"),
+            ("liberation serif", "liberation serif"),
         ] {
             aliases.insert(from.into(), to.into());
         }
@@ -306,23 +349,111 @@ impl FontDb {
         }
     }
 
-    /// DrawingML typeface name to embed in `a:latin` / `a:ea`.
+    /// DrawingML typeface name for `a:latin` / `a:ea`.
+    ///
+    /// When the SVG stack is unspecified/generic, defaults are **Times New Roman**
+    /// (Latin) and **Microsoft YaHei** (East Asian) — Windows system faces.
+    /// Explicit named families keep their resolved DrawingML names.
     pub fn typeface_for(&self, font_family: &str, for_east_asian: bool) -> String {
-        if for_east_asian {
-            return "Noto Sans CJK SC".into();
-        }
         let families = parse_font_family_list(font_family);
+        let generic_only = families.is_empty()
+            || families.iter().all(|f| {
+                let k = f.to_ascii_lowercase();
+                matches!(
+                    k.as_str(),
+                    "serif"
+                        | "sans-serif"
+                        | "monospace"
+                        | "cursive"
+                        | "fantasy"
+                        | "system-ui"
+                        | "ui-serif"
+                        | "ui-sans-serif"
+                        | "ui-monospace"
+                        | "emoji"
+                        | "math"
+                        | "fangsong"
+                )
+            });
+
+        if for_east_asian {
+            for f in &families {
+                let key = f.to_ascii_lowercase();
+                if key.contains("microsoft yahei")
+                    || key == "微软雅黑"
+                    || key == "yahei"
+                    || key.contains("yahei")
+                {
+                    return "Microsoft YaHei".into();
+                }
+                if key.contains("pingfang") {
+                    // Keep host PingFang when named; Windows often substitutes YaHei.
+                    return "Microsoft YaHei".into();
+                }
+                if key.contains("noto sans sc")
+                    || key.contains("source han")
+                    || f.contains("思源")
+                {
+                    return if self.faces.contains_key("noto sans sc") {
+                        "Noto Sans SC".into()
+                    } else {
+                        "Noto Sans CJK SC".into()
+                    };
+                }
+                if key.contains("noto sans cjk") || key.contains("cjk") {
+                    return "Noto Sans CJK SC".into();
+                }
+                if key.contains("simsun") || f.contains("宋体") {
+                    return "SimSun".into();
+                }
+                if key.contains("simhei") || f.contains("黑体") {
+                    return "SimHei".into();
+                }
+            }
+            // Default Chinese face when SVG omits a CJK family.
+            return "Microsoft YaHei".into();
+        }
+
         for f in &families {
             let key = f.to_ascii_lowercase();
-            let resolved = self.aliases.get(&key).cloned().unwrap_or(key);
-            if resolved.contains("dejavu") {
-                return "DejaVu Sans".into();
+            if key.contains("times new roman")
+                || key == "times"
+                || key == "times roman"
+                || (key == "serif" && (generic_only || families.len() == 1))
+            {
+                return "Times New Roman".into();
             }
-            if resolved.contains("liberation") || resolved.contains("arial") {
+            if key.contains("arial") {
                 return "Arial".into();
             }
+            if key.contains("helvetica") {
+                // Helvetica is not a Windows core font; Arial is the usual stand-in.
+                return "Arial".into();
+            }
+            if key.contains("liberation serif") {
+                return "Times New Roman".into();
+            }
+            if key.contains("liberation sans") || key.contains("liberation") {
+                return "Arial".into();
+            }
+            if key.contains("dejavu") {
+                return "Arial".into();
+            }
+            if key.contains("calibri") {
+                return "Calibri".into();
+            }
+            if key.contains("georgia") {
+                return "Georgia".into();
+            }
+            if key.contains("courier") {
+                return "Courier New".into();
+            }
         }
-        "DejaVu Sans".into()
+        if generic_only {
+            // SVG omitted a concrete Latin face → Times New Roman.
+            return "Times New Roman".into();
+        }
+        "Times New Roman".into()
     }
 
     /// Resolve a concrete face file for embedding.
@@ -397,12 +528,19 @@ impl FontDb {
             })?;
 
         let path_l = face.path.to_string_lossy().to_ascii_lowercase();
-        let typeface = if path_l.contains("cjk") || path_l.contains("noto") {
+        // Must match the font name table: MS PowerPoint rejects embedded fonts whose
+        // `p:font/@typeface` does not agree with nameID 1/4 inside the EOT payload.
+        let typeface = if path_l.contains("notosanssc") || path_l.contains("noto sans sc") {
+            "Noto Sans SC".into()
+        } else if path_l.contains("cjk") || (path_l.contains("noto") && path_l.contains("cjk")) {
             "Noto Sans CJK SC".into()
         } else if path_l.contains("dejavu") {
             "DejaVu Sans".into()
+        } else if path_l.contains("liberation") {
+            "Liberation Sans".into()
         } else {
-            "Arial".into()
+            // Prefer the resolved CSS family; do not lie as "Arial" for substitutes.
+            self.typeface_for(font_family, false)
         };
 
         let bytes = if face.data.get(0..4) == Some(b"ttcf") {
@@ -413,9 +551,24 @@ impl FontDb {
         Some((typeface, face.path.clone(), bytes, bold))
     }
 
-    /// Embeddable CJK face (extracted from TTC) for East-Asian typeface.
+    /// Embeddable CJK face for East-Asian typeface.
+    ///
+    /// Prefer bundled TrueType `Noto Sans SC` (Source Han Sans SC, fsType=0).
+    /// Fall back to a single-face extract from system Noto Sans CJK SC TTC.
     pub fn cjk_face_for_embed(&self, bold: bool) -> Option<(String, PathBuf, Vec<u8>, bool)> {
         let style = if bold { "bold" } else { "regular" };
+        if let Some(face) = self
+            .faces
+            .get("noto sans sc")
+            .and_then(|m| m.get(style).or_else(|| m.get("regular")))
+        {
+            return Some((
+                "Noto Sans SC".into(),
+                face.path.clone(),
+                face.data.clone(),
+                bold,
+            ));
+        }
         let face = self
             .faces
             .get("noto sans cjk sc")
@@ -426,6 +579,11 @@ impl FontDb {
             face.data.clone()
         };
         Some(("Noto Sans CJK SC".into(), face.path.clone(), bytes, bold))
+    }
+
+    /// Whether this FontDb has a bundled ODTTF-safe CJK face.
+    pub fn has_embeddable_cjk(&self) -> bool {
+        self.faces.contains_key("noto sans sc")
     }
 
     fn resolve_prefer_latin(&self, families: &[String], style: &str) -> Option<&FontFace> {
@@ -1193,6 +1351,31 @@ mod tests {
             );
         }
         let _ = prop9;
+    }
+
+    #[test]
+    fn typeface_for_defaults_tnr_and_yahei() {
+        let db = FontDb::global();
+        // SVG omitted font-family → generic default stack.
+        assert_eq!(
+            db.typeface_for("Times New Roman, Microsoft YaHei, 微软雅黑, serif", false),
+            "Times New Roman"
+        );
+        assert_eq!(
+            db.typeface_for("Times New Roman, Microsoft YaHei, 微软雅黑, serif", true),
+            "Microsoft YaHei"
+        );
+        assert_eq!(db.typeface_for("serif", false), "Times New Roman");
+        assert_eq!(db.typeface_for("sans-serif", true), "Microsoft YaHei");
+        // Explicit Latin sans stack still maps to Arial (Windows).
+        assert_eq!(
+            db.typeface_for("Helvetica Neue, Helvetica, Arial, PingFang SC, sans-serif", false),
+            "Arial"
+        );
+        assert_eq!(
+            db.typeface_for("Helvetica Neue, Helvetica, Arial, PingFang SC, sans-serif", true),
+            "Microsoft YaHei"
+        );
     }
 }
 

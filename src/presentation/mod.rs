@@ -2,7 +2,10 @@
 
 
 pub mod svg_to_shapes;
-pub use svg_to_shapes::{shape_tree_from_svg, svg_to_shapes, SvgShapeConversion, UsedFont};
+pub use svg_to_shapes::{
+    shape_tree_from_svg, svg_to_shapes, svg_to_shapes_ex, svg_to_shapes_with_options,
+    SvgShapeConversion, SvgToShapesOptions, UsedFont,
+};
 use crate::element::OpenXmlElement;
 use crate::namespace::ns;
 

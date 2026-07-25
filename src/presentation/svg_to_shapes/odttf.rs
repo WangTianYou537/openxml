@@ -6,21 +6,30 @@
 //!
 //! See also: <https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oe376/>
 
-/// Generate a random-ish GUID for embedding (not cryptographically secure; fine for package ids).
+/// Generate a GUID for embedding. Uses OS randomness when available.
 pub fn new_font_guid() -> [u8; 16] {
-    // Mix process time + address entropy without needing rand crate.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let ptr = &nanos as *const _ as usize as u128;
-    let mixed = nanos ^ (ptr << 17) ^ 0xA5A5_5A5A_C3C3_3C3C;
     let mut g = [0u8; 16];
-    for i in 0..16 {
-        g[i] = ((mixed >> (i * 8)) as u8).wrapping_add((i as u8).wrapping_mul(17));
+    // Prefer getrandom via /dev/urandom for unique high bytes (older PRNG left
+    // g[8..] as a fixed 8899-AABBCCDDEEFF pattern which is valid but suspicious).
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        use std::io::Read;
+        let _ = f.read_exact(&mut g);
+    } else {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let ptr = &nanos as *const _ as usize as u128;
+        let mixed = nanos
+            ^ (ptr << 17)
+            ^ (ptr.rotate_left(33))
+            ^ 0xA5A5_5A5A_C3C3_3C3C_1234_5678_9ABC_DEF0;
+        for i in 0..16 {
+            g[i] = (mixed >> (i * 8)) as u8;
+        }
     }
-    // RFC 4122 variant/version bits (version 4-ish)
+    // RFC 4122 variant/version bits (version 4)
     g[6] = (g[6] & 0x0f) | 0x40;
     g[8] = (g[8] & 0x3f) | 0x80;
     g
@@ -78,5 +87,15 @@ mod tests {
         let s = guid_string(&g);
         assert!(s.starts_with('{') && s.ends_with('}'));
         assert_eq!(s.len(), 38);
+    }
+
+    #[test]
+    fn guid_entropy_high_bytes_not_constant_pattern() {
+        let a = new_font_guid();
+        let b = new_font_guid();
+        // With /dev/urandom, successive GUIDs must differ.
+        assert_ne!(a, b);
+        // High bytes must not be the old fixed 88 99 AA BB CC DD EE FF pattern.
+        assert!(!(a[8] == 0x88 && a[9] == 0x99 && a[10] == 0xAA && a[11] == 0xBB));
     }
 }

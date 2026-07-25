@@ -572,6 +572,10 @@ impl OpcPackage {
         let media_options = SimpleFileOptions::default()
             .compression_method(CompressionMethod::Stored)
             .unix_permissions(0o644);
+        // PowerPoint also stores embedded fonts (`.fntdata` / `.odttf`) uncompressed.
+        let font_options = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Stored)
+            .unix_permissions(0o644);
 
         // [Content_Types].xml
         zip.start_file("[Content_Types].xml", options)?;
@@ -587,8 +591,14 @@ impl OpcPackage {
             let bytes = self
                 .load_part(&uri)?
                 .ok_or_else(|| Error::Package(format!("missing part `{uri}`")))?;
-            let opts = if uri.as_str().contains("/media/") {
+            let path = uri.as_str();
+            let opts = if path.contains("/media/") {
                 media_options
+            } else if path.contains("/fonts/")
+                || path.ends_with(".fntdata")
+                || path.ends_with(".odttf")
+            {
+                font_options
             } else {
                 options
             };

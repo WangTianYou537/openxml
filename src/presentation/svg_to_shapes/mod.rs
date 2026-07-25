@@ -16,7 +16,7 @@
 //! - Image: same-document / `data:image/svg+xml` expanded to native shapes (no PNG embed)
 //! - Stroke: `stroke-miterlimit` → DrawingML `a:miter/@lim`; `vector-effect="non-scaling-stroke"`
 //! - Text: real glyph advances via `ttf-parser` + system fonts; rotation via `a:xfrm/@rot`
-//! - Fonts used are reported and embedded as ODTTF (`application/vnd...obfuscatedFont`)
+//! - Fonts used are reported and embedded as EOT `.fntdata` (`application/x-fontdata`)
 //!
 //! Coordinates map the SVG `viewBox` onto a target EMU rectangle.
 //!
@@ -24,6 +24,7 @@
 //! `scripts/svg_pptx_pixel_diff.py` (LO host differences expected).
 
 mod dml;
+pub mod eot;
 mod font;
 mod matrix;
 pub mod odttf;
@@ -105,13 +106,64 @@ pub struct SvgShapeConversion {
     pub used_fonts: Vec<UsedFont>,
 }
 
+/// Options for SVG → DrawingML conversion.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SvgToShapesOptions {
+    /// When true, simple axis-aligned text becomes editable `txBody` boxes.
+    /// When false (`--font-shape`), glyphs are outlined as geometry.
+    pub editable_text: bool,
+    /// Prefer faces that can be EOT-embedded (Noto Sans SC) for `a:latin`/`a:ea`
+    /// and register them in [`SvgShapeConversion::used_fonts`]. Used with
+    /// `--embed-font` / `--embed-font-fully`.
+    pub prefer_embeddable_faces: bool,
+}
+
 /// Convert SVG bytes into native DrawingML shapes sized to `(target_cx, target_cy)` EMUs.
+///
+/// Glyph outlines by default (`editable_text=false`). Use [`svg_to_shapes_ex`] for
+/// editable `txBody` text boxes.
 pub fn svg_to_shapes(
     svg_bytes: &[u8],
     target_cx: i64,
     target_cy: i64,
     start_id: u32,
 ) -> Result<SvgShapeConversion> {
+    svg_to_shapes_ex(svg_bytes, target_cx, target_cy, start_id, false)
+}
+
+/// Convert SVG bytes into native DrawingML shapes.
+///
+/// When `editable_text` is true, simple axis-aligned text runs become PowerPoint
+/// text boxes (`txBox=1` + `txBody`); complex text still outlines glyphs.
+pub fn svg_to_shapes_ex(
+    svg_bytes: &[u8],
+    target_cx: i64,
+    target_cy: i64,
+    start_id: u32,
+    editable_text: bool,
+) -> Result<SvgShapeConversion> {
+    svg_to_shapes_with_options(
+        svg_bytes,
+        target_cx,
+        target_cy,
+        start_id,
+        SvgToShapesOptions {
+            editable_text,
+            prefer_embeddable_faces: false,
+        },
+    )
+}
+
+/// Convert SVG with full options (editable text + embeddable face preference).
+pub fn svg_to_shapes_with_options(
+    svg_bytes: &[u8],
+    target_cx: i64,
+    target_cy: i64,
+    start_id: u32,
+    options: SvgToShapesOptions,
+) -> Result<SvgShapeConversion> {
+    let editable_text = options.editable_text;
+    let prefer_embeddable_faces = options.prefer_embeddable_faces;
     let text =
         std::str::from_utf8(svg_bytes).map_err(|e| Error::Xml(format!("svg is not utf-8: {e}")))?;
     let root = parse_dom(text)?;
@@ -186,6 +238,8 @@ pub fn svg_to_shapes(
         path_index,
         active_clip: None,
         expand_patterns: true,
+        editable_text,
+        prefer_embeddable_faces,
     };
     // SVG 1.2 Tiny `viewport-fill` / `viewport-fill-opacity` on the root.
     {
@@ -2482,7 +2536,8 @@ impl Default for Style {
             vector_effect: "none".into(),
             stroke_dashoffset: 0.0,
             stroke_dashoffset_is_pct: false,
-            font_family: "sans-serif".into(),
+            // When SVG omits font-family: English → Times New Roman, Chinese → Microsoft YaHei.
+            font_family: "Times New Roman, Microsoft YaHei, 微软雅黑, serif".into(),
             font_size: 16.0,
             font_weight: "400".into(),
             font_style: "normal".into(),
@@ -3294,7 +3349,7 @@ fn apply_css_font_shorthand(s: &mut Style, raw: &str, parent_fs: f64) {
         s.font_style = "normal".into();
         s.font_weight = "400".into();
         s.font_size = 16.0;
-        s.font_family = "sans-serif".into();
+        s.font_family = "Times New Roman, Microsoft YaHei, 微软雅黑, serif".into();
         return;
     }
     // system fonts — densify only
@@ -16221,6 +16276,11 @@ struct WalkCtx<'a> {
     active_clip: Option<ActiveClip>,
     /// When true, pattern paints expand as tiled shapes instead of solid approx.
     expand_patterns: bool,
+    /// When true, simple axis-aligned text runs become editable `txBody` boxes.
+    /// Default false keeps glyph outlines for 1:1 fidelity / unit tests.
+    editable_text: bool,
+    /// Prefer EOT-embeddable faces (Noto Sans SC) for editable typefaces.
+    prefer_embeddable_faces: bool,
 }
 
 // ── Gradients ───────────────────────────────────────────────────────────────
@@ -18033,6 +18093,8 @@ fn emit_image_svg_tree(
         path_index: ctx.path_index.clone(),
         active_clip: ctx.active_clip.clone(),
         expand_patterns: ctx.expand_patterns,
+        editable_text: ctx.editable_text,
+        prefer_embeddable_faces: ctx.prefer_embeddable_faces,
     };
     // Index ids/paths inside the nested document for nested <use>.
     let mut nested_ids = HashMap::new();
@@ -23081,6 +23143,200 @@ fn flatten_text_runs(
 
 /// Vertical baseline offset in user units (positive = shift glyphs down in SVG y-down).
 /// Combines dominant-baseline / alignment-baseline / baseline-shift.
+/// Emit an editable DrawingML text box (`txBody` + `txBox=1`) when the run is
+/// simple enough that host font metrics + ODTTF can stand in for glyph outlines.
+///
+/// Returns `true` if a text box was emitted (caller must not outline glyphs).
+fn try_emit_editable_text_box(
+    origin_x: f64,
+    baseline_y: f64,
+    text_w: f64,
+    layout_content: &str,
+    style: &Style,
+    metrics: &font::TextMetrics,
+    letter_spacing: f64,
+    weight: i32,
+    bold: bool,
+    effective_anchor: &str,
+    ctm: Matrix,
+    ctx: &mut WalkCtx<'_>,
+    out: &mut Vec<OpenXmlElement>,
+    next_id: &mut u32,
+) -> bool {
+    if !ctx.editable_text {
+        return false;
+    }
+    if layout_content.is_empty() {
+        return false;
+    }
+    // Vertical / forced RTL / textPath / per-char already branched away; still
+    // require no stroke/filter/shadow and pure translate/uniform-scale CTM.
+    if style.text_stroke_width > 0.0 {
+        return false;
+    }
+    if style.filter.is_some()
+        || style.css_filter_shadow.is_some()
+        || !style.extra_text_shadows.is_empty()
+        || style.text_shadow.is_some()
+    {
+        return false;
+    }
+    if style.text_decoration.contains("underline")
+        || style.text_decoration.contains("line-through")
+        || style.text_decoration.contains("overline")
+        || (!style.text_emphasis_style.is_empty()
+            && !style.text_emphasis_style.eq_ignore_ascii_case("none"))
+    {
+        // Decoration stay on outline path for now.
+        return false;
+    }
+    if style.text_length.is_some() {
+        // textLength stretching needs outline fidelity.
+        return false;
+    }
+    if (effective_font_stretch(style) - 1.0).abs() > 1e-3 {
+        return false;
+    }
+    // Pure translate + uniform scale (no shear/rotate/non-uniform).
+    let eps = 1e-6;
+    if ctm.b.abs() > eps || ctm.c.abs() > eps {
+        return false;
+    }
+    if (ctm.a - ctm.d).abs() > 1e-4 * ctm.a.abs().max(1.0) {
+        return false;
+    }
+    if ctm.a <= 0.0 {
+        return false;
+    }
+    let user_to_emu = ctx.user_to_emu;
+    let m = ctm.then(user_to_emu);
+    // Same purity check after viewBox→EMU map (should still be uniform scale).
+    if m.b.abs() > eps || m.c.abs() > eps {
+        return false;
+    }
+    if (m.a - m.d).abs() > 1e-4 * m.a.abs().max(1.0) || m.a <= 0.0 {
+        return false;
+    }
+
+    // Box top-left in user space: SVG baseline → top via ascent.
+    let box_x = origin_x;
+    let box_y = baseline_y - metrics.ascent;
+    let box_w = text_w.max(style.font_size * 0.5);
+    let box_h = metrics.height.max(style.font_size);
+
+    // Transform four corners; use axis-aligned bbox in EMU.
+    let corners = [
+        (box_x, box_y),
+        (box_x + box_w, box_y),
+        (box_x, box_y + box_h),
+        (box_x + box_w, box_y + box_h),
+    ];
+    let mut xs = [0.0; 4];
+    let mut ys = [0.0; 4];
+    for (i, (ux, uy)) in corners.iter().enumerate() {
+        let (ex, ey) = m.map_point(*ux, *uy);
+        xs[i] = ex;
+        ys[i] = ey;
+    }
+    let min_x = xs.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max_x = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let min_y = ys.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max_y = ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let x_emu = min_x.round() as i64;
+    let y_emu = min_y.round() as i64;
+    let cx_emu = ((max_x - min_x).max(1.0)).round() as i64;
+    let cy_emu = ((max_y - min_y).max(1.0)).round() as i64;
+
+    // DrawingML `sz` is hundredths of a point. 1 user px → m.a EMU; 914400 EMU = 1".
+    let scale = m.a.abs();
+    let font_px = style.font_size;
+    let font_pt = font_px * scale / 12_700.0; // 12700 EMU = 1pt
+    let sz = ((font_pt * 100.0).round() as i64).clamp(100, 400_000);
+
+    // Letter spacing in EMU (DrawingML `spc` is 100ths of a point).
+    let spc = if letter_spacing.abs() > 1e-6 {
+        let ls_emu = letter_spacing * scale;
+        let ls_pt = ls_emu / 12_700.0;
+        (ls_pt * 100.0).round() as i64
+    } else {
+        0
+    };
+
+    let fill_str = style
+        .fill
+        .as_deref()
+        .filter(|s| !s.eq_ignore_ascii_case("none"))
+        .unwrap_or(style.color.as_str());
+    let (rgb, alpha) = parse_color(fill_str)
+        .map(|(r, a)| (r, a * style.fill_opacity * style.opacity))
+        .or_else(|| parse_color(&style.color).map(|(r, a)| (r, a * style.opacity)))
+        .unwrap_or(([0, 0, 0], 1.0));
+
+    let align = match effective_anchor {
+        "middle" => "ctr",
+        "end" => "r",
+        _ => "l",
+    };
+
+        // DrawingML typefaces from the SVG font stack.
+    // - Default (no embed): Times New Roman + Microsoft YaHei (Windows system).
+    // - prefer_embeddable_faces (--embed-font / --embed-font-fully): Noto Sans SC
+    //   for both latin/ea so packaging can EOT-embed a matching name table.
+    let fonts = ctx.fonts;
+    let (latin, ea) = if ctx.prefer_embeddable_faces && fonts.has_embeddable_cjk() {
+        let t = "Noto Sans SC".to_string();
+        (t.clone(), t)
+    } else {
+        (
+            fonts.typeface_for(&style.font_family, false),
+            fonts.typeface_for(&style.font_family, true),
+        )
+    };
+
+    let id = *next_id;
+    *next_id += 1;
+    out.push(text_shape(&TextShapeOpts {
+        id,
+        name: format!("text{id}"),
+        x: x_emu,
+        y: y_emu,
+        cx: cx_emu,
+        cy: cy_emu,
+        rot: None,
+        text: layout_content.to_string(),
+        font_size_half_points: sz,
+        bold,
+        italic: style.font_style == "italic" || style.font_style == "oblique",
+        rgb,
+        alpha: alpha.clamp(0.0, 1.0),
+        align,
+        latin,
+        ea: ea.clone(),
+        letter_spacing_emu: spc,
+    }));
+
+    // Register embeddable faces when packaging will embed (prefer_embeddable_faces),
+    // or when the resolved typeface is already an embeddable Noto face.
+    let wants_embed = ctx.prefer_embeddable_faces
+        || ea.to_ascii_lowercase().contains("noto")
+        || ea.contains("思源")
+        || ea.to_ascii_lowercase().contains("source han");
+    if wants_embed {
+        if let Some((typeface, path, data, b)) = fonts.cjk_face_for_embed(weight >= 700) {
+            let key = format!("{typeface}|{b}");
+            if ctx.used_font_keys.insert(key) {
+                ctx.used_fonts.push(UsedFont {
+                    typeface,
+                    bold: b,
+                    path,
+                    data,
+                });
+            }
+        }
+    }
+    true
+}
+
 fn text_baseline_offset(style: &Style, metrics: &font::TextMetrics) -> f64 {
     let mut key = if style.alignment_baseline != "auto" && style.alignment_baseline != "baseline" {
         style.alignment_baseline.as_str()
@@ -25111,8 +25367,9 @@ fn emit_text_run(
         return;
     }
 
-    // Host-independent 1:1: convert glyphs to path outlines (custGeom), not text boxes.
-    // This eliminates PowerPoint/LO font substitution differences.
+    // Default: glyph outlines (custGeom) for host-independent 1:1 raster.
+    // Axis-aligned simple runs can instead become editable `txBody` text boxes
+    // when the CTM is pure translate/uniform-scale and no stroke/filter tricks apply.
     // Optional common-ligature pre-shaping (explicit font-variant-ligatures only).
     let content_owned;
     let content = if style_common_ligatures(style) {
@@ -25282,6 +25539,25 @@ fn emit_text_run(
         }
     }
     let baseline_y = y + text_baseline_offset(style, &metrics);
+
+    if try_emit_editable_text_box(
+        origin_x,
+        baseline_y,
+        text_w,
+        &layout_content,
+        style,
+        &metrics,
+        letter_spacing,
+        weight,
+        bold,
+        effective_anchor,
+        ctm,
+        ctx,
+        out,
+        next_id,
+    ) {
+        return;
+    }
 
     let mut glyphs = font::outline_glyphs_weight_ex(fonts,
         &layout_content,
@@ -25742,6 +26018,8 @@ mod tests {
             path_index: HashMap::new(),
             active_clip: None,
             expand_patterns: false,
+            editable_text: false,
+            prefer_embeddable_faces: false,
         };
         let node = &root.children[0];
         assert_eq!(ctx_attr_f(&ctx, node, "x", 0.0, 16.0), 20.0);
@@ -26742,7 +27020,9 @@ mod tests {
     }
 
     #[test]
-    fn fill_rule_evenodd_emits_path_fill_mode() {
+    fn fill_rule_evenodd_does_not_emit_invalid_dml_fill() {
+        // ST_PathFillMode has no evenOdd; MS PowerPoint rejects that token.
+        // Converter may still honor even-odd via winding; XML must stay legal.
         let svg = br##"
         <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
           <path d="M10,10 H90 V90 H10 Z M30,30 H70 V70 H30 Z" fill="#f00" fill-rule="evenodd"/>
@@ -26751,7 +27031,11 @@ mod tests {
         assert!(!conv.shapes.is_empty());
         let xml = crate::element::write_element(&conv.shapes[0]).unwrap();
         let s = String::from_utf8_lossy(&xml);
-        assert!(s.contains("evenOdd") || s.contains("evenodd"), "{s}");
+        assert!(
+            !s.contains("evenOdd") && !s.contains("evenodd"),
+            "illegal ST_PathFillMode: {s}"
+        );
+        assert!(s.contains("custGeom") || s.contains("pathLst"), "{s}");
     }
 
     #[test]

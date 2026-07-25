@@ -21,6 +21,7 @@ pub use parts::{
 };
 pub use presentation_document::{
     PresentationDocument, PresentationDocumentType, SlideInfo, SlideLayoutInfo, SlideMasterInfo,
+    SvgFontEmbedMode, SvgShapesOnSlideOptions,
 };
 pub use spreadsheet_document::{
     SpreadsheetDocument, SpreadsheetDocumentType, WorksheetInfo,

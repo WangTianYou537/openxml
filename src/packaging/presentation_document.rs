@@ -120,6 +120,37 @@ pub struct PresentationDocument {
     next_layout_id: u32,
 }
 
+/// How fonts are packaged after SVG → shapes conversion.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SvgFontEmbedMode {
+    /// No font parts. Host substitutes (Windows: TNR / YaHei / Arial).
+    #[default]
+    None,
+    /// Editable text + subset EOT of used faces (`--embed-font`).
+    Subset,
+    /// Editable text + full EOT of used faces (`--embed-font-fully`).
+    Full,
+}
+
+/// Options for [`PresentationDocument::add_svg_shapes_on_slide_ex`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SvgShapesOnSlideOptions {
+    /// `false` = outline glyphs as shapes (`--font-shape`); `true` = text boxes.
+    pub editable_text: bool,
+    /// Font packaging mode.
+    pub font_embed: SvgFontEmbedMode,
+}
+
+impl Default for SvgShapesOnSlideOptions {
+    fn default() -> Self {
+        // Default: editable text boxes, no embed (Windows system faces).
+        Self {
+            editable_text: true,
+            font_embed: SvgFontEmbedMode::None,
+        }
+    }
+}
+
 impl PresentationDocument {
     /// Create a new presentation at `path`.
     pub fn create(path: impl AsRef<Path>, document_type: PresentationDocumentType) -> Result<Self> {
@@ -15633,6 +15664,26 @@ impl PresentationDocument {
         charset: Option<i32>,
         pitch_family: Option<i32>,
     ) -> Result<()> {
+        self.add_embedded_font_faces_full(
+            typeface,
+            regular_rid,
+            bold_rid,
+            charset,
+            pitch_family,
+            None,
+        )
+    }
+
+    /// Like [`add_embedded_font_faces_ex`], with optional panose hex (10 bytes → 20 hex chars).
+    pub fn add_embedded_font_faces_full(
+        &mut self,
+        typeface: &str,
+        regular_rid: Option<&str>,
+        bold_rid: Option<&str>,
+        charset: Option<i32>,
+        pitch_family: Option<i32>,
+        panose: Option<&str>,
+    ) -> Result<()> {
         let pres_uri = self.ensure_presentation()?;
         let mut root = parse_element(
             self.package
@@ -15642,6 +15693,10 @@ impl PresentationDocument {
         )?;
         let p = crate::namespace::ns::PRESENTATIONML.uri;
         let a = crate::namespace::ns::DRAWINGML.uri;
+        let panose_val = panose
+            .filter(|s| s.len() == 20)
+            .unwrap_or("020B0604020202020204")
+            .to_string();
 
         let make_font_el = |typeface: &str| {
             let mut font = OpenXmlElement::new("p", p, "font")
@@ -15654,8 +15709,7 @@ impl PresentationDocument {
             if let Some(pf) = pitch_family {
                 font = font.with_attribute("pitchFamily", pf.to_string());
             }
-            // Common panose for sans-serif Latin; CJK faces ignore it safely.
-            font = font.with_attribute("panose", "020B0604020202020204");
+            font = font.with_attribute("panose", &panose_val);
             font
         };
 
@@ -16757,6 +16811,10 @@ impl PresentationDocument {
     /// edits them as ordinary shapes. Coordinates map the SVG viewBox onto the
     /// given EMU rectangle `(x, y, cx, cy)`.
     ///
+    /// Default options: editable text boxes, no font embed. See
+    /// [`add_svg_shapes_on_slide_ex`] for `--font-shape` / `--embed-font` /
+    /// `--embed-font-fully`.
+    ///
     /// Returns the number of shapes added.
     pub fn add_svg_shapes_on_slide(
         &mut self,
@@ -16766,6 +16824,28 @@ impl PresentationDocument {
         y: i64,
         cx: i64,
         cy: i64,
+    ) -> Result<usize> {
+        self.add_svg_shapes_on_slide_ex(
+            slide_index,
+            svg_bytes,
+            x,
+            y,
+            cx,
+            cy,
+            SvgShapesOnSlideOptions::default(),
+        )
+    }
+
+    /// Like [`add_svg_shapes_on_slide`], with text / font-embed options.
+    pub fn add_svg_shapes_on_slide_ex(
+        &mut self,
+        slide_index: usize,
+        svg_bytes: &[u8],
+        x: i64,
+        y: i64,
+        cx: i64,
+        cy: i64,
+        options: SvgShapesOnSlideOptions,
     ) -> Result<usize> {
         use crate::presentation::svg_to_shapes;
 
@@ -16789,34 +16869,134 @@ impl PresentationDocument {
             .unwrap_or(1)
             + 1;
 
-        let conv = svg_to_shapes::svg_to_shapes(svg_bytes, cx, cy, start_id)?;
-        // Embed fonts used by the SVG text runs as ODTTF (Office obfuscated font).
-        // GUID is generated per face; first 32 bytes XOR'd per ECMA-376 / MS-OFFCRYPTO.
-        // TTC sources are expected to already be extracted to single-face SFNT by the
-        // converter (see font::cjk_face_for_embed / ttc::extract_face).
-        for uf in &conv.used_fonts {
-            // Noto CJK single-face OTTO extract is typically ~16–17MB; allow up to 24MB.
-            if uf.data.len() > 24_000_000 {
-                continue;
+        let prefer_embed = matches!(
+            options.font_embed,
+            SvgFontEmbedMode::Subset | SvgFontEmbedMode::Full
+        ) && options.editable_text;
+        let conv = svg_to_shapes::svg_to_shapes_with_options(
+            svg_bytes,
+            cx,
+            cy,
+            start_id,
+            svg_to_shapes::SvgToShapesOptions {
+                editable_text: options.editable_text,
+                prefer_embeddable_faces: prefer_embed,
+            },
+        )?;
+
+        // Font embed only for editable text boxes (outlined glyphs need no fonts).
+        if options.editable_text
+            && !matches!(options.font_embed, SvgFontEmbedMode::None)
+        {
+            let mut referenced = std::collections::HashSet::new();
+            for sp in &conv.shapes {
+                collect_referenced_typefaces(sp, &mut referenced);
             }
-            // Skip residual TTC blobs that were not extracted.
-            if uf.data.get(0..4) == Some(b"ttcf") {
-                continue;
-            }
-            let guid = crate::presentation::svg_to_shapes::odttf::new_font_guid();
-            let odttf = crate::presentation::svg_to_shapes::odttf::to_odttf(&uf.data, &guid);
-            // MS-OFFCRYPTO: part stem is the braced GUID used as the XOR key.
-            let stem = crate::presentation::svg_to_shapes::odttf::guid_string(&guid);
-            let ct = content_type::FONT_ODTTF;
-            if let Ok((_uri, rid)) = self.add_font_part_named(odttf, ct, "odttf", Some(&stem)) {
-                // panose/charset: set common defaults so Office accepts the face
-                let _ = self.add_embedded_font_faces_ex(
-                    &uf.typeface,
-                    if uf.bold { None } else { Some(&rid) },
-                    if uf.bold { Some(&rid) } else { None },
-                    /* charset */ Some(0), // ANSI default; EA faces still work
-                    /* pitchFamily */ Some(34), // Swiss variable (2<<4 | 2)
-                );
+            if !referenced.is_empty() {
+                let mut codepoints = std::collections::HashSet::new();
+                for sp in &conv.shapes {
+                    collect_text_codepoints(sp, &mut codepoints);
+                }
+                // Keep a small ASCII baseline for post-edit typing (subset mode).
+                for c in 0x20u32..0x7Fu32 {
+                    codepoints.insert(c);
+                }
+                self.package
+                    .opc_mut()
+                    .content_types_mut()
+                    .set_default("fntdata", content_type::FONT_DATA);
+                let mut embedded_any = false;
+                let full = matches!(options.font_embed, SvgFontEmbedMode::Full);
+                for uf in &conv.used_fonts {
+                    if !referenced
+                        .iter()
+                        .any(|t| t.eq_ignore_ascii_case(&uf.typeface))
+                    {
+                        continue;
+                    }
+                    // Skip Windows/macOS system faces and Liberation/DejaVu (MS PPT
+                    // refuses to install Liberation embeds).
+                    let tf_l = uf.typeface.to_ascii_lowercase();
+                    if matches!(
+                        tf_l.as_str(),
+                        "arial"
+                            | "microsoft yahei"
+                            | "微软雅黑"
+                            | "simsun"
+                            | "simhei"
+                            | "nsimsun"
+                            | "dengxian"
+                            | "等线"
+                            | "calibri"
+                            | "segoe ui"
+                            | "tahoma"
+                            | "times new roman"
+                            | "times"
+                            | "courier new"
+                            | "georgia"
+                            | "liberation sans"
+                            | "liberation serif"
+                            | "liberation mono"
+                            | "dejavu sans"
+                            | "dejavu serif"
+                    ) || tf_l.contains("yahei")
+                        || tf_l.starts_with("liberation")
+                        || tf_l.starts_with("dejavu")
+                    {
+                        continue;
+                    }
+                    if uf.data.len() > 24_000_000 {
+                        continue;
+                    }
+                    if uf.data.get(0..4) == Some(b"ttcf") {
+                        continue;
+                    }
+                    let font_bytes = if full {
+                        // Full face; still force installable fsType via subset script
+                        // only when huge (>2MB) CJK would bloat the package too much?
+                        // User asked fully embed — keep original bytes.
+                        uf.data.clone()
+                    } else {
+                        subset_ttf_for_embed(&uf.data, &codepoints)
+                    };
+                    let is_cjk = tf_l.contains("cjk")
+                        || tf_l.contains("noto sans sc")
+                        || uf.typeface.contains("思源")
+                        || tf_l.contains("source han");
+                    let charset_u8: u8 = if is_cjk { 134 } else { 0 };
+                    let charset_xml: i32 = if is_cjk { -122 } else { 0 };
+                    let pitch_family = if is_cjk { 2 } else { 34 };
+                    let eot_info = {
+                        let mut info = crate::presentation::svg_to_shapes::eot::font_info_from_sfnt(
+                            &font_bytes,
+                            &uf.typeface,
+                        );
+                        info.family = uf.typeface.clone();
+                        info.charset = charset_u8;
+                        info
+                    };
+                    let eot =
+                        crate::presentation::svg_to_shapes::eot::to_eot(&font_bytes, &eot_info);
+                    let panose = crate::presentation::svg_to_shapes::eot::panose_hex(&eot_info);
+                    if let Ok((_uri, rid)) =
+                        self.add_font_part_named(eot, content_type::FONT_DATA, "fntdata", None)
+                    {
+                        let _ = self.add_embedded_font_faces_full(
+                            &uf.typeface,
+                            if uf.bold { None } else { Some(&rid) },
+                            if uf.bold { Some(&rid) } else { None },
+                            Some(charset_xml),
+                            Some(pitch_family),
+                            Some(&panose),
+                        );
+                        embedded_any = true;
+                    }
+                }
+                if embedded_any {
+                    let _ = self.set_embed_true_type_fonts(true);
+                    // saveSubsetFonts only when we actually subset.
+                    let _ = self.set_save_subset_fonts(!full);
+                }
             }
         }
         // Offset all shapes by (x, y) if non-zero
@@ -17570,6 +17750,100 @@ fn offset_shape(elem: &mut OpenXmlElement, dx: i64, dy: i64) {
     for child in &mut elem.children {
         offset_shape(child, dx, dy);
     }
+}
+
+/// True when a shape tree fragment still references a font typeface (text runs).
+/// Outlined glyph shapes (`custGeom` only) do not need embedded fonts.
+
+fn collect_text_codepoints(elem: &OpenXmlElement, out: &mut std::collections::HashSet<u32>) {
+    if elem.local_name == "t" {
+        if let Some(t) = elem.text.as_deref() {
+            for c in t.chars() {
+                out.insert(c as u32);
+            }
+        }
+    }
+    for child in &elem.children {
+        collect_text_codepoints(child, out);
+    }
+}
+
+/// Glyph-subset a TrueType face to `codepoints` (on-demand embed).
+///
+/// Uses `scripts/subset_ttf.py` + fontTools. Returns original bytes when the
+/// face is not TrueType SFNT, subsetting is unavailable, or the subset is not smaller.
+fn subset_ttf_for_embed(font_bytes: &[u8], codepoints: &std::collections::HashSet<u32>) -> Vec<u8> {
+    // TrueType only (`\0\x01\0\0`); skip CFF/OTTO and collections.
+    if font_bytes.get(0..4) != Some(b"\x00\x01\x00\x00") {
+        return font_bytes.to_vec();
+    }
+    if codepoints.is_empty() {
+        return font_bytes.to_vec();
+    }
+    // Tiny faces already smaller than a useful subset payload — still try when
+    // larger than ~32KB so ASCII-only packs shrink consistently.
+    if font_bytes.len() < 32_768 {
+        return font_bytes.to_vec();
+    }
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/subset_ttf.py");
+    if !script.exists() {
+        return font_bytes.to_vec();
+    }
+    let tmp = std::env::temp_dir();
+    let pid = std::process::id();
+    // Unique paths per call so regular/bold subsets in one process do not race.
+    let nonce = codepoints.len().wrapping_mul(font_bytes.len());
+    let in_path = tmp.join(format!("openxml-embed-in-{pid}-{nonce}.ttf"));
+    let out_path = tmp.join(format!("openxml-embed-out-{pid}-{nonce}.ttf"));
+    if std::fs::write(&in_path, font_bytes).is_err() {
+        return font_bytes.to_vec();
+    }
+    let mut args: Vec<String> = vec![
+        script.to_string_lossy().into_owned(),
+        in_path.to_string_lossy().into_owned(),
+        out_path.to_string_lossy().into_owned(),
+    ];
+    // Cap codepoint list to keep argv reasonable; include all for typical slides.
+    for cp in codepoints.iter().copied().take(4000) {
+        args.push(format!("{cp:X}"));
+    }
+    let status = std::process::Command::new("python3").args(&args).status();
+    let result = match status {
+        Ok(s) if s.success() => std::fs::read(&out_path).ok(),
+        _ => None,
+    };
+    let _ = std::fs::remove_file(&in_path);
+    let _ = std::fs::remove_file(&out_path);
+    match result {
+        Some(b) if !b.is_empty() && b.len() <= font_bytes.len() => b,
+        _ => font_bytes.to_vec(),
+    }
+}
+
+/// Collect `a:latin` / `a:ea` / `a:cs` / `a:sym` typeface names from a shape tree.
+fn collect_referenced_typefaces(elem: &OpenXmlElement, out: &mut std::collections::HashSet<String>) {
+    if matches!(elem.local_name.as_str(), "latin" | "ea" | "cs" | "sym") {
+        if let Some(tf) = elem.get_attribute("typeface") {
+            if !tf.is_empty() && tf != "+mn-lt" && tf != "+mj-lt" && tf != "+mn-ea" && tf != "+mj-ea" {
+                out.insert(tf.to_string());
+            }
+        }
+    }
+    for child in &elem.children {
+        collect_referenced_typefaces(child, out);
+    }
+}
+
+fn shape_references_typeface(elem: &OpenXmlElement) -> bool {
+    if matches!(elem.local_name.as_str(), "latin" | "ea" | "cs" | "sym")
+        && elem.get_attribute("typeface").is_some()
+    {
+        return true;
+    }
+    if elem.local_name == "txBody" {
+        return true;
+    }
+    elem.children.iter().any(shape_references_typeface)
 }
 
 /// Insert index for `p:embeddedFontLst` under `p:presentation` per ECMA-376 CT_Presentation:

@@ -60,8 +60,27 @@ pub struct ShapeBuild {
     /// DrawingML miter lim (100000ths); ignored unless join is miter.
     pub stroke_miter_lim: Option<i64>,
     pub effect: Option<ShapeEffect>,
-    /// DrawingML path fill mode: None = default (norm), Some("evenOdd") for glyph holes.
+    /// DrawingML `a:path/@fill` ([`ST_PathFillMode`](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.pathfillmodevalues)):
+    /// `none|norm|lighten|lightenLess|darken|darkenLess`. There is **no** `evenOdd` —
+    /// MS PowerPoint rejects packages that use it. SVG even-odd holes must be expressed
+    /// via opposite subpath winding under `norm` (TrueType glyph outlines already do).
     pub path_fill_mode: Option<&'static str>,
+}
+
+/// Map converter fill-mode tags to a legal ST_PathFillMode, or None for default `norm`.
+fn sanitize_path_fill_mode(mode: Option<&str>) -> Option<&'static str> {
+    match mode {
+        None => None,
+        Some("none") => Some("none"),
+        Some("norm") => Some("norm"),
+        Some("lighten") => Some("lighten"),
+        Some("lightenLess") => Some("lightenLess"),
+        Some("darken") => Some("darken"),
+        Some("darkenLess") => Some("darkenLess"),
+        // Legacy invalid token from SVG fill-rule=evenodd — drop so default norm applies.
+        Some("evenOdd") | Some("evenodd") | Some("even-odd") => None,
+        Some(_) => None,
+    }
 }
 
 pub fn freeform_shape(b: &ShapeBuild) -> OpenXmlElement {
@@ -84,7 +103,7 @@ pub fn freeform_shape(b: &ShapeBuild) -> OpenXmlElement {
         .with_attribute("h", path_h.to_string());
     if matches!(b.fill, Paint::None) {
         path = path.with_attribute("fill", "none");
-    } else if let Some(mode) = b.path_fill_mode {
+    } else if let Some(mode) = sanitize_path_fill_mode(b.path_fill_mode) {
         path = path.with_attribute("fill", mode);
     }
 
