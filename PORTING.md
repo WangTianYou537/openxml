@@ -1008,6 +1008,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `OpenXmlPackageValidationResult::into_pkg_validation_error` / `part_name_and_uri` (C# ValidatePackageStructure mapping); DocumentValidator uses it for package errors
 - [x] `from_validation_error` strips `Pkg_` prefix; `part_display_name` resolves class names from content type
 - [x] Spreadsheet particles: `sst` / `styleSheet` / `fonts` / `fills` / `borders` / `cellXfs`; walks + DocumentValidator roots
+- [x] Word particles: `sectPr` / `sdt` / `sdtContent` / `hyperlink` / `drawing`
 
 **Still intentionally deferred / partial:**
 

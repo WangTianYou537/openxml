@@ -1034,6 +1034,87 @@ pub mod word {
         )
     }
 
+    /// `<w:sectPr>` — common section properties (simplified ordered optionals).
+    pub fn section_properties() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("footnotePr", Occurs::OPTIONAL),
+                Particle::element("endnotePr", Occurs::OPTIONAL),
+                Particle::element("type", Occurs::OPTIONAL),
+                Particle::element("pgSz", Occurs::OPTIONAL),
+                Particle::element("pgMar", Occurs::OPTIONAL),
+                Particle::element("pgBorders", Occurs::OPTIONAL),
+                Particle::element("lnNumType", Occurs::OPTIONAL),
+                Particle::element("pgNumType", Occurs::OPTIONAL),
+                Particle::element("cols", Occurs::OPTIONAL),
+                Particle::element("formProt", Occurs::OPTIONAL),
+                Particle::element("vAlign", Occurs::OPTIONAL),
+                Particle::element("titlePg", Occurs::OPTIONAL),
+                Particle::element("textDirection", Occurs::OPTIONAL),
+                Particle::element("bidi", Occurs::OPTIONAL),
+                Particle::element("docGrid", Occurs::OPTIONAL),
+                Particle::element("headerReference", Occurs::STAR),
+                Particle::element("footerReference", Occurs::STAR),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<w:sdt>` structured document tag (block/run-level simplified).
+    pub fn sdt() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("sdtPr", Occurs::OPTIONAL),
+                Particle::element("sdtEndPr", Occurs::OPTIONAL),
+                Particle::element("sdtContent", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<w:sdtContent>` — block-level content choice.
+    pub fn sdt_content() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("p", Occurs::ONE),
+                Particle::element("tbl", Occurs::ONE),
+                Particle::element("sdt", Occurs::ONE),
+                Particle::element("customXml", Occurs::ONE),
+                Particle::element("r", Occurs::ONE),
+                Particle::element("hyperlink", Occurs::ONE),
+                Particle::element("bookmarkStart", Occurs::ONE),
+                Particle::element("bookmarkEnd", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<w:hyperlink>` — run-level content.
+    pub fn hyperlink() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("r", Occurs::ONE),
+                Particle::element("sdt", Occurs::ONE),
+                Particle::element("hyperlink", Occurs::ONE),
+                Particle::element("fldSimple", Occurs::ONE),
+                Particle::element("bookmarkStart", Occurs::ONE),
+                Particle::element("bookmarkEnd", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<w:drawing>` — DrawingML anchor/inline.
+    pub fn drawing() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("anchor", Occurs::ONE),
+                Particle::element("inline", Occurs::ONE),
+            ],
+            Occurs::PLUS,
+        )
+    }
+
     /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
@@ -1044,6 +1125,11 @@ pub mod word {
             "tbl" => table(),
             "tr" => table_row(),
             "tc" => table_cell(),
+            "sectPr" => section_properties(),
+            "sdt" => sdt(),
+            "sdtContent" => sdt_content(),
+            "hyperlink" => hyperlink(),
+            "drawing" => drawing(),
             _ => return None,
         })
     }
@@ -1716,6 +1802,30 @@ mod tests {
         body, document, paragraph, paragraph_properties, paragraph_with_text, run,
         table_from_strings, text,
     };
+
+    #[test]
+    fn word_particle_for_resolves_extended_roots() {
+        assert!(word::particle_for("sectPr").is_some());
+        assert!(word::particle_for("sdt").is_some());
+        assert!(word::particle_for("sdtContent").is_some());
+        assert!(word::particle_for("hyperlink").is_some());
+        assert!(word::particle_for("drawing").is_some());
+        assert!(crate::validation::particle::particle_for("sectPr").is_some());
+    }
+
+    #[test]
+    fn sdt_particle_accepts_pr_then_content() {
+        let mut sdt = crate::element::OpenXmlElement::w("sdt");
+        sdt.append_child(crate::element::OpenXmlElement::w("sdtPr"));
+        sdt.append_child(crate::element::OpenXmlElement::w("sdtContent"));
+        let errs = validate_particle_for_version(
+            &sdt,
+            &word::sdt(),
+            "w:sdt",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
 
     #[test]
     fn document_particle_ok() {
