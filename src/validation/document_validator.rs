@@ -145,6 +145,17 @@ impl DocumentValidator {
             }
         }
 
+        // C# AlternateContentValidator + CompatibilityRuleAttributesValidator passes.
+        let mut mc_errors = super::validate_alternate_content(root);
+        mc_errors.extend(super::validate_mc_attributes(root));
+        for error in mc_errors {
+            if !context.try_add_error(
+                error.with_error_type(ValidationErrorType::MarkupCompatibility),
+            )? {
+                return Ok(());
+            }
+        }
+
         // Constraint pass (C# element.Metadata.Constraints per element).
         let mut constraint_errors = super::validate_schematron_numeric_ranges(root);
         constraint_errors.extend(super::validate_schematron_string_lengths(root));
@@ -285,6 +296,25 @@ mod tests {
             .validate_element(&OpenXmlElement::comment("skip"), &mut context)
             .unwrap();
         assert!(context.errors().is_empty());
+    }
+
+    #[test]
+    fn schema_pass_reports_mc_structural_errors() {
+        let root = crate::element::OpenXmlElement::w("document").with_children(vec![
+            crate::markup_compatibility::alternate_content(Vec::<OpenXmlElement>::new()),
+        ]);
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&root, &mut context).unwrap();
+        let error = context
+            .errors()
+            .iter()
+            .find(|e| e.message.contains("MC_ShallContainChoice"))
+            .expect("MC structural error");
+        assert_eq!(
+            error.error_type(),
+            ValidationErrorType::MarkupCompatibility
+        );
     }
 
     #[test]
