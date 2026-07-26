@@ -988,6 +988,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `SchemaTypeValidator` shell: `validate_schema_type` / `validate_schema_types_in_tree` / `is_reserved_element` / empty-root leaf check; DocumentValidator schema pass routes through it with inherited MC Ignorable
 - [x] Framework `IValidator` shell: `Validator` trait + `VersionGate` / `RequiredValidator` / `StringValidator` / `NumberValidator` / `EnumValidator` / `UnionValidator` / `ListValidator` / `OfficeVersionValidator` + `validate_value` helper
 - [x] `validate_attribute_value_types` routes declared attributes through `validate_attribute_with_type_name` / `TypeNameValidator` (Number/OnOff/HexBinary/token-family) with XsdType lexical fallback
+- [x] Expand `ValidationResources` message table: remaining Sch_* (All/Union/Empty/Length/TotalDigits/Unexpected/WrongType/StringIsNotValidValue), Sem_AttributeValueUniqueInDocument / Sem_CellValue, Pkg_* / Fmt_* / TypeName_* ids
 
 **Still intentionally deferred / partial:**
 

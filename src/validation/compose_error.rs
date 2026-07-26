@@ -79,6 +79,64 @@ pub fn validation_resource_message(message_id: &str) -> Option<&'static str> {
             "The element '{0}' is a leaf element and cannot contain children."
         }
         "Sch_MissingPartRootElement" => "The '{0}' part is missing its root element.",
+        "Sch_AllElement" => {
+            "Element '{0}' cannot appear more than once if content model type is \"all\"."
+        }
+        "Sch_AttributeUnionFailedEx" => {
+            "The '{0}' attribute is invalid - The value '{1}' is not valid according to any of the memberTypes of the union."
+        }
+        "Sch_ElementUnionFailedEx" => {
+            "The '{0}' element is invalid - The value '{1}' is not valid according to any of the memberTypes of the union."
+        }
+        "Sch_ElementValueDataTypeDetailed" => {
+            "The element '{0}' has invalid value '{1}'.{2}"
+        }
+        "Sch_EmptyAttributeValue" => "The attribute value cannot be empty.",
+        "Sch_EmptyElementValue" => "The text value cannot be empty.",
+        "Sch_InvalidElementContentWrongType" => {
+            "The element has child element '{0}' of invalid type '{1}'."
+        }
+        "Sch_LengthConstraintFailed" => {
+            "The actual length according to data type '{0}' is not equal to the specified length. The expected length is {1}."
+        }
+        "Sch_MaxLengthConstraintFailed" => {
+            "The actual length according to data type '{0}' is greater than the MaxLength value. The length must be smaller than or equal to {1}."
+        }
+        "Sch_MinLengthConstraintFailed" => {
+            "The actual length according to data type '{0}' is less than the MinLength value. The length must be bigger than or equal to {1}."
+        }
+        "Sch_StringIsNotValidValue" => "The string '{0}' is not a valid '{1}' value.",
+        "Sch_TotalDigitsConstraintFailed" => {
+            "The TotalDigits constraint failed. The expected number of digits is {0}."
+        }
+        "Sch_UnexpectedElementContentExpectingComplex" => {
+            "The element has unexpected child element '{0}'.{1}"
+        }
+        "Sem_AttributeValueUniqueInDocument" => {
+            "Attribute '{0}' should have unique value in the whole document. Its current value '{1}' duplicates with others."
+        }
+        "Sem_CellValue" => "Cell contents have invalid value '{0}' for type '{1}'.",
+        "Pkg_PartIsNotAllowed" => "The part is not allowed.",
+        "Pkg_RequiredPartDoNotExist" => "A required part is missing.",
+        "Pkg_OnlyOnePartAllowed" => "Only one part of this type is allowed.",
+        "Pkg_DataPartReferenceIsNotAllowed" => "The data part reference is not allowed.",
+        "Pkg_ExtendedPartIsOpenXmlPart" => {
+            "An ExtendedPart has an Open XML relationship type."
+        }
+        "Fmt_ListOfPossibleElements" => " List of possible elements expected: {0}.",
+        "Fmt_ElementName" => "<{0}>",
+        "Fmt_ElementNameSeparator" => ",",
+        "Fmt_AnyElementInNamespace" => "any element in namespace '{0}'",
+        "TypeName_base64Binary" => "base64Binary",
+        "TypeName_hexBinary" => "hexBinary",
+        "TypeName_ID" => "ID",
+        "TypeName_Integer" => "Integer",
+        "TypeName_language" => "language",
+        "TypeName_NCName" => "NCName",
+        "TypeName_nonNegativeInteger" => "nonNegativeInteger",
+        "TypeName_positiveInteger" => "positiveInteger",
+        "TypeName_QName" => "QName",
+        "TypeName_token" => "token",
         "MC_ShallContainChoice" => {
             "An AlternateContent element must contain one or more Choice child elements, optionally followed by a Fallback child element."
         }
@@ -241,6 +299,52 @@ mod tests {
         assert_eq!(
             unknown.description(),
             "An unknown error occurred. Original message: 'Nope_NotReal'"
+        );
+    }
+
+    #[test]
+    fn expanded_resource_table_covers_missing_sch_and_pkg_ids() {
+        for id in [
+            "Sch_AllElement",
+            "Sch_AttributeUnionFailedEx",
+            "Sch_ElementUnionFailedEx",
+            "Sch_ElementValueDataTypeDetailed",
+            "Sch_EmptyAttributeValue",
+            "Sch_EmptyElementValue",
+            "Sch_InvalidElementContentWrongType",
+            "Sch_LengthConstraintFailed",
+            "Sch_MaxLengthConstraintFailed",
+            "Sch_MinLengthConstraintFailed",
+            "Sch_StringIsNotValidValue",
+            "Sch_TotalDigitsConstraintFailed",
+            "Sch_UnexpectedElementContentExpectingComplex",
+            "Sem_AttributeValueUniqueInDocument",
+            "Sem_CellValue",
+            "Pkg_PartIsNotAllowed",
+            "Pkg_RequiredPartDoNotExist",
+            "Pkg_OnlyOnePartAllowed",
+            "Pkg_DataPartReferenceIsNotAllowed",
+            "TypeName_hexBinary",
+            "Fmt_ListOfPossibleElements",
+        ] {
+            assert!(
+                validation_resource_message(id).is_some(),
+                "missing resource id {id}"
+            );
+        }
+        assert_eq!(
+            format_positional(
+                validation_resource_message("Sch_StringIsNotValidValue").unwrap(),
+                &["xyz", "token"]
+            ),
+            "The string 'xyz' is not a valid 'token' value."
+        );
+        assert_eq!(
+            format_positional(
+                validation_resource_message("Sem_CellValue").unwrap(),
+                &["not-a-number", "n"]
+            ),
+            "Cell contents have invalid value 'not-a-number' for type 'n'."
         );
     }
 }
