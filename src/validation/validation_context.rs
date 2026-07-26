@@ -2,10 +2,34 @@
 
 use super::{ValidationCache, ValidationError, ValidationSettings};
 use crate::element::OpenXmlElement;
+use crate::error::{Error, Result};
 use crate::file_format::FileFormatVersions;
 use crate::markup_compatibility::{
     selected_alternate_content_branch, ElementAction, MarkupCompatibilityAttributes, McContext,
 };
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
+#[derive(Debug, Clone, Default)]
+pub struct ValidationCancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl ValidationCancellationToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+}
 
 /// A logical validation child paired with its inherited MC context.
 #[derive(Debug, Clone)]
@@ -82,6 +106,7 @@ pub struct ValidationContext {
     pub stack: super::ValidationStack,
     /// Per-pass typed state cache (C# `StateManager`).
     pub state: super::StateManager,
+    cancellation_token: ValidationCancellationToken,
 }
 
 impl ValidationContext {
@@ -97,11 +122,25 @@ impl ValidationContext {
             current_path: String::new(),
             stack: super::ValidationStack::new(),
             state: super::StateManager::new(),
+            cancellation_token: ValidationCancellationToken::new(),
         }
     }
 
     pub fn with_file_format(version: FileFormatVersions) -> Self {
         Self::new(ValidationSettings::new(version))
+    }
+
+    pub fn with_cancellation_token(
+        settings: ValidationSettings,
+        cancellation_token: ValidationCancellationToken,
+    ) -> Self {
+        let mut context = Self::new(settings);
+        context.cancellation_token = cancellation_token;
+        context
+    }
+
+    pub fn cancellation_token(&self) -> &ValidationCancellationToken {
+        &self.cancellation_token
     }
 
     pub fn file_format(&self) -> FileFormatVersions {
@@ -118,7 +157,9 @@ impl ValidationContext {
 
     pub fn reset(&mut self) {
         self.errors.clear();
+        self.collect_expected_children = false;
         self.expected_children.clear();
+        self.mc_context = None;
         self.current_path.clear();
         self.stack.clear();
         self.state.clear();
@@ -130,6 +171,22 @@ impl ValidationContext {
 
     pub fn stack_mut(&mut self) -> &mut super::ValidationStack {
         &mut self.stack
+    }
+
+    pub fn with_error_sink<R, F>(&mut self, sink: super::ValidationErrorSink, callback: F) -> R
+    where
+        F: FnOnce(&mut ValidationContext) -> R,
+    {
+        let depth = self.stack.depth();
+        self.stack.push_error_sink(sink);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(self)));
+        while self.stack.depth() > depth {
+            self.stack.pop();
+        }
+        match result {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
     }
 
     pub fn state(&self) -> &super::StateManager {
@@ -189,6 +246,23 @@ impl ValidationContext {
         self.settings.max_number_of_errors
     }
 
+    pub fn try_create_error(
+        &mut self,
+        id: &str,
+        error_type: super::ValidationErrorType,
+        description: impl AsRef<str>,
+    ) -> Result<bool> {
+        let path = if self.current_path.is_empty() {
+            String::new()
+        } else {
+            self.current_path.clone()
+        };
+        self.try_add_error(
+            super::ValidationError::with_id(path, id, description.as_ref())
+                .with_error_type(error_type),
+        )
+    }
+
     /// C# `ValidationContext.CreateError` shell.
     pub fn create_error(
         &mut self,
@@ -217,18 +291,46 @@ impl ValidationContext {
         self.add_error(super::ValidationError::with_id(path, id, description.as_ref()))
     }
 
-    /// True when the max-error budget is exhausted (C# `CheckIfCancelled` error-count half).
+    /// Check cancellation before applying the maximum-error budget.
+    pub fn check_if_cancelled(&self) -> Result<bool> {
+        if self.cancellation_token.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+        Ok(self.check_max_errors())
+    }
+
+    /// True when the max-error budget is exhausted.
     pub fn check_max_errors(&self) -> bool {
         let max = self.settings.max_number_of_errors;
         max > 0 && self.errors.len() >= max
+    }
+
+    pub fn try_add_error(&mut self, error: ValidationError) -> Result<bool> {
+        if self.check_if_cancelled()? {
+            return Ok(false);
+        }
+        self.route_error(error);
+        Ok(true)
     }
 
     pub fn add_error(&mut self, error: ValidationError) -> bool {
         if self.check_max_errors() {
             return false;
         }
-        self.errors.push(error);
+        self.route_error(error);
         true
+    }
+
+    fn route_error(&mut self, error: ValidationError) {
+        if let Some(sink) = self
+            .stack
+            .current()
+            .and_then(|frame| frame.add_error.clone())
+        {
+            sink.add(error);
+        } else {
+            self.errors.push(error);
+        }
     }
 
     pub fn errors(&self) -> &[ValidationError] {
@@ -237,6 +339,24 @@ impl ValidationContext {
 
     pub fn into_errors(self) -> Vec<ValidationError> {
         self.errors
+    }
+
+    pub fn set_collect_expected_children(&mut self, collect: bool) {
+        self.collect_expected_children = collect;
+    }
+
+    pub fn with_expected_children_collection<R, F>(&mut self, callback: F) -> R
+    where
+        F: FnOnce(&mut ValidationContext) -> R,
+    {
+        let previous = self.collect_expected_children;
+        self.collect_expected_children = true;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(self)));
+        self.collect_expected_children = previous;
+        match result {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
     }
 
     pub fn push_expected_child(&mut self, name: impl Into<String>) {
@@ -283,8 +403,89 @@ mod tests {
         assert!(!ctx.add_error(ValidationError::new("c", "e3")));
         assert_eq!(ctx.errors().len(), 2);
         assert!(ctx.check_max_errors());
+        assert_eq!(ctx.check_if_cancelled().unwrap(), true);
         ctx.clear();
         assert!(ctx.valid());
+    }
+
+    #[test]
+    fn cancellation_is_checked_before_error_budget() {
+        let token = ValidationCancellationToken::new();
+        let mut ctx = ValidationContext::with_cancellation_token(
+            ValidationSettings::new(FileFormatVersions::OFFICE2010).with_max_number_of_errors(1),
+            token.clone(),
+        );
+        assert!(!ctx.check_if_cancelled().unwrap());
+        token.cancel();
+        assert!(matches!(ctx.check_if_cancelled(), Err(Error::Cancelled)));
+        assert!(matches!(
+            ctx.try_add_error(ValidationError::new("cancelled", "error")),
+            Err(Error::Cancelled)
+        ));
+        assert!(matches!(
+            ctx.try_create_error(
+                "Sch_Cancelled",
+                super::super::ValidationErrorType::Schema,
+                "cancelled"
+            ),
+            Err(Error::Cancelled)
+        ));
+        assert!(ctx.errors().is_empty());
+        assert!(ctx.cancellation_token().is_cancelled());
+    }
+
+    #[test]
+    fn scoped_error_sink_routes_and_restores() {
+        use std::sync::{Arc, Mutex};
+
+        let redirected = Arc::new(Mutex::new(Vec::new()));
+        let redirected2 = Arc::clone(&redirected);
+        let mut ctx = ValidationContext::default();
+        ctx.with_error_sink(
+            super::super::ValidationErrorSink::new(move |error| {
+                redirected2.lock().unwrap().push(error);
+            }),
+            |ctx| {
+                ctx.stack_mut().push_value("nested");
+                assert!(ctx.add_error(ValidationError::new("redirected", "one")));
+            },
+        );
+        assert_eq!(redirected.lock().unwrap().len(), 1);
+        assert!(ctx.errors().is_empty());
+        assert!(ctx.stack().is_empty());
+
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            ctx.with_error_sink(super::super::ValidationErrorSink::new(|_| {}), |ctx| {
+                ctx.stack_mut().push_value("nested");
+                panic!("sink failed");
+            });
+        }));
+        assert!(panic.is_err());
+        assert!(ctx.stack().is_empty());
+        assert!(ctx.add_error(ValidationError::new("default", "two")));
+        assert_eq!(ctx.errors().len(), 1);
+    }
+
+    #[test]
+    fn expected_children_collection_is_scoped() {
+        let mut ctx = ValidationContext::default();
+        ctx.push_expected_child("ignored");
+        assert!(ctx.expected_children().is_empty());
+
+        ctx.with_expected_children_collection(|ctx| {
+            ctx.push_expected_child("w:p");
+            assert!(ctx.collect_expected_children);
+        });
+        assert!(!ctx.collect_expected_children);
+        assert_eq!(ctx.expected_children(), &[String::from("w:p")]);
+
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            ctx.with_expected_children_collection(|_| panic!("collection failed"));
+        }));
+        assert!(panic.is_err());
+        assert!(!ctx.collect_expected_children);
+        ctx.clear_expected_children();
+        assert!(ctx.expected_children().is_empty());
     }
 
     #[test]

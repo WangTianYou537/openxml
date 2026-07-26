@@ -3,6 +3,37 @@
 use super::ValidationError;
 use std::any::Any;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+#[derive(Clone)]
+pub struct ValidationErrorSink {
+    callback: Arc<Mutex<Box<dyn FnMut(ValidationError) + Send>>>,
+}
+
+impl ValidationErrorSink {
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnMut(ValidationError) + Send + 'static,
+    {
+        Self {
+            callback: Arc::new(Mutex::new(Box::new(callback))),
+        }
+    }
+
+    pub fn add(&self, error: ValidationError) {
+        let mut callback = self
+            .callback
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        callback(error);
+    }
+}
+
+impl std::fmt::Debug for ValidationErrorSink {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ValidationErrorSink")
+    }
+}
 
 /// One frame on the validation stack (C# `ValidationElement` subset).
 #[derive(Debug, Clone, Default)]
@@ -13,6 +44,7 @@ pub struct ValidationElement {
     pub is_attribute: bool,
     pub property_name: Option<String>,
     pub simple_value: Option<String>,
+    pub add_error: Option<ValidationErrorSink>,
 }
 
 impl ValidationElement {
@@ -73,6 +105,7 @@ impl ValidationElement {
             self.property_name = other.property_name.clone();
             self.simple_value = other.simple_value.clone();
             self.is_attribute = other.is_attribute;
+            self.add_error = other.add_error.clone();
         }
     }
 }
@@ -125,6 +158,9 @@ impl ValidationStack {
         } else if frame.simple_value.is_some() {
             updated.simple_value = frame.simple_value;
         }
+        if frame.add_error.is_some() {
+            updated.add_error = frame.add_error;
+        }
         self.elements.push(updated);
     }
 
@@ -158,6 +194,13 @@ impl ValidationStack {
         frame.property_name = Some(property_name.into());
         frame.simple_value = value.map(Into::into);
         frame.is_attribute = is_attribute;
+        self.elements.push(frame);
+    }
+
+    pub fn push_error_sink(&mut self, sink: ValidationErrorSink) {
+        let mut frame = self.available.pop().unwrap_or_default();
+        frame.copy_from(self.current());
+        frame.add_error = Some(sink);
         self.elements.push(frame);
     }
 
@@ -205,6 +248,20 @@ impl ValidationStack {
         let value = value.map(Into::into);
         let depth = self.depth();
         self.push_property(property_name, value, is_attribute);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(self)));
+        self.restore_depth(depth);
+        match result {
+            Ok(value) => value,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+
+    pub fn with_error_sink<R, F>(&mut self, sink: ValidationErrorSink, callback: F) -> R
+    where
+        F: FnOnce(&mut ValidationStack) -> R,
+    {
+        let depth = self.depth();
+        self.push_error_sink(sink);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(self)));
         self.restore_depth(depth);
         match result {
@@ -446,6 +503,7 @@ mod tests {
             is_attribute: true,
             property_name: Some("property".into()),
             simple_value: Some("value".into()),
+            add_error: Some(ValidationErrorSink::new(|_| {})),
         };
         frame.clear();
         assert!(frame.package_uri.is_none());
@@ -454,6 +512,7 @@ mod tests {
         assert!(!frame.is_attribute);
         assert!(frame.property_name.is_none());
         assert!(frame.simple_value.is_none());
+        assert!(frame.add_error.is_none());
     }
 
     #[test]

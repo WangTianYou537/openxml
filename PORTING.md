@@ -922,6 +922,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationStack` full-frame inheritance, reusable cleared frames, value/property pushes, and panic-safe scopes
 - [x] `StateManager` key-only typed cache semantics + mutable/replace/remove operations
 - [x] `ValidationContext::clear` C# error-only semantics + explicit full `reset`
+- [x] `ValidationCancellationToken` + `check_if_cancelled` / `try_add_error` / `try_create_error` Result APIs (C# `CheckIfCancelled` throw path)
+- [x] `ValidationErrorSink` stack-frame error routing (C# `Stack.Push(Errors.Add)` / `Current.AddError`) + scoped `with_error_sink`
+- [x] Scoped `with_expected_children_collection` toggle; `reset` restores MC context + collect flag
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

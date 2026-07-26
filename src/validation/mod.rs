@@ -40,8 +40,8 @@ pub use package_validator::{
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
 pub use validation_cache::ValidationCache;
-pub use validation_context::{ValidationChild, ValidationContext};
-pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationStack};
+pub use validation_context::{ValidationCancellationToken, ValidationChild, ValidationContext};
+pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};
 pub use particle::{
     validate_particle, validate_particle_for_version, validate_word_particles,
     validate_word_particles_for_version, Occurs, Particle,

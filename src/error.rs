@@ -48,6 +48,9 @@ pub enum Error {
     #[error("validation error: {0}")]
     Validation(String),
 
+    #[error("operation cancelled")]
+    Cancelled,
+
     /// Markup Compatibility content error (C# `InvalidMCContentException`).
     #[error("invalid markup compatibility content: {0}")]
     InvalidMcContent(String),
@@ -71,7 +74,6 @@ impl From<quick_xml::events::attributes::AttrError> for Error {
         Error::Xml(value.to_string())
     }
 }
-
 
 /// C# `OpenXmlPackageException` — packaging errors that map to [`Error::Package`].
 ///
