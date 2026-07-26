@@ -18,6 +18,7 @@ mod schematron_constraints;
 mod schematron_rules;
 mod schematron_validate;
 mod semantic;
+mod traverser;
 mod validation_cache;
 mod validation_context;
 mod validation_stack;
@@ -39,6 +40,7 @@ pub use package_validator::{
     validate_part_constraints, OpenXmlPackageValidationResult,
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
+pub use traverser::{descendants_with_options, validating_traverse, validating_traverse_tree, TraversalOptions};
 pub use validation_cache::ValidationCache;
 pub use validation_context::{ValidationCancellationToken, ValidationChild, ValidationContext};
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};

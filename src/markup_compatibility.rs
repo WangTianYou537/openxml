@@ -612,6 +612,56 @@ impl McContext {
         ElementAction::Normal
     }
 
+    /// C# `MCContext.GetContentFromACBlock` — select the first `mc:Choice` whose
+    /// `Requires` prefixes all resolve to namespaces available in `format`,
+    /// falling back to `mc:Fallback`.
+    ///
+    /// Unresolvable prefixes raise [`Error::InvalidMcContent`](crate::error::Error::InvalidMcContent)
+    /// unless the context was built with `exception_on_error = false`.
+    pub fn get_content_from_ac_block<'a>(
+        &self,
+        ac_block: &'a OpenXmlElement,
+        format: crate::file_format::FileFormatVersions,
+    ) -> crate::error::Result<Option<&'a OpenXmlElement>> {
+        for choice in ac_block.children.iter().filter(|c| c.local_name == "Choice") {
+            let Some(requires) = choice.get_attribute("Requires").map(str::trim) else {
+                continue;
+            };
+            if requires.is_empty() {
+                continue;
+            }
+            let mut choose = true;
+            for req in Self::get_prefixes(Some(requires)) {
+                let uri = choice.lookup_namespace(&req).map(str::to_string).or_else(|| {
+                    crate::generated::namespaces::uri_for_prefix(&req).map(str::to_string)
+                });
+                let Some(uri) = uri else {
+                    if self.no_exception_on_error {
+                        choose = false;
+                        break;
+                    }
+                    return Err(crate::error::Error::InvalidMcContent(format!(
+                        "unknown MC content prefix '{req}'"
+                    )));
+                };
+                let available = crate::generated::namespaces::prefix_for_uri(&uri)
+                    .map(|prefix| {
+                        format
+                            .includes_introduction(crate::file_format::prefix_introduced_in(prefix))
+                    })
+                    .unwrap_or(false);
+                if !available {
+                    choose = false;
+                    break;
+                }
+            }
+            if choose {
+                return Ok(Some(choice));
+            }
+        }
+        Ok(ac_block.children.iter().find(|c| c.local_name == "Fallback"))
+    }
+
     fn push_ignorable(
         &mut self,
         value: Option<&str>,

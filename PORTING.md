@@ -925,6 +925,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationCancellationToken` + `check_if_cancelled` / `try_add_error` / `try_create_error` Result APIs (C# `CheckIfCancelled` throw path)
 - [x] `ValidationErrorSink` stack-frame error routing (C# `Stack.Push(Errors.Add)` / `Current.AddError`) + scoped `with_error_sink`
 - [x] Scoped `with_expected_children_collection` toggle; `reset` restores MC context + collect flag
+- [x] `ValidationTraverser` MC-aware preorder walk (`validating_traverse_tree`): AC branch selection via `GetContentFromACBlock`, unknown ProcessContent promotion, out-of-version + misc skips
+- [x] `TraversalOptions::SelectAlternateContent` descendants + context-level `validating_traverse` (per-child stack frame, budget stop, cancellation Err)
+- [x] `McContext::get_content_from_ac_block` Choice/Fallback selection with Requires prefix resolution + version availability
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

@@ -38,7 +38,7 @@ pub struct ValidationChild<'a> {
     pub mc_context: McContext,
 }
 
-fn namespace_key(element: &OpenXmlElement) -> &str {
+pub(crate) fn namespace_key(element: &OpenXmlElement) -> &str {
     if element.prefix.is_empty() {
         element.namespace_uri.as_str()
     } else {
