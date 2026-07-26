@@ -228,7 +228,13 @@ impl OpenXmlPackageValidationResult {
 
     /// Best-effort parse of a package constraint [`ValidationError`] back into a result shell.
     pub fn from_validation_error(error: &ValidationError) -> Self {
-        let message_id = error.id().map(|s| s.to_string());
+        let raw_id = error.id().map(|s| s.to_string());
+        // C# DocumentValidator uses Pkg_ prefix; strip it so factories stay stable.
+        let message_id = raw_id.map(|id| {
+            id.strip_prefix("Pkg_")
+                .unwrap_or(&id)
+                .to_string()
+        });
         let mut r = Self {
             message: error.message.clone(),
             message_id,
@@ -236,13 +242,19 @@ impl OpenXmlPackageValidationResult {
             part_uri: if error.path.is_empty() {
                 None
             } else {
-                Some(error.path.clone())
+                // Strip relationship fragment `#rId…` for part_uri.
+                let path = error.path.as_str();
+                Some(
+                    path.split_once('#')
+                        .map(|(p, _)| p.to_string())
+                        .unwrap_or_else(|| path.to_string()),
+                )
             },
             sub_part_uri: error.related_part_uri.clone(),
             data_part_reference_id: None,
         };
         // Detail after `Id: ` often is the relationship type for package constraints.
-        if let Some(id) = error.id() {
+        if let Some(id) = r.message_id.as_deref() {
             let detail = error.description();
             if !detail.is_empty()
                 && (id == message_id::PART_IS_NOT_ALLOWED
@@ -250,10 +262,37 @@ impl OpenXmlPackageValidationResult {
                     || id == message_id::ONLY_ONE_PART_ALLOWED
                     || id == message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED)
             {
-                r.relationship_type = Some(detail.to_string());
+                // Prefer relationship type URI tokens when present in the detail.
+                if let Some(rel) = detail
+                    .split_whitespace()
+                    .find(|t| t.starts_with("http://") || t.starts_with("https://"))
+                {
+                    r.relationship_type = Some(rel.trim_matches(|c| c == '`' || c == '\'' || c == ',' || c == '.').to_string());
+                } else if !detail.contains(' ') {
+                    r.relationship_type = Some(detail.to_string());
+                }
             }
         }
         r
+    }
+
+    /// C# `GetPartNameAndUri` using generated [`PartInfo`] when a content type is known.
+    pub fn part_display_name(
+        part_name: Option<&str>,
+        uri: &str,
+        content_type: Option<&str>,
+    ) -> String {
+        let class_name = part_name
+            .or_else(|| {
+                content_type.and_then(|ct| {
+                    crate::generated::parts::PARTS
+                        .iter()
+                        .find(|p| p.content_type == Some(ct))
+                        .map(|p| p.name)
+                })
+            })
+            .unwrap_or("");
+        Self::part_name_and_uri(class_name, uri)
     }
 }
 
@@ -892,6 +931,24 @@ mod tests {
                 "/word/document.xml"
             ),
             "MainDocumentPart{/word/document.xml}"
+        );
+        assert_eq!(
+            OpenXmlPackageValidationResult::part_display_name(
+                None,
+                "/word/styles.xml",
+                Some(content_type::WORD_STYLES),
+            ),
+            "StyleDefinitionsPart{/word/styles.xml}"
+        );
+        let pkg_err = OpenXmlPackageValidationResult::required_part_do_not_exist(
+            "/ppt/presentation.xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+        )
+        .into_pkg_validation_error();
+        let roundtrip = OpenXmlPackageValidationResult::from_validation_error(&pkg_err);
+        assert_eq!(
+            roundtrip.message_id_str(),
+            Some(message_id::REQUIRED_PART_DO_NOT_EXIST)
         );
     }
 
