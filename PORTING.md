@@ -933,6 +933,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `DocumentValidator` schema pass includes `AlternateContentValidator` + `CompatibilityRuleAttributesValidator` (MC structural/attribute errors typed MarkupCompatibility)
 - [x] `ExpectedChildren` (elements + xsd:any namespaces, merge/count/clear, `Fmt_ListOfPossibleElements` message) + `ParticleMatch` / `ParticleMatchInfo` shells
 - [x] Particle `get_required_elements` / `get_expected_elements` walks (Choice requires all alternatives); mismatch errors append expected-children list under `CollectExpectedChildren`
+- [x] Simple-type restrictions: `verify_token` (xsd:token), `verify_ncname` / `is_valid_qname` (xsd:QName), `validate_any_uri` (xsd:anyURI)
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

@@ -15,6 +15,7 @@ mod package;
 mod package_validator;
 mod open_xml_validator;
 mod particle;
+mod restrictions;
 mod schematron_constraints;
 mod schematron_rules;
 mod schematron_validate;
@@ -51,6 +52,7 @@ pub use particle::{
     validate_particle_for_version, validate_word_particles, validate_word_particles_for_version,
     ExpectedChildren, Occurs, Particle, ParticleMatch, ParticleMatchInfo,
 };
+pub use restrictions::{is_valid_qname, validate_any_uri, verify_ncname, verify_token};
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,
     schematron_both_present_rules, schematron_conditional_attr_rules,
