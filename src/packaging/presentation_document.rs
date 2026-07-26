@@ -3252,6 +3252,30 @@ impl PresentationDocument {
         )
     }
 
+    /// C# `AddNewPart<T>(contentType, id)` shell under the presentation.
+    pub fn add_new_part(
+        &mut self,
+        part_name: &str,
+        content_type: Option<&str>,
+        relationship_id: Option<&str>,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<crate::packaging::TypedPart> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        crate::packaging::add_new_part(
+            &mut self.package,
+            &main,
+            Some("PresentationPart"),
+            part_name,
+            content_type,
+            relationship_id,
+            data,
+        )
+    }
+
     /// Clone this presentation into a new in-memory package (deep copy of all parts).
     ///
     /// C# `CloneableExtensions.Clone()` (MemoryStream).

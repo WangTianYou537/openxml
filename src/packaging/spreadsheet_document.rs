@@ -25617,6 +25617,30 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
         )
     }
 
+    /// C# `AddNewPart<T>(contentType, id)` shell under the workbook.
+    pub fn add_new_part(
+        &mut self,
+        part_name: &str,
+        content_type: Option<&str>,
+        relationship_id: Option<&str>,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<crate::packaging::TypedPart> {
+        let main = self
+            .package
+            .opc()
+            .main_part_uri(crate::namespace::rel::OFFICE_DOCUMENT)
+            .map_err(|_| Error::Package("no main part".into()))?;
+        crate::packaging::add_new_part(
+            &mut self.package,
+            &main,
+            Some("WorkbookPart"),
+            part_name,
+            content_type,
+            relationship_id,
+            data,
+        )
+    }
+
     /// Create a workbook by cloning an existing package (template).
     pub fn create_from_template(template_path: impl AsRef<Path>) -> Result<Self> {
         Self::create_from_template_as(template_path, None)

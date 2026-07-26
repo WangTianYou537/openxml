@@ -225,6 +225,77 @@ pub fn add_typed_part_element(
     add_typed_part(package, parent, parent_part_name, part_name, xml)
 }
 
+/// C# `AddNewPart<T>(contentType, id)` shell — create a typed child part with an
+/// optional fixed relationship id and optional content-type override.
+///
+/// When `content_type` is `None`, uses the generated PartInfo fixed content type
+/// (or `application/octet-stream`). When `relationship_id` is `Some`, that id is
+/// used if free; otherwise a unique id is generated.
+pub fn add_new_part(
+    package: &mut OpenXmlPackage,
+    parent: &PackUri,
+    parent_part_name: Option<&str>,
+    part_name: &str,
+    content_type: Option<&str>,
+    relationship_id: Option<&str>,
+    data: impl Into<Vec<u8>>,
+) -> Result<TypedPart> {
+    let info = part_by_name(part_name)
+        .ok_or_else(|| Error::Package(format!("unknown part type `{part_name}`")))?;
+    if let Some(parent_name) = parent_part_name {
+        if !is_allowed_child(parent_name, part_name) {
+            return Err(Error::Package(format!(
+                "`{part_name}` is not an allowed child of `{parent_name}`"
+            )));
+        }
+        if !allows_multiple(parent_name, part_name) {
+            let existing = package
+                .opc()
+                .parts_of_relationship_type(Some(parent), info.relationship_type);
+            if !existing.is_empty() {
+                return Err(Error::Package(format!(
+                    "`{parent_name}` already has a `{part_name}` (maxOccurs=1)"
+                )));
+            }
+        }
+    }
+
+    let ct = content_type
+        .or(info.content_type)
+        .unwrap_or("application/octet-stream");
+    let ext = if info.root_element.is_some() || ct.ends_with("+xml") || ct.contains("xml") {
+        ".xml"
+    } else {
+        ""
+    };
+    let mut helper = PartUriHelper::from_package(package.opc());
+    let uri = helper.create_part_uri(
+        ct,
+        parent,
+        info.path_general,
+        info.target,
+        ext,
+        true,
+    )?;
+    package.set_part(uri.clone(), ct, data.into());
+    let rid = if let Some(id) = relationship_id {
+        package.create_relationship_to_part(
+            parent,
+            &uri,
+            info.relationship_type,
+            Some(id),
+        )?
+    } else {
+        package.add_part_relationship(
+            parent,
+            info.relationship_type,
+            &uri,
+            RelationshipTargetMode::Internal,
+        )
+    };
+    Ok(TypedPart::new(info, uri).with_relationship_id(rid))
+}
+
 /// Resolve part metadata from a relationship type URI.
 pub fn part_info_for_relationship(relationship_type: &str) -> Option<&'static PartInfo> {
     part_by_relationship_type(relationship_type)
@@ -357,5 +428,26 @@ mod tests {
         assert!(!part.is_in_version(FileFormatVersions::OFFICE2007));
         assert!(part.is_in_version(FileFormatVersions::OFFICE2010));
         assert!(part.is_in_version(FileFormatVersions::OFFICE2016));
+    }
+
+    #[test]
+    fn add_new_part_with_explicit_id() {
+        let (mut pkg, doc) = pkg_with_doc();
+        let part = add_new_part(
+            &mut pkg,
+            &doc,
+            Some("MainDocumentPart"),
+            "StyleDefinitionsPart",
+            None,
+            Some("rIdStyles"),
+            b"<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"/>",
+        )
+        .expect("add styles");
+        assert_eq!(part.relationship_id.as_deref(), Some("rIdStyles"));
+        assert!(pkg.opc().has_part(&part.uri));
+        assert_eq!(
+            pkg.try_get_part_by_id(Some(&doc), "rIdStyles"),
+            Some(part.uri.clone())
+        );
     }
 }

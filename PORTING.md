@@ -1035,6 +1035,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Timelines/named views/authors: `timelines` / `timelineCacheDefinition` / `namedSheetViews` / `personList` / `authorLst`
 - [x] Form control/datastore/sort map/chart styles: `formControlPr` / `datastoreItem` / `worksheetSortMap` / `colorStyle` / `chartStyle`
 - [x] Package/UI particles: `coreProperties` / `Properties` / `customUI` / `webextension` / `taskpanes` / `macrosheet`
+- [x] `OpenXmlElement::common_ancestor_path` / `same_tree_at`; `add_new_part` (C# `AddNewPart` contentType+id) on package + Word/Excel/PPT
 
 **Still intentionally deferred / partial:**
 

@@ -38,7 +38,7 @@ pub use part_constraints::{
     constraints_for, relationship_introduced_in, PartConstraintFeature, PartConstraintRule,
 };
 pub use typed_part::{
-    add_typed_part, add_typed_part_element, delete_typed_part_by_id, find_typed_parts,
+    add_new_part, add_typed_part, add_typed_part_element, delete_typed_part_by_id, find_typed_parts,
     find_typed_parts_recursive, open_typed_part, part_info_for_relationship, TypedPart,
 };
 pub use wordprocessing_document::{WordprocessingDocument, WordprocessingDocumentType};

@@ -1211,6 +1211,30 @@ impl OpenXmlElement {
         )
     }
 
+    /// Longest common path prefix of two descendant paths (common ancestor path).
+    ///
+    /// Empty slice means the common ancestor is `root` itself. Returns `None` only
+    /// when either path is invalid under `root`.
+    pub fn common_ancestor_path(
+        root: &OpenXmlElement,
+        a: &[usize],
+        b: &[usize],
+    ) -> Option<Vec<usize>> {
+        let _ = root.get_at_path(a)?;
+        let _ = root.get_at_path(b)?;
+        let mut i = 0;
+        while i < a.len() && i < b.len() && a[i] == b[i] {
+            i += 1;
+        }
+        Some(a[..i].to_vec())
+    }
+
+    /// Whether two paths refer to nodes in the same tree under `root`
+    /// (both paths resolve).
+    pub fn same_tree_at(root: &OpenXmlElement, a: &[usize], b: &[usize]) -> bool {
+        root.get_at_path(a).is_some() && root.get_at_path(b).is_some()
+    }
+
     pub fn get_at_path_mut(&mut self, path: &[usize]) -> Option<&mut OpenXmlElement> {
         let mut cur = self;
         for &i in path {
@@ -1934,6 +1958,19 @@ mod element_api_parity_tests {
             OpenXmlElement::order_at_paths(&root, &[1], &[1]),
             Some(std::cmp::Ordering::Equal)
         );
+
+        // Common ancestor of p1 and r-in-p2 is body (empty path).
+        assert_eq!(
+            OpenXmlElement::common_ancestor_path(&root, &[0], &[1, 0]),
+            Some(vec![])
+        );
+        // Common ancestor of p2 and r-in-p2 is p2.
+        assert_eq!(
+            OpenXmlElement::common_ancestor_path(&root, &[1], &[1, 0]),
+            Some(vec![1])
+        );
+        assert!(OpenXmlElement::same_tree_at(&root, &[0], &[1, 0]));
+        assert!(!OpenXmlElement::same_tree_at(&root, &[0], &[9]));
     }
 
     #[test]

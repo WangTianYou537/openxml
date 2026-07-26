@@ -13279,6 +13279,31 @@ impl WordprocessingDocument {
         )
     }
 
+    /// C# `AddNewPart<T>(contentType, id)` shell under the main document.
+    pub fn add_new_part(
+        &mut self,
+        part_name: &str,
+        content_type: Option<&str>,
+        relationship_id: Option<&str>,
+        data: impl Into<Vec<u8>>,
+    ) -> Result<crate::packaging::TypedPart> {
+        let main = self
+            .main_document_part
+            .as_ref()
+            .ok_or_else(|| Error::Package("no main document part".into()))?
+            .uri()
+            .clone();
+        crate::packaging::add_new_part(
+            &mut self.package,
+            &main,
+            Some("MainDocumentPart"),
+            part_name,
+            content_type,
+            relationship_id,
+            data,
+        )
+    }
+
     pub fn create_extended_part(
         &mut self,
         content_type_str: &str,
