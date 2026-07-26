@@ -198,6 +198,10 @@ impl DocumentValidator {
                         mc_context,
                         &element.qualified_name(),
                     ));
+                    errors.extend(super::validate_leaf_content(
+                        element,
+                        &element.qualified_name(),
+                    ));
                 }
                 for child in &element.children {
                     walk(child, mc_context, errors);
@@ -403,8 +407,34 @@ mod tests {
     }
 
     #[test]
-    fn undeclared_attributes_reported_unless_ignorable() {
-        use crate::wordprocessing::paragraph;
+    fn leaf_elements_reject_element_children() {
+        use crate::wordprocessing::{paragraph, run, text};
+
+        let validator = DocumentValidator::default();
+
+        let good = paragraph(vec![run(vec![text("plain")])]);
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&good, &mut context).unwrap();
+        assert!(context.errors().is_empty(), "{:?}", context.errors());
+
+        let mut bad_text = text("broken");
+        bad_text.append_child(OpenXmlElement::w("nested"));
+        let bad = paragraph(vec![run(vec![bad_text])]);
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&bad, &mut context).unwrap();
+        assert!(
+            context
+                .errors()
+                .iter()
+                .any(|e| e.id() == Some("Sch_InvalidChildinLeafElement")
+                    && e.description().contains("w:t")),
+            "{:?}",
+            context.errors()
+        );
+    }
+
+    #[test]
+    fn undeclared_attributes_reported_unless_ignorable() {        use crate::wordprocessing::paragraph;
 
         let validator = DocumentValidator::default();
 

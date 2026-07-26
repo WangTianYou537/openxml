@@ -35,8 +35,8 @@ pub use digsig_crypto::{
 };
 pub use attributes::{
     validate_attribute_range, validate_attribute_value, validate_attributes,
-    validate_spreadsheet_attribute_ranges, validate_undeclared_attributes, AttributeRule,
-    AttributeType,
+    validate_leaf_content, validate_spreadsheet_attribute_ranges,
+    validate_undeclared_attributes, AttributeRule, AttributeType,
 };
 pub use compose_error::validation_resource_message;
 pub use package::validate_package;

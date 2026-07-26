@@ -939,6 +939,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `word::particle_for` registry lookup; DocumentValidator validates non-document roots via traverser walk + per-element particles
 - [x] `OpenXmlElementExtensionMethods`: `get_xpath_index`, `get_attribute_value_ex`, `can_contain_child` / `try_create_valid_child` (generated WordprocessingML children tables), `is_in_version`
 - [x] `Sch_UndeclaredAttribute` extended-attribute check against generated attribute tables (inherited MC Ignorable, xml:/xmlns/mc: skips) wired into DocumentValidator
+- [x] `Sch_InvalidChildinLeafElement` leaf-content check from generated `is_leaf`/`is_leaf_text` metadata (one error per element)
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

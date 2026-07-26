@@ -12,6 +12,32 @@ use crate::simple_types::{
 
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
+/// C# `SchemaTypeValidator.ValidateEmptyComplexType` /
+/// `ValidateSimpleContextComplexType` — a schema leaf element (empty or
+/// simple-content complex type) cannot contain element children. At most one
+/// `Sch_InvalidChildinLeafElement` error is reported per element.
+pub fn validate_leaf_content(element: &OpenXmlElement, path: &str) -> Vec<ValidationError> {
+    let Some(info) =
+        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)
+    else {
+        return Vec::new();
+    };
+    if element.prefix != info.prefix || !(info.is_leaf || info.is_leaf_text) {
+        return Vec::new();
+    }
+    if element.children.iter().any(|child| !child.is_misc_node()) {
+        return vec![ValidationError::with_id(
+            path,
+            "Sch_InvalidChildinLeafElement",
+            format!(
+                "The element '{}' is a leaf element and cannot contain children.",
+                element.qualified_name()
+            ),
+        )];
+    }
+    Vec::new()
+}
+
 /// C# `SchemaTypeValidator.ValidateAttributes` extended-attribute branch:
 /// report `Sch_UndeclaredAttribute` for attributes not declared in the
 /// generated WordprocessingML schema for `element`, skipping MC-ignorable
