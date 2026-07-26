@@ -919,6 +919,9 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PackagePartFeature::{uri,is_bound}`; `RootElementFeature::{contains,clear,registered_type_names}`
 
 - [x] `ValidationStack` / `ValidationElement` / `StateManager` / `ValidationErrorEventArgs`
+- [x] `ValidationStack` full-frame inheritance, reusable cleared frames, value/property pushes, and panic-safe scopes
+- [x] `StateManager` key-only typed cache semantics + mutable/replace/remove operations
+- [x] `ValidationContext::clear` C# error-only semantics + explicit full `reset`
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

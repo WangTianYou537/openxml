@@ -114,6 +114,10 @@ impl ValidationContext {
 
     pub fn clear(&mut self) {
         self.errors.clear();
+    }
+
+    pub fn reset(&mut self) {
+        self.errors.clear();
         self.expected_children.clear();
         self.current_path.clear();
         self.stack.clear();
@@ -379,7 +383,13 @@ mod tests {
         let n = ctx.state_mut().get_or_create("count", || 1u32).clone();
         assert_eq!(n, 1);
         ctx.clear();
+        assert!(ctx.errors().is_empty());
+        assert_eq!(ctx.stack().depth(), 2);
+        assert_eq!(ctx.state().get::<u32>("count"), Some(&1));
+        assert_eq!(ctx.current_path(), "/w:document[1]");
+        ctx.reset();
         assert!(ctx.stack().is_empty());
         assert!(ctx.state().is_empty());
+        assert!(ctx.current_path().is_empty());
     }
 }
