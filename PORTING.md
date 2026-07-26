@@ -1033,6 +1033,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Spreadsheet shared-workbook particles (`headers` / `revisions` / `users`) + Presentation `sldSyncPr`
 - [x] Modern comments/slicers: `commentsIds` / `commentsExtensible` / `ThreadedComments` / `slicers` / `slicerCacheDefinition`
 - [x] Timelines/named views/authors: `timelines` / `timelineCacheDefinition` / `namedSheetViews` / `personList` / `authorLst`
+- [x] Form control/datastore/sort map/chart styles: `formControlPr` / `datastoreItem` / `worksheetSortMap` / `colorStyle` / `chartStyle`
 
 **Still intentionally deferred / partial:**
 

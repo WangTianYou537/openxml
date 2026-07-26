@@ -178,7 +178,10 @@ impl DocumentValidator {
             | "timelines"
             | "timelineCacheDefinition"
             | "namedSheetViews"
-            | "personList" => {
+            | "personList"
+            | "formControlPr"
+            | "datastoreItem"
+            | "worksheetSortMap" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
@@ -206,7 +209,9 @@ impl DocumentValidator {
             | "dataModel"
             | "layoutDef"
             | "styleDef"
-            | "tblStyleLst" => {
+            | "tblStyleLst"
+            | "colorStyle"
+            | "chartStyle" => {
                 super::validate_drawing_particles_for_version(root, version)
             }
             // Other Word part roots: single-root particle via registry.

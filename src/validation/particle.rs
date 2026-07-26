@@ -1642,6 +1642,39 @@ pub mod spreadsheet {
         )
     }
 
+    /// `<x14:formControlPr>` form control properties part root.
+    pub fn form_control_properties() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("itemLst", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<ds:datastoreItem>` / `<x14:datastoreItem>` custom data props root.
+    pub fn datastore_item() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("schemaRefs", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<xne:worksheetSortMap>` worksheet sort map part root.
+    pub fn worksheet_sort_map() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("rowSortMap", Occurs::OPTIONAL),
+                Particle::element("colSortMap", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1680,6 +1713,9 @@ pub mod spreadsheet {
             "timelineCacheDefinition" => timeline_cache_definition(),
             "namedSheetViews" => named_sheet_views(),
             "personList" => person_list(),
+            "formControlPr" => form_control_properties(),
+            "datastoreItem" => datastore_item(),
+            "worksheetSortMap" => worksheet_sort_map(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -1915,7 +1951,7 @@ pub mod presentation {
 
 /// DrawingML part-root particles (`theme`, `themeOverride`, `chartSpace`).
 pub mod drawing {
-    use super::Particle;
+    use super::{Occurs, Particle};
 
     /// `<a:theme>` theme part root (generated content model).
     pub fn theme() -> Particle {
@@ -2038,6 +2074,42 @@ pub mod drawing {
         crate::generated::drawingml_2006_main::particle_table_style_list()
     }
 
+    /// `<cs:colorStyle>` chart color style part root (simplified).
+    pub fn color_style() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("scrgbClr", Occurs::ONE),
+                Particle::element("srgbClr", Occurs::ONE),
+                Particle::element("hslClr", Occurs::ONE),
+                Particle::element("sysClr", Occurs::ONE),
+                Particle::element("schemeClr", Occurs::ONE),
+                Particle::element("prstClr", Occurs::ONE),
+                Particle::element("variation", Occurs::ONE),
+                Particle::element("extLst", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<cs:chartStyle>` chart style part root (common style entries).
+    pub fn chart_style() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("axisTitle", Occurs::OPTIONAL),
+                Particle::element("categoryAxis", Occurs::OPTIONAL),
+                Particle::element("chartArea", Occurs::OPTIONAL),
+                Particle::element("dataLabel", Occurs::OPTIONAL),
+                Particle::element("dataPoint", Occurs::OPTIONAL),
+                Particle::element("legend", Occurs::OPTIONAL),
+                Particle::element("plotArea", Occurs::OPTIONAL),
+                Particle::element("title", Occurs::OPTIONAL),
+                Particle::element("valueAxis", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "theme" => theme(),
@@ -2050,6 +2122,8 @@ pub mod drawing {
             "layoutDef" => layout_definition(),
             "styleDef" => style_definition(),
             "tblStyleLst" => table_style_list(),
+            "colorStyle" => color_style(),
+            "chartStyle" => chart_style(),
             _ => return None,
         })
     }
@@ -2507,6 +2581,33 @@ pub fn validate_spreadsheet_particles_for_version(
                 &root_mc,
             ));
         }
+        "formControlPr" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::form_control_properties(),
+                "x14:formControlPr",
+                &context,
+                &root_mc,
+            ));
+        }
+        "datastoreItem" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::datastore_item(),
+                "ds:datastoreItem",
+                &context,
+                &root_mc,
+            ));
+        }
+        "worksheetSortMap" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::worksheet_sort_map(),
+                "xne:worksheetSortMap",
+                &context,
+                &root_mc,
+            ));
+        }
         _ => {}
     }
     errors
@@ -2771,6 +2872,24 @@ pub fn validate_drawing_particles_for_version(
                 root,
                 &drawing::table_style_list(),
                 "a:tblStyleLst",
+                &context,
+                &root_mc,
+            ));
+        }
+        "colorStyle" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::color_style(),
+                "cs:colorStyle",
+                &context,
+                &root_mc,
+            ));
+        }
+        "chartStyle" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::chart_style(),
+                "cs:chartStyle",
                 &context,
                 &root_mc,
             ));
@@ -3812,6 +3931,69 @@ mod tests {
             &presentation::author_list(),
             "p188:authorLst",
             FileFormatVersions::OFFICE2019,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn form_control_datastore_chart_style_roots() {
+        assert!(spreadsheet::particle_for("formControlPr").is_some());
+        assert!(spreadsheet::particle_for("datastoreItem").is_some());
+        assert!(spreadsheet::particle_for("worksheetSortMap").is_some());
+        assert!(drawing::particle_for("colorStyle").is_some());
+        assert!(drawing::particle_for("chartStyle").is_some());
+
+        let mut form = crate::element::OpenXmlElement::new(
+            "x14",
+            "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+            "formControlPr",
+        );
+        form.append_child(crate::element::OpenXmlElement::new(
+            "x14",
+            "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+            "itemLst",
+        ));
+        let errs = validate_particle_for_version(
+            &form,
+            &spreadsheet::form_control_properties(),
+            "x14:formControlPr",
+            FileFormatVersions::OFFICE2010,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut sort_map = crate::element::OpenXmlElement::new(
+            "xne",
+            "http://schemas.microsoft.com/office/excel/2006/main",
+            "worksheetSortMap",
+        );
+        sort_map.append_child(crate::element::OpenXmlElement::new(
+            "xne",
+            "http://schemas.microsoft.com/office/excel/2006/main",
+            "rowSortMap",
+        ));
+        let errs = validate_particle_for_version(
+            &sort_map,
+            &spreadsheet::worksheet_sort_map(),
+            "xne:worksheetSortMap",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut color = crate::element::OpenXmlElement::new(
+            "cs",
+            "http://schemas.microsoft.com/office/drawing/2012/chartStyle",
+            "colorStyle",
+        );
+        color.append_child(crate::element::OpenXmlElement::new(
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "srgbClr",
+        ));
+        let errs = validate_particle_for_version(
+            &color,
+            &drawing::color_style(),
+            "cs:colorStyle",
+            FileFormatVersions::OFFICE2013,
         );
         assert!(errs.is_empty(), "{errs:?}");
     }
