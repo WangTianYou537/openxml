@@ -25322,6 +25322,12 @@ pub fn clear_color_id(&mut self, sheet_name: &str) -> Result<bool> {
             .delete_parts_recursively_of_relationship_type(relationship_type)
     }
 
+    /// C# `DeletePartsRecursivelyOfType<T>` shell by generated part type name.
+    pub fn delete_parts_recursively_of_part_name(&mut self, part_name: &str) -> usize {
+        self.package
+            .delete_parts_recursively_of_part_name(part_name)
+    }
+
     /// Add an external relationship from the workbook part.
     pub fn add_external_relationship(
         &mut self,

@@ -1036,6 +1036,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Form control/datastore/sort map/chart styles: `formControlPr` / `datastoreItem` / `worksheetSortMap` / `colorStyle` / `chartStyle`
 - [x] Package/UI particles: `coreProperties` / `Properties` / `customUI` / `webextension` / `taskpanes` / `macrosheet`
 - [x] `OpenXmlElement::common_ancestor_path` / `same_tree_at`; `add_new_part` (C# `AddNewPart` contentType+id) on package + Word/Excel/PPT
+- [x] `delete_parts_recursively_of_part_name` (C# `DeletePartsRecursivelyOfType<T>` by generated part name)
 
 **Still intentionally deferred / partial:**
 

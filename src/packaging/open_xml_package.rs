@@ -597,6 +597,23 @@ impl OpenXmlPackage {
         n
     }
 
+    /// C# `DeletePartsRecursivelyOfType<T>` shell by generated part type name
+    /// (e.g. `"ImagePart"`, `"StyleDefinitionsPart"`).
+    ///
+    /// Resolves the part's relationship type and fixed content type from
+    /// [`crate::generated::parts`], then deletes matching parts with orphan cascade.
+    pub fn delete_parts_recursively_of_part_name(&mut self, part_name: &str) -> usize {
+        let Some(info) = crate::generated::parts::part_by_name(part_name) else {
+            return 0;
+        };
+        let mut n = self.delete_parts_recursively_of_relationship_type(info.relationship_type);
+        if let Some(ct) = info.content_type {
+            // Also catch any remaining parts of this content type (e.g. reparented).
+            n += self.delete_parts_of_content_type(ct);
+        }
+        n
+    }
+
     /// Delete parts by relationship ids under `source` (C# `DeleteParts` via ids).
     pub fn delete_parts_by_ids(
         &mut self,
@@ -3557,6 +3574,38 @@ mod part_events_tests {
         assert!(!pkg.parts_feature().contains(theme.as_str()));
         assert!(pkg.parts_feature().contains(doc.as_str()));
         assert!(pkg.get_reference_relationship(Some(&doc), &rid).is_none());
+    }
+
+    #[test]
+    fn delete_parts_recursively_of_part_name_removes_styles() {
+        use crate::namespace::rel;
+        let mut pkg =
+            OpenXmlPackage::from_opc(crate::opc::OpcPackage::create(), OpenSettings::default());
+        let doc = PackUri::new("/word/document.xml");
+        let styles = PackUri::new("/word/styles.xml");
+        pkg.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            b"<w:document/>".to_vec(),
+        );
+        pkg.set_part(
+            styles.clone(),
+            content_type::WORD_STYLES,
+            b"<w:styles/>".to_vec(),
+        );
+        let _ = pkg.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &doc,
+            crate::opc::RelationshipTargetMode::Internal,
+        );
+        let _ = pkg
+            .create_relationship_to_part(&doc, &styles, rel::STYLES, None)
+            .unwrap();
+        assert!(pkg.opc().has_part(&styles));
+        let n = pkg.delete_parts_recursively_of_part_name("StyleDefinitionsPart");
+        assert!(n >= 1, "expected at least one styles part deleted, got {n}");
+        assert!(!pkg.opc().has_part(&styles));
+        assert!(pkg.opc().has_part(&doc));
     }
 
     #[test]
