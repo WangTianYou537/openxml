@@ -1165,6 +1165,38 @@ pub mod word {
         )
     }
 
+    /// `<w:hdr>` / `<w:ftr>` — block-level content like body (no sectPr).
+    pub fn header_footer() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("p", Occurs::ONE),
+                Particle::element("tbl", Occurs::ONE),
+                Particle::element("sdt", Occurs::ONE),
+                Particle::element("customXml", Occurs::ONE),
+                Particle::element("altChunk", Occurs::ONE),
+                Particle::element("bookmarkStart", Occurs::ONE),
+                Particle::element("bookmarkEnd", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<w:abstractNum>` numbering definition.
+    pub fn abstract_num() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("nsid", Occurs::OPTIONAL),
+                Particle::element("multiLevelType", Occurs::OPTIONAL),
+                Particle::element("tmpl", Occurs::OPTIONAL),
+                Particle::element("name", Occurs::OPTIONAL),
+                Particle::element("styleLink", Occurs::OPTIONAL),
+                Particle::element("numStyleLink", Occurs::OPTIONAL),
+                Particle::element("lvl", Occurs::STAR),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
@@ -1186,6 +1218,8 @@ pub mod word {
             "comments" => comments(),
             "footnotes" => footnotes(),
             "endnotes" => endnotes(),
+            "hdr" | "ftr" => header_footer(),
+            "abstractNum" => abstract_num(),
             _ => return None,
         })
     }
@@ -1899,7 +1933,23 @@ mod tests {
         assert!(word::particle_for("fonts").is_some());
         assert!(word::particle_for("comments").is_some());
         assert!(word::particle_for("footnotes").is_some());
+        assert!(word::particle_for("hdr").is_some());
+        assert!(word::particle_for("ftr").is_some());
+        assert!(word::particle_for("abstractNum").is_some());
         assert!(crate::validation::particle::particle_for("sectPr").is_some());
+    }
+
+    #[test]
+    fn header_particle_accepts_paragraphs() {
+        let mut hdr = crate::element::OpenXmlElement::w("hdr");
+        hdr.append_child(crate::element::OpenXmlElement::w("p"));
+        let errs = validate_particle_for_version(
+            &hdr,
+            &word::header_footer(),
+            "w:hdr",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
     }
 
     #[test]

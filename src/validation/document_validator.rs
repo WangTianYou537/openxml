@@ -157,6 +157,20 @@ impl DocumentValidator {
             "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" | "presentation" => {
                 super::validate_presentation_particles_for_version(root, version)
             }
+            // Other Word part roots: single-root particle via registry.
+            "styles" | "numbering" | "fonts" | "comments" | "footnotes" | "endnotes"
+            | "hdr" | "ftr" => {
+                if let Some(particle) = super::particle_for(&root.local_name) {
+                    super::validate_particle_for_version(
+                        root,
+                        &particle,
+                        &root.qualified_name(),
+                        version,
+                    )
+                } else {
+                    Vec::new()
+                }
+            }
             _ => Vec::new(),
         };
         // Dedup against errors already produced by the schema-type walk.

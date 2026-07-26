@@ -1011,6 +1011,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Word particles: `sectPr` / `sdt` / `sdtContent` / `hyperlink` / `drawing`
 - [x] Presentation particles: `notes` / `notesMaster` roots in registry, walks, and DocumentValidator
 - [x] Word part-root particles: `styles` / `numbering` / `fonts` / `comments` / `footnotes` / `endnotes`
+- [x] Word particles: `hdr` / `ftr` / `abstractNum`; DocumentValidator routes styles/numbering/fonts/comments/footnotes/endnotes/hdr/ftr through particle registry
 
 **Still intentionally deferred / partial:**
 
