@@ -572,14 +572,18 @@ mod tests {
         assert!(
             errors.iter().any(|e| e.message.contains("at most one")
                 || e.message.contains("Sch_InvalidElementContent")
-                || e.message.contains("invalid child")),
+                || e.message.contains("Sch_UnexpectedElementContent")
+                || e.message.contains("invalid child")
+                || e.message.contains("unexpected child")),
             "{errors:?}"
         );
 
         let part_errors = v.validate_document_part(&package, &uri).unwrap();
         assert!(part_errors.iter().any(|e| e.message.contains("at most one")
             || e.message.contains("Sch_InvalidElementContent")
-            || e.message.contains("invalid child")));
+            || e.message.contains("Sch_UnexpectedElementContent")
+            || e.message.contains("invalid child")
+            || e.message.contains("unexpected child")));
 
         let mut mismatched = crate::packaging::OpenXmlPackage::from_opc(
             OpcPackage::create(),
@@ -615,7 +619,9 @@ mod tests {
         assert!(
             errors.iter().any(|e| e.message.contains("at most one")
                 || e.message.contains("Sch_InvalidElementContent")
-                || e.message.contains("invalid child")),
+                || e.message.contains("Sch_UnexpectedElementContent")
+                || e.message.contains("invalid child")
+                || e.message.contains("unexpected child")),
             "{errors:?}"
         );
 

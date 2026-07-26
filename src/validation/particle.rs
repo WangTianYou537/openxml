@@ -587,19 +587,77 @@ pub fn validate_particle_with_context(
         } else {
             format!("{}:{}", extra.prefix, extra.local_name)
         };
-        let description = format!(
-            "The element has invalid child element '{child_name}'.{expected_suffix}"
-        );
-        errors.push(
-            ValidationError::with_id(
-                format!("{path}/{}", extra.local_name),
-                "Sch_InvalidElementContentExpectingComplex",
-                description,
-            )
-            .with_error_type(crate::validation::ValidationErrorType::Schema),
-        );
+
+        // C# AllParticleValidator: duplicate allowed child under xs:all → Sch_AllElement.
+        if matches!(particle.particle_type(), ParticleType::All)
+            && is_all_duplicate_child(particle, &children[..result.consumed], extra)
+        {
+            errors.push(
+                ValidationError::with_id(
+                    format!("{path}/{}", extra.local_name),
+                    "Sch_AllElement",
+                    format!(
+                        "Element '{child_name}' cannot appear more than once if content model type is \"all\"."
+                    ),
+                )
+                .with_error_type(crate::validation::ValidationErrorType::Schema),
+            );
+        } else {
+            // C# CompositeParticleValidator: CanContainChild → Unexpected; else
+            // TryCreateValidChild → WrongType or InvalidElementContent.
+            let id = if element.can_contain_child(extra) {
+                "Sch_UnexpectedElementContentExpectingComplex"
+            } else if element
+                .try_create_valid_child(
+                    context.file_format(),
+                    &extra.prefix,
+                    &extra.local_name,
+                )
+                .is_some()
+            {
+                // Parent allows a different type with the same local name.
+                "Sch_InvalidElementContentWrongType"
+            } else {
+                "Sch_InvalidElementContentExpectingComplex"
+            };
+            let description = match id {
+                "Sch_UnexpectedElementContentExpectingComplex" => format!(
+                    "The element has unexpected child element '{child_name}'.{expected_suffix}"
+                ),
+                "Sch_InvalidElementContentWrongType" => format!(
+                    "The element has child element '{child_name}' of invalid type '{}'.",
+                    extra.local_name
+                ),
+                _ => format!(
+                    "The element has invalid child element '{child_name}'.{expected_suffix}"
+                ),
+            };
+            errors.push(
+                ValidationError::with_id(
+                    format!("{path}/{}", extra.local_name),
+                    id,
+                    description,
+                )
+                .with_error_type(crate::validation::ValidationErrorType::Schema),
+            );
+        }
     }
     for e in result.errors {
+        // xs:all duplicate reported from match_particle as structured message.
+        if e.starts_with("Sch_AllElement:") {
+            let child_name = e.trim_start_matches("Sch_AllElement:").trim();
+            errors.push(
+                ValidationError::with_id(
+                    path,
+                    "Sch_AllElement",
+                    format!(
+                        "Element '{child_name}' cannot appear more than once if content model type is \"all\"."
+                    ),
+                )
+                .with_error_type(crate::validation::ValidationErrorType::Schema),
+            );
+            continue;
+        }
         let incomplete = e.contains("requires at least") || e.contains("required particle");
         let (id, mut description) = if incomplete {
             (
@@ -628,6 +686,39 @@ pub fn validate_particle_with_context(
         );
     }
     errors
+}
+
+/// Whether `extra` is a second occurrence of an already-matched xs:all child.
+fn is_all_duplicate_child(
+    particle: &Particle,
+    matched: &[&OpenXmlElement],
+    extra: &OpenXmlElement,
+) -> bool {
+    let Particle::All { items, .. } = particle else {
+        return false;
+    };
+    // Extra matches some item that was already consumed among `matched`.
+    let matches_item = |item: &Particle, child: &OpenXmlElement| -> bool {
+        match item {
+            Particle::Element { local_name, .. } => child.local_name == *local_name,
+            _ => false,
+        }
+    };
+    let mut used = vec![false; items.len()];
+    for child in matched {
+        for (i, item) in items.iter().enumerate() {
+            if !used[i] && matches_item(item, child) {
+                used[i] = true;
+                break;
+            }
+        }
+    }
+    for (i, item) in items.iter().enumerate() {
+        if used[i] && matches_item(item, extra) {
+            return true;
+        }
+    }
+    false
 }
 
 fn match_particle(
@@ -1122,9 +1213,51 @@ mod tests {
         let errs = validate_word_particles(&doc);
         assert!(errs.iter().any(|e| {
             e.id() == Some("Sch_InvalidElementContentExpectingComplex")
+                || e.id() == Some("Sch_UnexpectedElementContentExpectingComplex")
                 || e.message.contains("invalid child")
                 || e.message.contains("unexpected")
         }));
+    }
+
+    #[test]
+    fn dual_body_is_unexpected_not_invalid() {
+        // document can contain body, but sequence maxOccurs=1 → Unexpected.
+        let doc = document(vec![body(vec![]), body(vec![])]);
+        let errs = validate_particle_for_version(
+            &doc,
+            &word::document(),
+            "w:document",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            errs.iter()
+                .any(|e| e.id() == Some("Sch_UnexpectedElementContentExpectingComplex")),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn all_particle_rejects_duplicate_with_sch_all_element() {
+        let particle = Particle::all(
+            vec![
+                Particle::element("a", Occurs::OPTIONAL),
+                Particle::element("b", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        );
+        let mut el = crate::element::OpenXmlElement::w("host");
+        el.append_child(crate::element::OpenXmlElement::w("a"));
+        el.append_child(crate::element::OpenXmlElement::w("a"));
+        let errs = validate_particle_for_version(
+            &el,
+            &particle,
+            "w:host",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            errs.iter().any(|e| e.id() == Some("Sch_AllElement")),
+            "{errs:?}"
+        );
     }
 
     #[test]

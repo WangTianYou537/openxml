@@ -269,7 +269,9 @@ mod tests {
                 .iter()
                 .any(|e| e.message.contains("at most one")
                     || e.message.contains("Sch_InvalidElementContent")
-                    || e.message.contains("invalid child")),
+                    || e.message.contains("Sch_UnexpectedElementContent")
+                    || e.message.contains("invalid child")
+                    || e.message.contains("unexpected child")),
             "{:?}",
             context.errors()
         );
