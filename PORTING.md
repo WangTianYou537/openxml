@@ -990,6 +990,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `validate_attribute_value_types` routes declared attributes through `validate_attribute_with_type_name` / `TypeNameValidator` (Number/OnOff/HexBinary/token-family) with XsdType lexical fallback
 - [x] Expand `ValidationResources` message table: remaining Sch_* (All/Union/Empty/Length/TotalDigits/Unexpected/WrongType/StringIsNotValidValue), Sem_AttributeValueUniqueInDocument / Sem_CellValue, Pkg_* / Fmt_* / TypeName_* ids
 - [x] Particle mismatch classification: `Sch_AllElement` for xs:all duplicates; `Sch_UnexpectedElementContentExpectingComplex` when parent can contain child; `Sch_InvalidElementContentWrongType` via `try_create_valid_child`
+- [x] Spreadsheet `Sem_CellValue` (C# `CellType` IValidator): `validate_spreadsheet_cell_values` for boolean/date/number `c@t` + `v` lexical checks; DocumentValidator constraint pass
 
 **Still intentionally deferred / partial:**
 

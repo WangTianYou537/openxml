@@ -160,6 +160,12 @@ impl DocumentValidator {
                 return Ok(());
             }
         }
+        // C# CellType IValidator — Sem_CellValue for boolean/date/number cells.
+        for error in super::validate_spreadsheet_cell_values(root) {
+            if !context.try_add_error(error)? {
+                return Ok(());
+            }
+        }
         Ok(())
     }
 

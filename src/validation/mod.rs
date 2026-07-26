@@ -8,6 +8,7 @@
 //! - Attribute constraints (ranges / lengths / patterns / enums) ([`schematron_constraints`])
 
 mod attributes;
+mod cell_values;
 mod compose_error;
 mod digsig;
 mod digsig_crypto;
@@ -41,6 +42,7 @@ pub use attributes::{
     validate_attributes, validate_leaf_content, validate_spreadsheet_attribute_ranges,
     validate_undeclared_attributes, AttributeRule, AttributeType,
 };
+pub use cell_values::validate_spreadsheet_cell_values;
 pub use compose_error::validation_resource_message;
 pub use package::{validate_package, validate_package_for_version};
 pub use document_validator::DocumentValidator;
