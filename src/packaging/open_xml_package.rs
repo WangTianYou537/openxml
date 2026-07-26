@@ -1513,8 +1513,9 @@ impl OpenXmlPackage {
             .features
             .contains::<crate::features::TypedPartFactoryFeature>()
         {
-            self.features
-                .set(crate::features::TypedPartFactoryFeature::new());
+            let mut factory = crate::features::TypedPartFactoryFeature::new();
+            factory.seed_from_generated_parts();
+            self.features.set(factory);
         }
         self.features
             .get_mut::<crate::features::TypedPartFactoryFeature>()

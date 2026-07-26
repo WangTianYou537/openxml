@@ -1511,6 +1511,11 @@ impl TypedPartFactoryFeature {
             .insert(type_name.into(), relationship_type.into());
     }
 
+    /// Remove a type→relationship mapping.
+    pub fn unregister(&mut self, type_name: &str) -> Option<String> {
+        self.by_type_name.remove(type_name)
+    }
+
     pub fn create(&self, type_name: &str) -> Option<&str> {
         self.by_type_name.get(type_name).map(|s| s.as_str())
     }
@@ -1525,6 +1530,25 @@ impl TypedPartFactoryFeature {
 
     pub fn is_empty(&self) -> bool {
         self.by_type_name.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.by_type_name.clear();
+    }
+
+    /// Registered `(type_name, relationship_type)` pairs.
+    pub fn registered_entries(&self) -> Vec<(String, String)> {
+        self.by_type_name
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
+    /// Seed from generated [`crate::generated::parts::PARTS`] name → relationship map.
+    pub fn seed_from_generated_parts(&mut self) {
+        for part in crate::generated::parts::PARTS {
+            self.register(part.name, part.relationship_type);
+        }
     }
 }
 
@@ -2528,6 +2552,11 @@ impl DefaultFeatures {
             factory.seed_from_generated_parts();
             bag.set(factory);
         }
+        if !bag.contains::<TypedPartFactoryFeature>() {
+            let mut factory = TypedPartFactoryFeature::new();
+            factory.seed_from_generated_parts();
+            bag.set(factory);
+        }
     }
 }
 
@@ -3115,6 +3144,18 @@ mod tests {
         );
         assert!(tf.contains("ImagePart"));
         assert!(!tf.is_empty());
+        assert_eq!(
+            tf.unregister("ImagePart").as_deref(),
+            Some("http://schemas.openxmlformats.org/officeDocument/2006/relationships/image")
+        );
+        let mut seeded = TypedPartFactoryFeature::new();
+        seeded.seed_from_generated_parts();
+        assert!(!seeded.is_empty());
+        assert!(
+            seeded.contains("MainDocumentPart")
+                || seeded.contains("WorksheetPart")
+                || !seeded.registered_entries().is_empty()
+        );
     }
 
     #[test]

@@ -1024,6 +1024,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Drawing `tblStyleLst` particle; `OpenXmlElement::descendants_named` (C# `Descendants<T>` by name)
 - [x] `RootElementFeature` unregister / try_create_element / seed_common_part_roots / registered_entries
 - [x] `PartFactoryFeature` seed_from_generated_parts / unregister; DefaultFeatures.ensure_on seeds RootElement + PartFactory
+- [x] `TypedPartFactoryFeature` seed_from_generated_parts / unregister; DefaultFeatures + package accessor auto-seed
 
 **Still intentionally deferred / partial:**
 
