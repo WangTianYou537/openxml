@@ -190,7 +190,8 @@ impl DocumentValidator {
             | "colorsDef"
             | "dataModel"
             | "layoutDef"
-            | "styleDef" => {
+            | "styleDef"
+            | "tblStyleLst" => {
                 super::validate_drawing_particles_for_version(root, version)
             }
             // Other Word part roots: single-root particle via registry.

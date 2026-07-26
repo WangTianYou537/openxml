@@ -1839,6 +1839,11 @@ pub mod drawing {
         )
     }
 
+    /// `<a:tblStyleLst>` presentation/drawing table styles part root.
+    pub fn table_style_list() -> Particle {
+        crate::generated::drawingml_2006_main::particle_table_style_list()
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "theme" => theme(),
@@ -1850,6 +1855,7 @@ pub mod drawing {
             "dataModel" => data_model(),
             "layoutDef" => layout_definition(),
             "styleDef" => style_definition(),
+            "tblStyleLst" => table_style_list(),
             _ => return None,
         })
     }
@@ -2427,6 +2433,15 @@ pub fn validate_drawing_particles_for_version(
                 root,
                 &drawing::style_definition(),
                 "dgm:styleDef",
+                &context,
+                &root_mc,
+            ));
+        }
+        "tblStyleLst" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::table_style_list(),
+                "a:tblStyleLst",
                 &context,
                 &root_mc,
             ));
@@ -3351,7 +3366,9 @@ mod tests {
         assert!(drawing::particle_for("dataModel").is_some());
         assert!(drawing::particle_for("layoutDef").is_some());
         assert!(drawing::particle_for("styleDef").is_some());
+        assert!(drawing::particle_for("tblStyleLst").is_some());
         assert!(crate::validation::particle::particle_for("dataModel").is_some());
+        assert!(crate::validation::particle::particle_for("tblStyleLst").is_some());
 
         let mut model = crate::element::OpenXmlElement::new(
             "dgm",
@@ -3385,6 +3402,19 @@ mod tests {
             &shapes,
             &drawing::user_shapes(),
             "c:userShapes",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn table_style_list_particle_accepts_tbl_style() {
+        let mut lst = crate::element::OpenXmlElement::a("tblStyleLst");
+        lst.append_child(crate::element::OpenXmlElement::a("tblStyle"));
+        let errs = validate_particle_for_version(
+            &lst,
+            &drawing::table_style_list(),
+            "a:tblStyleLst",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");

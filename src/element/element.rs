@@ -1342,6 +1342,15 @@ impl OpenXmlElement {
         }
     }
 
+    /// Depth-first descendants filtered by local name (C# `Descendants<T>` by name).
+    pub fn descendants_named<'a>(
+        &'a self,
+        local_name: &'a str,
+    ) -> impl Iterator<Item = &'a OpenXmlElement> + 'a {
+        self.descendants()
+            .filter(move |e| !e.is_misc_node() && e.local_name == local_name)
+    }
+
     /// Collect all text content from this element and descendants (concatenated).
     pub fn inner_text(&self) -> String {
         let mut out = String::new();
@@ -1762,6 +1771,41 @@ mod element_api_parity_tests {
             dst.lookup_namespace("w"),
             Some("http://schemas.openxmlformats.org/wordprocessingml/2006/main")
         );
+    }
+
+    #[test]
+    fn descendants_named_filters_by_local_name() {
+        let mut body = OpenXmlElement::w("body");
+        body.append_child(
+            OpenXmlElement::w("p").with_child(OpenXmlElement::w("r").with_text("a")),
+        );
+        body.append_child(
+            OpenXmlElement::w("p").with_child(OpenXmlElement::w("r").with_text("b")),
+        );
+        body.append_child(OpenXmlElement::w("tbl"));
+        let runs: Vec<_> = body.descendants_named("r").collect();
+        assert_eq!(runs.len(), 2);
+        let paras: Vec<_> = body.descendants_named("p").collect();
+        assert_eq!(paras.len(), 2);
+        assert!(body.descendants_named("sectPr").next().is_none());
+    }
+
+    #[test]
+    fn elements_before_after_in_parent() {
+        let mut body = OpenXmlElement::w("body");
+        body.append_child(OpenXmlElement::w("p").with_text("1"));
+        body.append_child(OpenXmlElement::comment("skip"));
+        body.append_child(OpenXmlElement::w("p").with_text("2"));
+        body.append_child(OpenXmlElement::w("p").with_text("3"));
+        // index 2 is second paragraph ("2"); before = first p, after = third p
+        let before: Vec<_> = OpenXmlElement::elements_before_in_parent(&body.children, 2)
+            .map(|e| e.text_value())
+            .collect();
+        assert_eq!(before, vec![Some("1")]);
+        let after: Vec<_> = OpenXmlElement::elements_after_in_parent(&body.children, 2)
+            .map(|e| e.text_value())
+            .collect();
+        assert_eq!(after, vec![Some("3")]);
     }
 
     #[test]
