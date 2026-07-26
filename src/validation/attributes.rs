@@ -5,9 +5,77 @@
 
 use super::ValidationError;
 use crate::element::OpenXmlElement;
+use crate::markup_compatibility::McContext;
 use crate::simple_types::{
     BooleanValue, DoubleValue, Int32Value, OnOffValue, OpenXmlSimpleType, UInt32Value,
 };
+
+const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+
+/// C# `SchemaTypeValidator.ValidateAttributes` extended-attribute branch:
+/// report `Sch_UndeclaredAttribute` for attributes not declared in the
+/// generated WordprocessingML schema for `element`, skipping MC-ignorable
+/// namespaces, `xml:*`, `xmlns` declarations, and `mc:*` compatibility
+/// attributes. Unknown elements are not checked.
+pub fn validate_undeclared_attributes(
+    element: &OpenXmlElement,
+    mc_context: &McContext,
+    path: &str,
+) -> Vec<ValidationError> {
+    let Some(info) =
+        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)
+    else {
+        return Vec::new();
+    };
+    if element.prefix != info.prefix {
+        return Vec::new();
+    }
+
+    let mut errors = Vec::new();
+    for attribute in &element.attributes {
+        let prefix = attribute.prefix.as_deref().unwrap_or("");
+        if prefix == "xmlns" || (prefix.is_empty() && attribute.local_name == "xmlns") {
+            continue;
+        }
+        if prefix == "xml" || attribute.namespace_uri.as_deref() == Some(XML_NAMESPACE) {
+            continue;
+        }
+        if prefix == "mc"
+            || attribute.namespace_uri.as_deref()
+                == Some(crate::namespace::ns::MARKUP_COMPATIBILITY.uri)
+        {
+            continue;
+        }
+        // MC lists may hold URIs (resolved) or bare prefixes (no lookup): try both.
+        let uri_ignorable = attribute
+            .namespace_uri
+            .as_deref()
+            .is_some_and(|uri| mc_context.is_ignorable_ns(uri));
+        if uri_ignorable || (!prefix.is_empty() && mc_context.is_ignorable_ns(prefix)) {
+            continue;
+        }
+
+        let qname = if prefix.is_empty() {
+            format!("{}:{}", info.prefix, attribute.local_name)
+        } else {
+            format!("{prefix}:{}", attribute.local_name)
+        };
+        let declared = info.attributes.iter().any(|a| a.qname == qname);
+        if !declared {
+            let display = if prefix.is_empty() {
+                attribute.local_name.clone()
+            } else {
+                format!("{prefix}:{}", attribute.local_name)
+            };
+            errors.push(ValidationError::with_id(
+                path,
+                "Sch_UndeclaredAttribute",
+                format!("The '{display}' attribute is not declared."),
+            ));
+        }
+    }
+    errors
+}
 
 /// Expected simple type for an attribute value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

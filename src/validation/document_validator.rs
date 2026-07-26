@@ -179,6 +179,43 @@ impl DocumentValidator {
             }
         }
 
+        // C# SchemaTypeValidator.ValidateAttributes extended-attribute branch
+        // (inherited MC context: ancestor mc:Ignorable covers descendants).
+        {
+            fn walk(
+                element: &OpenXmlElement,
+                mc_context: &mut crate::markup_compatibility::McContext,
+                errors: &mut Vec<ValidationError>,
+            ) {
+                let attributes =
+                    crate::markup_compatibility::MarkupCompatibilityAttributes::from_element(
+                        element,
+                    );
+                mc_context.push_mc_attributes_for_validation(&attributes, None);
+                if !element.is_misc_node() && !element.is_unknown() {
+                    errors.extend(super::validate_undeclared_attributes(
+                        element,
+                        mc_context,
+                        &element.qualified_name(),
+                    ));
+                }
+                for child in &element.children {
+                    walk(child, mc_context, errors);
+                }
+                mc_context.pop_mc_attributes_for_validation();
+            }
+
+            let mut mc_context =
+                crate::markup_compatibility::McContext::with_exception_on_error(false);
+            let mut undeclared = Vec::new();
+            walk(root, &mut mc_context, &mut undeclared);
+            for error in undeclared {
+                if !context.try_add_error(error)? {
+                    return Ok(());
+                }
+            }
+        }
+
         // Constraint pass (C# element.Metadata.Constraints per element).
         let mut constraint_errors = super::validate_schematron_numeric_ranges(root);
         constraint_errors.extend(super::validate_schematron_string_lengths(root));
@@ -360,6 +397,55 @@ mod tests {
                 .errors()
                 .iter()
                 .any(|e| e.message.contains("particle mismatch")),
+            "{:?}",
+            context.errors()
+        );
+    }
+
+    #[test]
+    fn undeclared_attributes_reported_unless_ignorable() {
+        use crate::wordprocessing::paragraph;
+
+        let validator = DocumentValidator::default();
+
+        let mut bad = paragraph(vec![]);
+        bad.set_attribute_ns("foo", "urn:foo", "custom", "1");
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&bad, &mut context).unwrap();
+        assert!(
+            context
+                .errors()
+                .iter()
+                .any(|e| e.id() == Some("Sch_UndeclaredAttribute")
+                    && e.description().contains("foo:custom")),
+            "{:?}",
+            context.errors()
+        );
+
+        // Declared w:rsidR and inherited mc:Ignorable-covered foo:custom are fine.
+        let mut inner = paragraph(vec![crate::wordprocessing::run(vec![
+            crate::wordprocessing::text("hello"),
+        ])]);
+        inner.set_attribute_ns("foo", "urn:foo", "custom", "1");
+        inner.set_attribute_qname("w:rsidR", "00AB12CD");
+        let mut root = crate::element::OpenXmlElement::w("document");
+        root.add_namespace_declaration("foo", "urn:foo");
+        root.set_attribute_ns(
+            "mc",
+            crate::namespace::ns::MARKUP_COMPATIBILITY.uri,
+            "Ignorable",
+            "foo",
+        );
+        let mut body_el = crate::element::OpenXmlElement::w("body");
+        body_el.append_child(inner);
+        root.append_child(body_el);
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&root, &mut context).unwrap();
+        assert!(
+            !context
+                .errors()
+                .iter()
+                .any(|e| e.id() == Some("Sch_UndeclaredAttribute")),
             "{:?}",
             context.errors()
         );
