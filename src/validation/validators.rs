@@ -234,6 +234,13 @@ impl StringValidator {
         v
     }
 
+    /// C# `StringValidator { IsId = true }` — same lexical check as NCName.
+    pub fn id() -> Self {
+        let mut v = Self::new();
+        v.is_id = true;
+        v
+    }
+
     pub fn with_pattern(mut self, pattern: impl Into<String>) -> Self {
         self.pattern = Some(pattern.into());
         self
@@ -836,6 +843,9 @@ pub fn validator_for_type_name(type_name: &str) -> Option<TypeNameValidator> {
         "Token" => TypeNameValidator::String(StringValidator::token()),
         "QName" | "QnameValue" => TypeNameValidator::String(StringValidator::qname()),
         "NCName" => TypeNameValidator::String(StringValidator::ncname()),
+        "ID" | "Id" | "IdValue" | "StringId" => {
+            TypeNameValidator::String(StringValidator::id())
+        }
         "AnyURI" | "AnyUriValue" => TypeNameValidator::String(StringValidator::any_uri()),
         // StringValue / EnumValue / DateTimeValue / Base64BinaryValue: no
         // additional framework restriction beyond XsdType lexical checks.
@@ -1045,6 +1055,25 @@ mod tests {
             .push_property("w:val", Some("a\tb".to_string()), true);
         StringValidator::token().validate(&mut context).unwrap();
         assert!(!context.errors().is_empty(), "{:?}", context.errors());
+        context.stack_mut().pop();
+    }
+
+    #[test]
+    fn string_id_requires_ncname() {
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:id", Some("1bad".to_string()), true);
+        StringValidator::id().validate(&mut context).unwrap();
+        assert!(!context.errors().is_empty(), "{:?}", context.errors());
+        context.stack_mut().pop();
+
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:id", Some("good_id".to_string()), true);
+        StringValidator::id().validate(&mut context).unwrap();
+        assert!(context.errors().is_empty(), "{:?}", context.errors());
         context.stack_mut().pop();
     }
 

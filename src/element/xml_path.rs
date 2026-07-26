@@ -217,15 +217,82 @@ impl OpenXmlElement {
     }
 }
 
-fn word_children_of(local_name: &str) -> Option<&'static [crate::generated::wordprocessingml_2006_main::ChildInfo]> {
-    crate::generated::wordprocessingml_2006_main::info_by_local_name(local_name)
-        .map(|info| info.children)
-}
-
 fn child_info_local_name(name: &str) -> &str {
     // ChildInfo names are `prefix:CT_Type/prefix:localName`.
     let tail = name.rsplit('/').next().unwrap_or(name);
     tail.rsplit(':').next().unwrap_or(tail)
+}
+
+/// Schema child-name strings for Word / Spreadsheet / Presentation / Drawing.
+///
+/// Returns the raw `ChildInfo.name` entries (`prefix:CT_Type/prefix:local`) so
+/// callers can match on the local name portion via [`child_info_local_name`].
+fn schema_child_names(element: &OpenXmlElement) -> Option<Vec<&'static str>> {
+    macro_rules! try_schema {
+        ($mod:path) => {{
+            use $mod as schema;
+            if let Some(info) = schema::info_by_local_name(&element.local_name) {
+                if element.prefix == info.prefix {
+                    return Some(info.children.iter().map(|c| c.name).collect());
+                }
+            }
+        }};
+    }
+    match element.prefix.as_str() {
+        "w" => try_schema!(crate::generated::wordprocessingml_2006_main),
+        "x" => try_schema!(crate::generated::spreadsheetml_2006_main),
+        "p" => try_schema!(crate::generated::presentationml_2006_main),
+        "a" => try_schema!(crate::generated::drawingml_2006_main),
+        _ => {}
+    }
+    try_schema!(crate::generated::wordprocessingml_2006_main);
+    try_schema!(crate::generated::spreadsheetml_2006_main);
+    try_schema!(crate::generated::presentationml_2006_main);
+    try_schema!(crate::generated::drawingml_2006_main);
+    None
+}
+
+/// Resolve (prefix, namespace_uri) for a child local name under the parent's schema.
+fn resolve_child_element_identity(
+    parent: &OpenXmlElement,
+    prefix: &str,
+    local_name: &str,
+) -> Option<(&'static str, &'static str)> {
+    macro_rules! try_schema {
+        ($mod:path) => {{
+            use $mod as schema;
+            if let Some(parent_info) = schema::info_by_local_name(&parent.local_name) {
+                if parent.prefix == parent_info.prefix {
+                    if let Some(info) = schema::info_by_local_name(local_name) {
+                        if prefix.is_empty() || info.prefix == prefix {
+                            return Some((info.prefix, info.namespace_uri));
+                        }
+                    }
+                }
+            }
+        }};
+    }
+    match parent.prefix.as_str() {
+        "w" => try_schema!(crate::generated::wordprocessingml_2006_main),
+        "x" => try_schema!(crate::generated::spreadsheetml_2006_main),
+        "p" => try_schema!(crate::generated::presentationml_2006_main),
+        "a" => try_schema!(crate::generated::drawingml_2006_main),
+        _ => {}
+    }
+    try_schema!(crate::generated::wordprocessingml_2006_main);
+    try_schema!(crate::generated::spreadsheetml_2006_main);
+    try_schema!(crate::generated::presentationml_2006_main);
+    try_schema!(crate::generated::drawingml_2006_main);
+
+    // Fallback: use the requested prefix (or parent prefix) via the namespace table.
+    let want = if prefix.is_empty() {
+        parent.prefix.as_str()
+    } else {
+        prefix
+    };
+    let uri = crate::generated::namespaces::uri_for_prefix(want)?;
+    let static_prefix = crate::generated::namespaces::prefix_for_uri(uri)?;
+    Some((static_prefix, uri))
 }
 
 impl OpenXmlElement {
@@ -242,44 +309,39 @@ impl OpenXmlElement {
     }
 
     /// C# `CanContainChild` — whether the schema children table of `self`
-    /// (WordprocessingML metadata) lists `child`'s local name.
+    /// (Word / Spreadsheet / Presentation / Drawing metadata) lists `child`'s
+    /// local name.
     pub fn can_contain_child(&self, child: &OpenXmlElement) -> bool {
         if child.is_misc_node() || child.is_unknown() {
             return false;
         }
-        let Some(children) = word_children_of(&self.local_name) else {
+        let Some(children) = schema_child_names(self) else {
             return false;
         };
         children
             .iter()
-            .any(|info| child_info_local_name(info.name) == child.local_name)
+            .any(|name| child_info_local_name(name) == child.local_name)
     }
 
     /// C# `TryCreateValidChild` — create an empty child element when the parent
     /// allows it and its namespace prefix is available in `file_format`.
+    ///
+    /// Looks up child tables across Word / Spreadsheet / Presentation / Drawing.
     pub fn try_create_valid_child(
         &self,
         file_format: crate::file_format::FileFormatVersions,
         prefix: &str,
         local_name: &str,
     ) -> Option<OpenXmlElement> {
-        let children = word_children_of(&self.local_name)?;
+        let children = schema_child_names(self)?;
         if !children
             .iter()
-            .any(|info| child_info_local_name(info.name) == local_name)
+            .any(|name| child_info_local_name(name) == local_name)
         {
             return None;
         }
-        let info = crate::generated::wordprocessingml_2006_main::info_by_local_name(local_name);
-        let (resolved_prefix, namespace_uri) = match info {
-            Some(info) if prefix.is_empty() || info.prefix == prefix => {
-                (info.prefix, info.namespace_uri)
-            }
-            _ => {
-                let uri = crate::generated::namespaces::uri_for_prefix(prefix)?;
-                (prefix, uri)
-            }
-        };
+        let (resolved_prefix, namespace_uri) =
+            resolve_child_element_identity(self, prefix, local_name)?;
         if !file_format
             .includes_introduction(crate::file_format::prefix_introduced_in(resolved_prefix))
         {
@@ -380,6 +442,39 @@ mod tests {
         assert!(p
             .try_create_valid_child(FileFormatVersions::OFFICE2007, "w", "body")
             .is_none());
+    }
+
+    #[test]
+    fn spreadsheet_can_contain_and_create_valid_children() {
+        use crate::file_format::FileFormatVersions;
+
+        let row = OpenXmlElement::x("row");
+        let cell = OpenXmlElement::x("c");
+        assert!(row.can_contain_child(&cell));
+        assert!(!row.can_contain_child(&OpenXmlElement::x("sheetData")));
+
+        let created = row
+            .try_create_valid_child(FileFormatVersions::OFFICE2007, "x", "c")
+            .expect("x:c allowed in x:row");
+        assert_eq!(created.local_name, "c");
+        assert_eq!(created.prefix, "x");
+        assert!(row
+            .try_create_valid_child(FileFormatVersions::OFFICE2007, "x", "worksheet")
+            .is_none());
+    }
+
+    #[test]
+    fn presentation_can_contain_csld_on_slide() {
+        use crate::file_format::FileFormatVersions;
+
+        let sld = OpenXmlElement::p("sld");
+        let csld = OpenXmlElement::p("cSld");
+        assert!(sld.can_contain_child(&csld));
+        let created = sld
+            .try_create_valid_child(FileFormatVersions::OFFICE2007, "p", "cSld")
+            .expect("p:cSld allowed in p:sld");
+        assert_eq!(created.local_name, "cSld");
+        assert_eq!(created.prefix, "p");
     }
 
     #[test]
