@@ -4,9 +4,8 @@
 //! with a max-error budget and target [`FileFormatVersions`].
 
 use super::{
-    validate_alternate_content, validate_mc_attributes, validate_package, validate_package_constraints,
-    validate_word_document_for_version, validate_word_document_full_for_version, DocumentValidator,
-    ValidationCache, ValidationError, ValidationErrorEventArgs,
+    validate_package, validate_package_constraints, DocumentValidator, ValidationCache,
+    ValidationError, ValidationErrorEventArgs,
 };
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
@@ -331,34 +330,11 @@ impl OpenXmlValidator {
     }
 
     /// Validate a WordprocessingML document element tree (rejects misc/unknown roots).
+    ///
+    /// Routes through [`DocumentValidator`] so schema particles, MC, attribute,
+    /// leaf-content, and Schematron constraint passes match the package path.
     pub fn validate_element(&mut self, element: &OpenXmlElement) -> Result<Vec<ValidationError>> {
-        if element.is_misc_node() {
-            return Err(Error::Validation(
-                "OpenXmlValidator cannot validate OpenXmlMiscNode".into(),
-            ));
-        }
-        if element.is_unknown() {
-            return Err(Error::Validation(
-                "OpenXmlValidator cannot validate OpenXmlUnknownElement".into(),
-            ));
-        }
-        if element.local_name == "AlternateContent"
-            || element.local_name == "Choice"
-            || element.local_name == "Fallback"
-        {
-            return Err(Error::Validation(
-                "OpenXmlValidator cannot validate AlternateContent nodes directly".into(),
-            ));
-        }
-
-        let mut errors = if element.local_name == "document" {
-            validate_word_document_full_for_version(element, self.settings.file_format)
-        } else {
-            validate_word_document_for_version(element, self.settings.file_format)
-        };
-        errors.extend(validate_alternate_content(element));
-        errors.extend(validate_mc_attributes(element));
-        Ok(self.cap(errors))
+        self.validate_dom_element(element)
     }
 
     /// Validate a [`WordprocessingDocument`]: package + main DOM full rules.

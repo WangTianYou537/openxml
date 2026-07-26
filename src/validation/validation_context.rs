@@ -380,6 +380,22 @@ impl ValidationContext {
     pub fn cache_mut(&mut self) -> &mut ValidationCache {
         &mut self.cache
     }
+
+    /// C# `ValidationContext.GetParticleConstraint` — resolve the version-built
+    /// particle for the current stack element's local name (last path segment).
+    pub fn get_particle_constraint(&mut self) -> Option<&super::Particle> {
+        let local_name = self
+            .stack
+            .current()
+            .and_then(|frame| frame.element_path.as_deref())
+            .map(|path| {
+                // Paths look like `/w:document[1]/w:body[1]` or bare `body` / `w:body`.
+                let last = path.rsplit(['/', ']']).find(|s| !s.is_empty()).unwrap_or(path);
+                let name = last.split('[').next().unwrap_or(last);
+                name.rsplit(':').next().unwrap_or(name).to_string()
+            })?;
+        self.cache.get_constraint(&local_name)
+    }
 }
 
 impl Default for ValidationContext {
@@ -592,5 +608,20 @@ mod tests {
         assert!(ctx.stack().is_empty());
         assert!(ctx.state().is_empty());
         assert!(ctx.current_path().is_empty());
+    }
+
+    #[test]
+    fn get_particle_constraint_resolves_from_stack_path() {
+        let mut ctx = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        ctx.stack_mut().push_element_path("/w:document[1]/w:body[1]");
+        let particle = ctx.get_particle_constraint().expect("body particle");
+        assert_eq!(
+            particle.particle_type(),
+            crate::validation::ParticleType::Sequence
+        );
+        ctx.stack_mut().push_element_path("w:p");
+        assert!(ctx.get_particle_constraint().is_some());
+        ctx.stack_mut().push_element_path("notReal");
+        assert!(ctx.get_particle_constraint().is_none());
     }
 }
