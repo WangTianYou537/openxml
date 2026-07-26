@@ -113,7 +113,7 @@ fn validate_composite_complex_type(
     let particle = context
         .get_particle_constraint()
         .cloned()
-        .or_else(|| super::particle::word::particle_for(&element.local_name));
+        .or_else(|| super::particle::particle_for(&element.local_name));
 
     let Some(particle) = particle else {
         // C# empty root complex type: no particle → reject non-misc children

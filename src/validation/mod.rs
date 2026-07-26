@@ -70,7 +70,7 @@ pub use validation_cache::ValidationCache;
 pub use validation_context::{ValidationCancellationToken, ValidationChild, ValidationContext};
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};
 pub use particle::{
-    get_expected_elements, get_required_elements, validate_particle,
+    get_expected_elements, get_required_elements, particle_for, validate_particle,
     validate_particle_for_version, validate_particle_with_context, validate_word_particles,
     validate_word_particles_for_version, ExpectedChildren, Occurs, Particle, ParticleMatch,
     ParticleMatchInfo, ParticleType, XsdAnyNamespace,

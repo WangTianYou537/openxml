@@ -1036,6 +1036,130 @@ pub mod word {
     }
 }
 
+/// Hand-authored particles for core SpreadsheetML types.
+pub mod spreadsheet {
+    use super::{Occurs, Particle};
+
+    /// `<x:workbook>` — simplified: optional props then required `sheets`.
+    pub fn workbook() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("fileVersion", Occurs::OPTIONAL),
+                Particle::element("fileSharing", Occurs::OPTIONAL),
+                Particle::element("workbookPr", Occurs::OPTIONAL),
+                Particle::element("workbookProtection", Occurs::OPTIONAL),
+                Particle::element("bookViews", Occurs::OPTIONAL),
+                Particle::element("sheets", Occurs::ONE),
+                Particle::element("functionGroups", Occurs::OPTIONAL),
+                Particle::element("externalReferences", Occurs::OPTIONAL),
+                Particle::element("definedNames", Occurs::OPTIONAL),
+                Particle::element("calcPr", Occurs::OPTIONAL),
+                Particle::element("oleSize", Occurs::OPTIONAL),
+                Particle::element("customWorkbookViews", Occurs::OPTIONAL),
+                Particle::element("pivotCaches", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn sheets() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("sheet", Occurs::PLUS)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x:worksheet>` — ordered optional children with required `sheetData`.
+    pub fn worksheet() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("sheetPr", Occurs::OPTIONAL),
+                Particle::element("dimension", Occurs::OPTIONAL),
+                Particle::element("sheetViews", Occurs::OPTIONAL),
+                Particle::element("sheetFormatPr", Occurs::OPTIONAL),
+                Particle::element("cols", Occurs::STAR),
+                Particle::element("sheetData", Occurs::ONE),
+                Particle::element("sheetCalcPr", Occurs::OPTIONAL),
+                Particle::element("sheetProtection", Occurs::OPTIONAL),
+                Particle::element("protectedRanges", Occurs::OPTIONAL),
+                Particle::element("autoFilter", Occurs::OPTIONAL),
+                Particle::element("sortState", Occurs::OPTIONAL),
+                Particle::element("dataConsolidate", Occurs::OPTIONAL),
+                Particle::element("mergeCells", Occurs::OPTIONAL),
+                Particle::element("conditionalFormatting", Occurs::STAR),
+                Particle::element("dataValidations", Occurs::OPTIONAL),
+                Particle::element("hyperlinks", Occurs::OPTIONAL),
+                Particle::element("printOptions", Occurs::OPTIONAL),
+                Particle::element("pageMargins", Occurs::OPTIONAL),
+                Particle::element("pageSetup", Occurs::OPTIONAL),
+                Particle::element("headerFooter", Occurs::OPTIONAL),
+                Particle::element("rowBreaks", Occurs::OPTIONAL),
+                Particle::element("colBreaks", Occurs::OPTIONAL),
+                Particle::element("drawing", Occurs::OPTIONAL),
+                Particle::element("legacyDrawing", Occurs::OPTIONAL),
+                Particle::element("picture", Occurs::OPTIONAL),
+                Particle::element("oleObjects", Occurs::OPTIONAL),
+                Particle::element("tableParts", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn sheet_data() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("row", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn row() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("c", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn cell() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("f", Occurs::OPTIONAL),
+                Particle::choice(
+                    vec![
+                        Particle::element("v", Occurs::ONE),
+                        Particle::element("is", Occurs::ONE),
+                    ],
+                    Occurs::OPTIONAL,
+                ),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn particle_for(local_name: &str) -> Option<Particle> {
+        Some(match local_name {
+            "workbook" => workbook(),
+            "sheets" => sheets(),
+            "worksheet" => worksheet(),
+            "sheetData" => sheet_data(),
+            "row" => row(),
+            "c" => cell(),
+            _ => return None,
+        })
+    }
+}
+
+/// Combined particle registry (Word + Spreadsheet) for
+/// [`ValidationCache::get_constraint`] / SchemaTypeValidator.
+pub fn particle_for(local_name: &str) -> Option<Particle> {
+    word::particle_for(local_name).or_else(|| spreadsheet::particle_for(local_name))
+}
+
 /// Recursively validate a Word document using ordered particles.
 pub fn validate_word_particles(root: &OpenXmlElement) -> Vec<ValidationError> {
     validate_word_particles_for_version(root, FileFormatVersions::OFFICE2007)
@@ -1592,5 +1716,61 @@ mod tests {
                 .contains(" List of possible elements expected: <background>,<body>."),
             "{collected:?}"
         );
+    }
+
+    #[test]
+    fn spreadsheet_worksheet_requires_sheet_data() {
+        let mut ws = crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "worksheet",
+        );
+        // Missing sheetData.
+        let errs = validate_particle_for_version(
+            &ws,
+            &spreadsheet::worksheet(),
+            "x:worksheet",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            errs.iter().any(|e| {
+                e.id() == Some("Sch_IncompleteContentExpectingComplex")
+                    || e.message.contains("sheetData")
+                    || e.message.contains("incomplete")
+            }),
+            "{errs:?}"
+        );
+
+        ws.append_child(crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "sheetData",
+        ));
+        let ok = validate_particle_for_version(
+            &ws,
+            &spreadsheet::worksheet(),
+            "x:worksheet",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(ok.is_empty(), "{ok:?}");
+    }
+
+    #[test]
+    fn spreadsheet_particle_for_resolves_core_roots() {
+        assert!(spreadsheet::particle_for("workbook").is_some());
+        assert!(spreadsheet::particle_for("worksheet").is_some());
+        assert!(spreadsheet::particle_for("sheetData").is_some());
+        assert!(spreadsheet::particle_for("row").is_some());
+        assert!(spreadsheet::particle_for("c").is_some());
+        assert!(crate::validation::particle::particle_for("worksheet").is_some());
+        assert!(crate::validation::particle::particle_for("document").is_some());
+    }
+
+    #[test]
+    fn validation_cache_resolves_spreadsheet_particles() {
+        let mut cache = crate::validation::ValidationCache::new(FileFormatVersions::OFFICE2007);
+        assert!(cache.get_constraint("worksheet").is_some());
+        assert!(cache.get_constraint("workbook").is_some());
+        assert!(cache.get_constraint("document").is_some());
     }
 }

@@ -1,12 +1,12 @@
 //! Validation constraint cache (C# `ValidationCache` shell).
 //!
 //! C# caches version-built particle constraints. This port keeps a lightweight
-//! version-scoped bag and resolves hand-authored Word particles via
-//! [`crate::validation::particle::word::particle_for`], applying
+//! version-scoped bag and resolves hand-authored particles via
+//! [`crate::validation::particle::particle_for`], applying
 //! [`Particle::build_for`] for the cache's target version.
 
 use crate::file_format::FileFormatVersions;
-use crate::validation::particle::{word, Particle};
+use crate::validation::particle::{particle_for, Particle};
 use std::collections::HashMap;
 
 /// Version-scoped validation cache (C# `ValidationCache`).
@@ -70,7 +70,7 @@ impl ValidationCache {
     /// the particle for `local_name`, memoizing the result for this cache version.
     pub fn get_constraint(&mut self, local_name: &str) -> Option<&Particle> {
         if !self.particles.contains_key(local_name) {
-            let built = word::particle_for(local_name)
+            let built = particle_for(local_name)
                 .and_then(|particle| particle.build_for(self.version));
             self.particles.insert(local_name.to_string(), built);
         }
