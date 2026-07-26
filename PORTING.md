@@ -1001,6 +1001,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `NumberValidator::total_digits` (C# TotalDigits / `Sch_TotalDigitsConstraintFailed`)
 - [x] DocumentValidator runs structured Word/Spreadsheet/Presentation particle walks for known package roots (deduped against schema-type pass); re-export `word`/`spreadsheet`/`presentation` particle modules
 - [x] `DocumentValidator::parts_to_be_validated` filters by `relationship_introduced_in` (C# `part.IsInVersion(version)`)
+- [x] DocumentValidator package structure errors use `Pkg_` MessageId prefix (C# `Pkg_` + PackageValidator MessageId)
 
 **Still intentionally deferred / partial:**
 

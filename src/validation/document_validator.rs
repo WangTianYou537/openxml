@@ -44,7 +44,23 @@ impl DocumentValidator {
         context: &mut ValidationContext,
     ) -> Result<()> {
         // C# PackageValidator.Validate(version) — filter rules by target FileFormatVersions.
-        for error in validate_package_constraints_for_version(package, self.cache.version()) {
+        // C# DocumentValidator.ValidatePackageStructure prefixes MessageId with "Pkg_".
+        for mut error in validate_package_constraints_for_version(package, self.cache.version()) {
+            if let Some(id) = error.id() {
+                if !id.starts_with("Pkg_")
+                    && matches!(
+                        id,
+                        "PartIsNotAllowed"
+                            | "RequiredPartDoNotExist"
+                            | "OnlyOnePartAllowed"
+                            | "InvalidContentTypePart"
+                            | "DataPartReferenceIsNotAllowed"
+                    )
+                {
+                    let detail = error.description().to_string();
+                    error.message = format!("Pkg_{id}: {detail}");
+                }
+            }
             if !context.try_add_error(error)? {
                 return Ok(());
             }
@@ -643,6 +659,37 @@ mod tests {
         assert!(
             parts_365.iter().any(|u| u.as_str() == "/word/tasks.xml"),
             "{parts_365:?}"
+        );
+    }
+
+    #[test]
+    fn package_structure_errors_use_pkg_prefix() {
+        use crate::namespace::content_type;
+        use crate::opc::RelationshipTargetMode;
+
+        // Presentation without slide master → RequiredPartDoNotExist.
+        let mut package = OpcPackage::create();
+        let uri = PackUri::new("/ppt/presentation.xml");
+        package.set_part(
+            uri.clone(),
+            content_type::PRESENTATION,
+            br#"<?xml version="1.0"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#.to_vec(),
+        );
+        package.add_package_relationship(
+            rel::OFFICE_DOCUMENT,
+            &uri,
+            RelationshipTargetMode::Internal,
+        );
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_package(&package, &mut context).unwrap();
+        assert!(
+            context.errors().iter().any(|e| {
+                e.id() == Some("Pkg_RequiredPartDoNotExist")
+                    || (e.message.contains("Pkg_RequiredPartDoNotExist"))
+            }),
+            "{:?}",
+            context.errors()
         );
     }
 }
