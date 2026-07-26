@@ -929,6 +929,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `TraversalOptions::SelectAlternateContent` descendants + context-level `validating_traverse` (per-child stack frame, budget stop, cancellation Err)
 - [x] `McContext::get_content_from_ac_block` Choice/Fallback selection with Requires prefix resolution + version availability
 - [x] `DocumentValidator` orchestration: package frame + structure errors, reachable-part walk, per-part schema/constraint passes, `Sch_MissingPartRootElement` for empty XML parts, `ExceptionError` for malformed XML, cancellation-aware
+- [x] `OpenXmlValidator` document APIs: `validate_document_package/part/dom_element` (+`_with_token`) with MC process-settings version-mismatch guard and reserved-element rejection
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

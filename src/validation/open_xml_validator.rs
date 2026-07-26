@@ -5,15 +5,16 @@
 
 use super::{
     validate_alternate_content, validate_mc_attributes, validate_package, validate_package_constraints,
-    validate_word_document_for_version, validate_word_document_full_for_version, ValidationCache,
-    ValidationError, ValidationErrorEventArgs,
+    validate_word_document_for_version, validate_word_document_full_for_version, DocumentValidator,
+    ValidationCache, ValidationError, ValidationErrorEventArgs,
 };
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
 use crate::file_format::FileFormatVersions;
 use crate::opc::OpcPackage;
 use crate::packaging::{
-    PresentationDocument, SpreadsheetDocument, WordprocessingDocument,
+    MarkupCompatibilityProcessMode, OpenXmlPackage, PresentationDocument, SpreadsheetDocument,
+    WordprocessingDocument,
 };
 
 /// Settings for validation (C# `ValidationSettings`).
@@ -218,6 +219,115 @@ impl OpenXmlValidator {
             .iter()
             .map(super::OpenXmlPackageValidationResult::from_validation_error)
             .collect()
+    }
+
+    /// C# `Validate(OpenXmlPackage)` MC guard: MC-processed packages must have been
+    /// preprocessed for the validator's target version.
+    fn ensure_mc_settings_match(&self, package: &OpenXmlPackage) -> Result<()> {
+        let mc = &package.open_settings().markup_compatibility;
+        if mc.mode != MarkupCompatibilityProcessMode::NoProcess
+            && mc.target_file_format_versions != self.settings.file_format
+        {
+            return Err(Error::Validation(format!(
+                "You should not validate document preprocessed based on FileFormatVersions.{:?} \
+                 against FileFormatVersions.{:?} constraints. The preprocessing file format version \
+                 is set in OpenSettings. Also check the file format version setting in the OpenXmlValidator.",
+                mc.target_file_format_versions, self.settings.file_format
+            )));
+        }
+        Ok(())
+    }
+
+    fn document_validator(&self) -> DocumentValidator {
+        DocumentValidator::new(self.cache.clone())
+    }
+
+    /// C# `Validate(OpenXmlPackage, token)` — full DocumentValidator orchestration.
+    pub fn validate_document_package_with_token(
+        &mut self,
+        package: &OpenXmlPackage,
+        token: super::ValidationCancellationToken,
+    ) -> Result<Vec<ValidationError>> {
+        self.ensure_mc_settings_match(package)?;
+        let validator = self.document_validator();
+        let mut context = super::ValidationContext::with_cancellation_token(self.settings, token);
+        validator.validate_package(package.opc(), &mut context)?;
+        Ok(self.cap(context.into_errors()))
+    }
+
+    /// C# `Validate(OpenXmlPackage)`.
+    pub fn validate_document_package(
+        &mut self,
+        package: &OpenXmlPackage,
+    ) -> Result<Vec<ValidationError>> {
+        self.validate_document_package_with_token(package, Default::default())
+    }
+
+    /// C# `Validate(OpenXmlPart, token)` — validate a single part's content.
+    pub fn validate_document_part_with_token(
+        &mut self,
+        package: &OpenXmlPackage,
+        part_uri: &crate::opc::PackUri,
+        token: super::ValidationCancellationToken,
+    ) -> Result<Vec<ValidationError>> {
+        self.ensure_mc_settings_match(package)?;
+        let validator = self.document_validator();
+        let mut context = super::ValidationContext::with_cancellation_token(self.settings, token);
+        validator.validate_part(package.opc(), part_uri, &mut context)?;
+        Ok(self.cap(context.into_errors()))
+    }
+
+    /// C# `Validate(OpenXmlPart)`.
+    pub fn validate_document_part(
+        &mut self,
+        package: &OpenXmlPackage,
+        part_uri: &crate::opc::PackUri,
+    ) -> Result<Vec<ValidationError>> {
+        self.validate_document_part_with_token(package, part_uri, Default::default())
+    }
+
+    /// C# `Validate(OpenXmlElement, token)` — element frame + DocumentValidator passes.
+    pub fn validate_dom_element_with_token(
+        &mut self,
+        element: &OpenXmlElement,
+        token: super::ValidationCancellationToken,
+    ) -> Result<Vec<ValidationError>> {
+        if element.is_unknown() {
+            return Err(Error::Validation(
+                "The OpenXmlValidator cannot validate against OpenXmlUnknownElement.".into(),
+            ));
+        }
+        if element.is_misc_node() {
+            return Err(Error::Validation(
+                "The OpenXmlValidator cannot validate against OpenXmlMiscNode.".into(),
+            ));
+        }
+        if element.local_name == "AlternateContent"
+            || element.local_name == "Choice"
+            || element.local_name == "Fallback"
+        {
+            return Err(Error::Validation(
+                "The OpenXmlValidator cannot validate against AlternateContent, \
+                 AlternateContentChoice and AlternateContentFallback."
+                    .into(),
+            ));
+        }
+
+        let validator = self.document_validator();
+        let mut context = super::ValidationContext::with_cancellation_token(self.settings, token);
+        context.stack_mut().push_element_path(element.qualified_name());
+        let result = validator.validate_element(element, &mut context);
+        context.stack_mut().pop();
+        result?;
+        Ok(self.cap(context.into_errors()))
+    }
+
+    /// C# `Validate(OpenXmlElement)`.
+    pub fn validate_dom_element(
+        &mut self,
+        element: &OpenXmlElement,
+    ) -> Result<Vec<ValidationError>> {
+        self.validate_dom_element_with_token(element, Default::default())
     }
 
     /// Validate a WordprocessingML document element tree (rejects misc/unknown roots).
@@ -456,5 +566,68 @@ mod tests {
         let pkg = OpcPackage::create();
         let results = v.validate_package_constraint_results(&pkg);
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn document_package_validation_reports_and_guards_mc_mismatch() {
+        use crate::opc::{PackUri, RelationshipTargetMode};
+        use crate::packaging::{MarkupCompatibilityProcessMode, OpenSettings};
+
+        let mut opc = OpcPackage::create();
+        let uri = PackUri::new("/word/document.xml");
+        opc.set_part(
+            uri.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/><w:body/></w:document>"#.to_vec(),
+        );
+        opc.add_package_relationship(rel::OFFICE_DOCUMENT, &uri, RelationshipTargetMode::Internal);
+        let package = crate::packaging::OpenXmlPackage::from_opc(opc, OpenSettings::default());
+
+        let mut v = OpenXmlValidator::new();
+        let errors = v.validate_document_package(&package).unwrap();
+        assert!(errors.iter().any(|e| e.message.contains("at most one")), "{errors:?}");
+
+        let part_errors = v.validate_document_part(&package, &uri).unwrap();
+        assert!(part_errors.iter().any(|e| e.message.contains("at most one")));
+
+        let mut mismatched = crate::packaging::OpenXmlPackage::from_opc(
+            OpcPackage::create(),
+            OpenSettings::default(),
+        );
+        {
+            let mc = &mut mismatched.open_settings_mut().markup_compatibility;
+            mc.mode = MarkupCompatibilityProcessMode::ProcessAllParts;
+            mc.target_file_format_versions = FileFormatVersions::OFFICE2013;
+        }
+        assert!(matches!(
+            v.validate_document_package(&mismatched),
+            Err(Error::Validation(message)) if message.contains("should not validate")
+        ));
+    }
+
+    #[test]
+    fn dom_element_validation_rejects_reserved_and_validates_content() {
+        let mut v = OpenXmlValidator::new();
+
+        assert!(v
+            .validate_dom_element(&OpenXmlElement::comment("misc"))
+            .is_err());
+        assert!(v
+            .validate_dom_element(&OpenXmlElement::unknown("x", "custom", "urn:x"))
+            .is_err());
+        assert!(v
+            .validate_dom_element(&crate::markup_compatibility::alternate_content(vec![]))
+            .is_err());
+
+        let doc = document(vec![body(vec![]), body(vec![])]);
+        let errors = v.validate_dom_element(&doc).unwrap();
+        assert!(errors.iter().any(|e| e.message.contains("at most one")), "{errors:?}");
+
+        let token = crate::validation::ValidationCancellationToken::new();
+        token.cancel();
+        assert!(matches!(
+            v.validate_dom_element_with_token(&doc, token),
+            Err(Error::Cancelled)
+        ));
     }
 }
