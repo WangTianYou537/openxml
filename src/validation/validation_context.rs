@@ -147,6 +147,15 @@ impl ValidationContext {
         self.settings.file_format
     }
 
+    /// Host application type for semantic constraint gating.
+    pub fn application_type(&self) -> crate::features::ApplicationType {
+        self.settings.application_type
+    }
+
+    pub fn set_application_type(&mut self, application_type: crate::features::ApplicationType) {
+        self.settings.application_type = application_type;
+    }
+
     pub fn valid(&self) -> bool {
         self.errors.is_empty()
     }

@@ -10,6 +10,7 @@ use super::{
 };
 use crate::element::OpenXmlElement;
 use crate::error::{Error, Result};
+use crate::features::ApplicationType;
 use crate::file_format::FileFormatVersions;
 use crate::opc::OpcPackage;
 use crate::packaging::{
@@ -24,6 +25,10 @@ pub struct ValidationSettings {
     pub file_format: FileFormatVersions,
     /// Maximum errors to return. `0` means no limit (C# default is 1000).
     pub max_number_of_errors: usize,
+    /// Host application type for semantic constraint gating
+    /// (C# semantic `ApplicationType` filter; not on C# ValidationSettings but
+    /// threaded here so DocumentValidator/OpenXmlValidator can gate constraints).
+    pub application_type: ApplicationType,
 }
 
 impl ValidationSettings {
@@ -36,11 +41,17 @@ impl ValidationSettings {
         Self {
             file_format,
             max_number_of_errors: Self::DEFAULT_MAX_ERRORS,
+            application_type: ApplicationType::ALL,
         }
     }
 
     pub fn with_max_number_of_errors(mut self, value: usize) -> Self {
         self.max_number_of_errors = value;
+        self
+    }
+
+    pub fn with_application_type(mut self, application_type: ApplicationType) -> Self {
+        self.application_type = application_type;
         self
     }
 }
@@ -135,6 +146,19 @@ impl OpenXmlValidator {
     pub fn set_file_format(&mut self, file_format: FileFormatVersions) {
         self.settings.file_format = file_format;
         self.cache.set_version(file_format);
+    }
+
+    pub fn application_type(&self) -> ApplicationType {
+        self.settings.application_type
+    }
+
+    pub fn set_application_type(&mut self, application_type: ApplicationType) {
+        self.settings.application_type = application_type;
+    }
+
+    pub fn with_application_type(mut self, application_type: ApplicationType) -> Self {
+        self.settings.application_type = application_type;
+        self
     }
 
     pub fn max_number_of_errors(&self) -> usize {
@@ -252,7 +276,16 @@ impl OpenXmlValidator {
     ) -> Result<Vec<ValidationError>> {
         self.ensure_mc_settings_match(package)?;
         let validator = self.document_validator();
-        let mut context = super::ValidationContext::with_cancellation_token(self.settings, token);
+        let mut settings = self.settings;
+        // Prefer package-registered application type when the validator still
+        // has the default ALL filter (callers can force a type via settings).
+        if settings.application_type == ApplicationType::ALL {
+            let pkg_app = package.application_type();
+            if pkg_app != ApplicationType::NONE && pkg_app != ApplicationType::ALL {
+                settings.application_type = pkg_app;
+            }
+        }
+        let mut context = super::ValidationContext::with_cancellation_token(settings, token);
         validator.validate_package(package.opc(), &mut context)?;
         Ok(self.cap(context.into_errors()))
     }
@@ -535,13 +568,17 @@ mod tests {
     #[test]
     fn validation_settings_roundtrip() {
         let s = ValidationSettings::new(FileFormatVersions::OFFICE2016)
-            .with_max_number_of_errors(42);
+            .with_max_number_of_errors(42)
+            .with_application_type(ApplicationType::WORD);
         let mut v = OpenXmlValidator::with_settings(s);
         assert_eq!(v.file_format(), FileFormatVersions::OFFICE2016);
         assert_eq!(v.max_number_of_errors(), 42);
+        assert_eq!(v.application_type(), ApplicationType::WORD);
         v.set_file_format(FileFormatVersions::OFFICE2010);
         assert_eq!(v.settings().file_format, FileFormatVersions::OFFICE2010);
         assert_eq!(v.cache().version(), FileFormatVersions::OFFICE2010);
+        v.set_application_type(ApplicationType::EXCEL);
+        assert_eq!(v.application_type(), ApplicationType::EXCEL);
     }
 
     #[test]
