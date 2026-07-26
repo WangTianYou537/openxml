@@ -656,6 +656,9 @@ impl Validator for ListValidator {
 
 /// C# `OfficeVersionValidator` — emits an error when the target version is
 /// earlier than the feature's introduction version (availability gate).
+///
+/// Only fires when the current stack frame has a present simple value and the
+/// property is not in an MC-ignorable namespace (C# `McContext.IsIgnorableNs`).
 #[derive(Debug, Clone, Copy)]
 pub struct OfficeVersionValidator {
     pub introduced: FileFormatVersions,
@@ -673,15 +676,89 @@ impl Validator for OfficeVersionValidator {
         if target.at_least(self.introduced) || target.includes_introduction(self.introduced) {
             return Ok(());
         }
+        // C#: current.Value?.HasValue == true
+        let Some(value) = current_value(context) else {
+            return Ok(());
+        };
+        if value.is_empty() {
+            return Ok(());
+        }
+        // C#: !context.McContext.IsIgnorableNs(current.Property.QName.Namespace)
+        if let Some(mc) = context.mc_context() {
+            if let Some(ns) = current_property_namespace(context) {
+                if mc.is_ignorable_ns(ns) {
+                    return Ok(());
+                }
+            }
+        }
         let qname = current_qname(context);
         let _ = context.create_error(
             "Sch_UndeclaredAttribute",
             ValidationErrorType::Schema,
-            format!(
-                "The '{qname}' attribute is not available in the target file format version."
-            ),
+            format!("The '{qname}' attribute is not declared."),
         );
         Ok(())
+    }
+}
+
+fn current_property_namespace(context: &ValidationContext) -> Option<&str> {
+    // Property names are stored as `prefix:local` or bare local; resolve prefix
+    // against the current element's namespace declarations is out of scope —
+    // when the qname starts with a known Office extension prefix, treat that
+    // URI as the property namespace for ignorable checks.
+    let qname = context.stack().current()?.property_name.as_deref()?;
+    let prefix = qname.split_once(':').map(|(p, _)| p)?;
+    Some(match prefix {
+        "w14" => "http://schemas.microsoft.com/office/word/2010/wordml",
+        "w15" => "http://schemas.microsoft.com/office/word/2012/wordml",
+        "w16" => "http://schemas.microsoft.com/office/word/2018/wordml",
+        "a14" => "http://schemas.microsoft.com/office/drawing/2010/main",
+        "p14" => "http://schemas.microsoft.com/office/powerpoint/2010/main",
+        "x14" => "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+        _ => return None,
+    })
+}
+
+/// C# `INameProvider` — optional schema type name for error reporting.
+pub trait NameProvider {
+    fn type_qname(&self) -> Option<&str>;
+}
+
+/// C# `NameProviderValidator` — wraps another validator and exposes a type QName.
+pub struct NameProviderValidator {
+    pub qname: String,
+    pub inner: Box<dyn Validator + Send + Sync>,
+}
+
+impl NameProviderValidator {
+    pub fn new<V: Validator + Send + Sync + 'static>(
+        qname: impl Into<String>,
+        inner: V,
+    ) -> Self {
+        Self {
+            qname: qname.into(),
+            inner: Box::new(inner),
+        }
+    }
+}
+
+impl NameProvider for NameProviderValidator {
+    fn type_qname(&self) -> Option<&str> {
+        Some(self.qname.as_str())
+    }
+}
+
+impl Validator for NameProviderValidator {
+    fn validate(&self, context: &mut ValidationContext) -> Result<()> {
+        self.inner.validate(context)
+    }
+}
+
+impl std::fmt::Debug for NameProviderValidator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NameProviderValidator")
+            .field("qname", &self.qname)
+            .finish()
     }
 }
 
@@ -1164,6 +1241,39 @@ mod tests {
             .validate(&mut context)
             .unwrap();
         assert!(!context.errors().is_empty());
+        context.stack_mut().pop();
+    }
+
+    #[test]
+    fn name_provider_validator_delegates() {
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:val", Some("x".to_string()), true);
+        let v = NameProviderValidator::new(
+            "{http://www.w3.org/2001/XMLSchema}token",
+            StringValidator::token(),
+        );
+        assert_eq!(
+            v.type_qname(),
+            Some("{http://www.w3.org/2001/XMLSchema}token")
+        );
+        v.validate(&mut context).unwrap();
+        assert!(context.errors().is_empty());
+        context.stack_mut().pop();
+    }
+
+    #[test]
+    fn office_version_skips_empty_value() {
+        let mut context =
+            ValidationContext::new(ValidationSettings::new(FileFormatVersions::OFFICE2007));
+        context
+            .stack_mut()
+            .push_property("w14:paraId", None::<String>, true);
+        OfficeVersionValidator::new(FileFormatVersions::OFFICE2010)
+            .validate(&mut context)
+            .unwrap();
+        assert!(context.errors().is_empty());
         context.stack_mut().pop();
     }
 }

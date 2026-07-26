@@ -994,6 +994,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] SpreadsheetML particle registry (`workbook`/`sheets`/`worksheet`/`sheetData`/`row`/`c`); combined `particle_for` + ValidationCache/SchemaTypeValidator routing
 - [x] PresentationML particle registry (`presentation`/`sld`/`sldLayout`/`sldMaster`/`cSld`/`spTree`/`sp`/`pic`); combined `particle_for` covers Word+Spreadsheet+Presentation
 - [x] `VersionGate` matches C# `VersionedValidator` (InitialVersion/exact/all); `SimpleTypeValidator` + integer/OnOff convenience wrappers
+- [x] `NameProvider`/`NameProviderValidator`; `OfficeVersionValidator` skips empty values and MC-ignorable namespaces (C# parity)
 
 **Still intentionally deferred / partial:**
 
