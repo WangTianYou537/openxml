@@ -27,6 +27,7 @@ mod traverser;
 mod validation_cache;
 mod validation_context;
 mod validation_stack;
+mod validators;
 
 pub use digsig::{add_digital_signature_part, clear_digital_signatures, digital_signature_parts, ensure_digital_signature_origin, has_digital_signature_origin, validate_digital_signatures};
 pub use digsig_crypto::{
@@ -46,6 +47,11 @@ pub use document_validator::DocumentValidator;
 pub use schema_type_validator::{
     is_reserved_element, validate_empty_root_complex_type, validate_schema_type,
     validate_schema_type_standalone, validate_schema_types_in_tree,
+};
+pub use validators::{
+    validate_value, validate_with_validators, EnumValidator, ListValidator, NumberValidator,
+    OfficeVersionValidator, RequiredValidator, StringValidator, UnionValidator, Validator,
+    VersionGate,
 };
 pub use package_validator::{
     message_id as package_constraint_message_id, validate_package_constraints,

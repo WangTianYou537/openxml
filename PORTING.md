@@ -986,6 +986,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `validate_package_constraints_for_version` / `validate_package_constraint_results_for_version` / `validate_part_constraints_for_version` / `validate_package_for_version` (C# `version.AtLeast(rule.FileFormat)` + `part.IsInVersion`)
 - [x] `DocumentValidator` / `OpenXmlValidator` / `OpenXmlPackage` pass target `FileFormatVersions` into package constraint walk
 - [x] `SchemaTypeValidator` shell: `validate_schema_type` / `validate_schema_types_in_tree` / `is_reserved_element` / empty-root leaf check; DocumentValidator schema pass routes through it with inherited MC Ignorable
+- [x] Framework `IValidator` shell: `Validator` trait + `VersionGate` / `RequiredValidator` / `StringValidator` / `NumberValidator` / `EnumValidator` / `UnionValidator` / `ListValidator` / `OfficeVersionValidator` + `validate_value` helper
 
 **Still intentionally deferred / partial:**
 
