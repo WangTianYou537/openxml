@@ -228,7 +228,7 @@ impl DocumentValidator {
     }
 
     /// C# `PartsToBeValidated` — reachable XML parts from the main-document root
-    /// (only parts defined in the target version are yielded).
+    /// that are defined in the target file format version.
     pub fn parts_to_be_validated(&self, package: &OpcPackage) -> Vec<PackUri> {
         let Some(main) = package
             .package_relationships()
@@ -241,10 +241,12 @@ impl DocumentValidator {
             return Vec::new();
         };
 
-        let mut visited = Vec::new();
-        let mut queue = vec![main_uri];
-        while let Some(uri) = queue.pop() {
-            if visited.contains(&uri) || !package.has_part(&uri) {
+        let version = self.cache.version();
+        // (uri, relationship_type that discovered this part — empty for main)
+        let mut visited: Vec<(PackUri, String)> = Vec::new();
+        let mut queue = vec![(main_uri, rel::OFFICE_DOCUMENT.to_string())];
+        while let Some((uri, rel_type)) = queue.pop() {
+            if visited.iter().any(|(u, _)| u == &uri) || !package.has_part(&uri) {
                 continue;
             }
             if let Some(rels) = package.part_relationships(&uri) {
@@ -254,14 +256,24 @@ impl DocumentValidator {
                     }
                     if let Ok(target) = crate::opc::resolve_uri(&uri, &rel.target) {
                         if target.as_str().ends_with(".xml") {
-                            queue.push(target);
+                            queue.push((target, rel.relationship_type.clone()));
                         }
                     }
                 }
             }
-            visited.push(uri);
+            visited.push((uri, rel_type));
         }
+
         visited
+            .into_iter()
+            .filter(|(_, rel_type)| {
+                // C# `part.IsInVersion(version)` — skip parts introduced after target.
+                let intro =
+                    crate::packaging::relationship_introduced_in(rel_type);
+                version.at_least(intro) || version.includes_introduction(intro)
+            })
+            .map(|(uri, _)| uri)
+            .collect()
     }
 }
 
@@ -591,6 +603,46 @@ mod tests {
             }),
             "{:?}",
             context.errors()
+        );
+    }
+
+    #[test]
+    fn parts_to_be_validated_skips_future_version_parts() {
+        use crate::generated::parts::part_by_name;
+        use crate::opc::RelationshipTargetMode;
+
+        let mut package = minimal_package(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+        );
+        let main = PackUri::new("/word/document.xml");
+        let tasks = PackUri::new("/word/tasks.xml");
+        let info = part_by_name("DocumentTasksPart").unwrap();
+        package.set_part(
+            tasks.clone(),
+            info.content_type.unwrap(),
+            b"<tasks/>".to_vec(),
+        );
+        package.part_relationships_mut(&main).add(
+            info.relationship_type,
+            "tasks.xml",
+            RelationshipTargetMode::Internal,
+        );
+
+        // Office 2007: 2019 documenttasks relationship is out of version.
+        let v2007 = DocumentValidator::new(ValidationCache::new(FileFormatVersions::OFFICE2007));
+        let parts_2007 = v2007.parts_to_be_validated(&package);
+        assert!(
+            !parts_2007.iter().any(|u| u.as_str() == "/word/tasks.xml"),
+            "{parts_2007:?}"
+        );
+        assert!(parts_2007.iter().any(|u| u.as_str() == "/word/document.xml"));
+
+        // Microsoft365: include the 2019 part.
+        let v365 = DocumentValidator::new(ValidationCache::new(FileFormatVersions::MICROSOFT365));
+        let parts_365 = v365.parts_to_be_validated(&package);
+        assert!(
+            parts_365.iter().any(|u| u.as_str() == "/word/tasks.xml"),
+            "{parts_365:?}"
         );
     }
 }

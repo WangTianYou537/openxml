@@ -1000,6 +1000,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ValidationSettings.application_type` + OpenXmlValidator/ValidationContext accessors; document package validation seeds from package ApplicationTypeFeature when settings are ALL
 - [x] `NumberValidator::total_digits` (C# TotalDigits / `Sch_TotalDigitsConstraintFailed`)
 - [x] DocumentValidator runs structured Word/Spreadsheet/Presentation particle walks for known package roots (deduped against schema-type pass); re-export `word`/`spreadsheet`/`presentation` particle modules
+- [x] `DocumentValidator::parts_to_be_validated` filters by `relationship_introduced_in` (C# `part.IsInVersion(version)`)
 
 **Still intentionally deferred / partial:**
 
