@@ -1225,6 +1225,25 @@ pub mod word {
         Particle::sequence(vec![Particle::element("person", Occurs::STAR)], Occurs::ONE)
     }
 
+    /// `<w16cid:commentsIds>` comments ids part root.
+    pub fn comments_ids() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("commentId", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<w16cex:commentsExtensible>` comments extensible part root.
+    pub fn comments_extensible() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("commentExtensible", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
@@ -1253,6 +1272,8 @@ pub mod word {
             "glossaryDocument" => glossary_document(),
             "commentsEx" => comments_ex(),
             "people" => people(),
+            "commentsIds" => comments_ids(),
+            "commentsExtensible" => comments_extensible(),
             _ => return None,
         })
     }
@@ -1548,6 +1569,37 @@ pub mod spreadsheet {
         )
     }
 
+    /// `<xltc:ThreadedComments>` threaded comments part root.
+    pub fn threaded_comments() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("threadedComment", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x14:slicers>` slicers part root.
+    pub fn slicers() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("slicer", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x14:slicerCacheDefinition>` slicer cache part root.
+    pub fn slicer_cache_definition() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("pivotTables", Occurs::OPTIONAL),
+                Particle::element("data", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1579,6 +1631,9 @@ pub mod spreadsheet {
             "headers" => headers(),
             "revisions" => revisions(),
             "users" => users(),
+            "ThreadedComments" => threaded_comments(),
+            "slicers" => slicers(),
+            "slicerCacheDefinition" => slicer_cache_definition(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -2330,6 +2385,33 @@ pub fn validate_spreadsheet_particles_for_version(
                 root,
                 &spreadsheet::users(),
                 "x:users",
+                &context,
+                &root_mc,
+            ));
+        }
+        "ThreadedComments" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::threaded_comments(),
+                "xltc:ThreadedComments",
+                &context,
+                &root_mc,
+            ));
+        }
+        "slicers" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::slicers(),
+                "x14:slicers",
+                &context,
+                &root_mc,
+            ));
+        }
+        "slicerCacheDefinition" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::slicer_cache_definition(),
+                "x14:slicerCacheDefinition",
                 &context,
                 &root_mc,
             ));
@@ -3504,6 +3586,69 @@ mod tests {
             &presentation::slide_sync_properties(),
             "p:sldSyncPr",
             FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn modern_comment_and_slicer_roots() {
+        assert!(word::particle_for("commentsIds").is_some());
+        assert!(word::particle_for("commentsExtensible").is_some());
+        assert!(spreadsheet::particle_for("ThreadedComments").is_some());
+        assert!(spreadsheet::particle_for("slicers").is_some());
+        assert!(spreadsheet::particle_for("slicerCacheDefinition").is_some());
+
+        let mut ids = crate::element::OpenXmlElement::new(
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid",
+            "commentsIds",
+        );
+        ids.append_child(crate::element::OpenXmlElement::new(
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid",
+            "commentId",
+        ));
+        let errs = validate_particle_for_version(
+            &ids,
+            &word::comments_ids(),
+            "w16cid:commentsIds",
+            FileFormatVersions::OFFICE2016,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut threaded = crate::element::OpenXmlElement::new(
+            "xltc",
+            "http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments",
+            "ThreadedComments",
+        );
+        threaded.append_child(crate::element::OpenXmlElement::new(
+            "xltc",
+            "http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments",
+            "threadedComment",
+        ));
+        let errs = validate_particle_for_version(
+            &threaded,
+            &spreadsheet::threaded_comments(),
+            "xltc:ThreadedComments",
+            FileFormatVersions::OFFICE2019,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut slicers = crate::element::OpenXmlElement::new(
+            "x14",
+            "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+            "slicers",
+        );
+        slicers.append_child(crate::element::OpenXmlElement::new(
+            "x14",
+            "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+            "slicer",
+        ));
+        let errs = validate_particle_for_version(
+            &slicers,
+            &spreadsheet::slicers(),
+            "x14:slicers",
+            FileFormatVersions::OFFICE2010,
         );
         assert!(errs.is_empty(), "{errs:?}");
     }

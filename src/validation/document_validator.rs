@@ -171,7 +171,10 @@ impl DocumentValidator {
             | "MapInfo"
             | "headers"
             | "revisions"
-            | "users" => {
+            | "users"
+            | "ThreadedComments"
+            | "slicers"
+            | "slicerCacheDefinition" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
@@ -204,7 +207,7 @@ impl DocumentValidator {
             // Other Word part roots: single-root particle via registry.
             "styles" | "numbering" | "fonts" | "comments" | "footnotes" | "endnotes"
             | "hdr" | "ftr" | "settings" | "webSettings" | "glossaryDocument"
-            | "commentsEx" | "people" => {
+            | "commentsEx" | "people" | "commentsIds" | "commentsExtensible" => {
                 if let Some(particle) = super::particle_for(&root.local_name) {
                     super::validate_particle_for_version(
                         root,

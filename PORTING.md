@@ -1031,6 +1031,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Spreadsheet particles: `volTypes` / `singleXmlCells` / `MapInfo` + DocumentValidator walks
 - [x] OpenXmlValidator part path: `ensure_relationship_in_version` (C# `ThrowIfNotInVersion(OpenXmlPart)`)
 - [x] Spreadsheet shared-workbook particles (`headers` / `revisions` / `users`) + Presentation `sldSyncPr`
+- [x] Modern comments/slicers: `commentsIds` / `commentsExtensible` / `ThreadedComments` / `slicers` / `slicerCacheDefinition`
 
 **Still intentionally deferred / partial:**
 
