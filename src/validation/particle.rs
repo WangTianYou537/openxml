@@ -706,6 +706,20 @@ pub mod word {
             Occurs::ONE,
         )
     }
+
+    /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
+    pub fn particle_for(local_name: &str) -> Option<Particle> {
+        Some(match local_name {
+            "document" => document(),
+            "body" => body(),
+            "p" => paragraph(),
+            "r" => run(),
+            "tbl" => table(),
+            "tr" => table_row(),
+            "tc" => table_cell(),
+            _ => return None,
+        })
+    }
 }
 
 /// Recursively validate a Word document using ordered particles.

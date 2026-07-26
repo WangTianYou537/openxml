@@ -143,6 +143,29 @@ impl DocumentValidator {
                     return Ok(());
                 }
             }
+        } else {
+            // Non-document roots: particle registry lookup per visited element
+            // (C# ValidationCache.GetParticleConstraint via the traverser walk).
+            let version = self.cache.version();
+            let mut mc_context =
+                crate::markup_compatibility::McContext::with_exception_on_error(false);
+            let visited = super::validating_traverse_tree(root, &mut mc_context, version);
+            for element in visited {
+                let Some(particle) = super::particle::word::particle_for(&element.local_name)
+                else {
+                    continue;
+                };
+                for error in super::validate_particle_for_version(
+                    element,
+                    &particle,
+                    &element.qualified_name(),
+                    version,
+                ) {
+                    if !context.try_add_error(error)? {
+                        return Ok(());
+                    }
+                }
+            }
         }
 
         // C# AlternateContentValidator + CompatibilityRuleAttributesValidator passes.
@@ -314,6 +337,31 @@ mod tests {
         assert_eq!(
             error.error_type(),
             ValidationErrorType::MarkupCompatibility
+        );
+    }
+
+    #[test]
+    fn non_document_roots_use_particle_registry() {
+        use crate::wordprocessing::{paragraph, run, text};
+
+        let validator = DocumentValidator::default();
+
+        let good = paragraph(vec![run(vec![text("ok")])]);
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&good, &mut context).unwrap();
+        assert!(context.errors().is_empty(), "{:?}", context.errors());
+
+        let mut bad = paragraph(vec![]);
+        bad.append_child(OpenXmlElement::w("body"));
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&bad, &mut context).unwrap();
+        assert!(
+            context
+                .errors()
+                .iter()
+                .any(|e| e.message.contains("particle mismatch")),
+            "{:?}",
+            context.errors()
         );
     }
 

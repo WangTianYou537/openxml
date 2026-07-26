@@ -936,6 +936,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Simple-type restrictions: `verify_token` (xsd:token), `verify_ncname` / `is_valid_qname` (xsd:QName), `validate_any_uri` (xsd:anyURI)
 - [x] `SemanticValidationLevel` flags + `SemanticConstraintGate` (level/version/application gating from stack frames, C# `SemanticConstraint.Validate` shell)
 - [x] `compose_schema/mc/validation_error` context helpers + `ValidationResources` message table subset (part path from stack frame, node/related-node paths, unknown-id fallback)
+- [x] `word::particle_for` registry lookup; DocumentValidator validates non-document roots via traverser walk + per-element particles
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
