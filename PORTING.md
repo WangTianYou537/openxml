@@ -1018,6 +1018,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Spreadsheet particles: `calcChain` / `connections` / `externalLink` / `table` / `queryTable` / `pivotTableDefinition` + DocumentValidator walks
 - [x] Presentation particles: `cmLst` / `cmAuthorLst` / `tagLst` / `viewPr`; Drawing `wsDr` worksheet drawing + walks
 - [x] Word `commentsEx` / `people` (w15); Spreadsheet `pivotCacheDefinition` / `pivotCacheRecords` / `metadata` / `dialogsheet` + DocumentValidator routes
+- [x] Drawing/diagram particles: `userShapes` / `colorsDef` / `dataModel` / `layoutDef` / `styleDef` + DocumentValidator walks
 
 **Still intentionally deferred / partial:**
 

@@ -182,7 +182,15 @@ impl DocumentValidator {
             | "viewPr" => {
                 super::validate_presentation_particles_for_version(root, version)
             }
-            "theme" | "themeOverride" | "chartSpace" | "wsDr" => {
+            "theme"
+            | "themeOverride"
+            | "chartSpace"
+            | "wsDr"
+            | "userShapes"
+            | "colorsDef"
+            | "dataModel"
+            | "layoutDef"
+            | "styleDef" => {
                 super::validate_drawing_particles_for_version(root, version)
             }
             // Other Word part roots: single-root particle via registry.

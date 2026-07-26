@@ -1768,12 +1768,88 @@ pub mod drawing {
         )
     }
 
+    /// `<c:userShapes>` chart drawing part root.
+    pub fn user_shapes() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("relSizeAnchor", super::Occurs::ONE),
+                Particle::element("absSizeAnchor", super::Occurs::ONE),
+            ],
+            super::Occurs::STAR,
+        )
+    }
+
+    /// `<dgm:colorsDef>` diagram colors part root.
+    pub fn colors_definition() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("title", super::Occurs::STAR),
+                Particle::element("desc", super::Occurs::STAR),
+                Particle::element("catLst", super::Occurs::OPTIONAL),
+                Particle::element("styleLbl", super::Occurs::STAR),
+                Particle::element("extLst", super::Occurs::OPTIONAL),
+            ],
+            super::Occurs::ONE,
+        )
+    }
+
+    /// `<dgm:dataModel>` diagram data part root.
+    pub fn data_model() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("ptLst", super::Occurs::OPTIONAL),
+                Particle::element("cxnLst", super::Occurs::OPTIONAL),
+                Particle::element("bg", super::Occurs::OPTIONAL),
+                Particle::element("whole", super::Occurs::OPTIONAL),
+                Particle::element("extLst", super::Occurs::OPTIONAL),
+            ],
+            super::Occurs::ONE,
+        )
+    }
+
+    /// `<dgm:layoutDef>` diagram layout part root.
+    pub fn layout_definition() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("title", super::Occurs::STAR),
+                Particle::element("desc", super::Occurs::STAR),
+                Particle::element("catLst", super::Occurs::OPTIONAL),
+                Particle::element("sampData", super::Occurs::OPTIONAL),
+                Particle::element("styleData", super::Occurs::OPTIONAL),
+                Particle::element("clrData", super::Occurs::OPTIONAL),
+                Particle::element("layoutNode", super::Occurs::OPTIONAL),
+                Particle::element("extLst", super::Occurs::OPTIONAL),
+            ],
+            super::Occurs::ONE,
+        )
+    }
+
+    /// `<dgm:styleDef>` diagram style part root.
+    pub fn style_definition() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("title", super::Occurs::STAR),
+                Particle::element("desc", super::Occurs::STAR),
+                Particle::element("catLst", super::Occurs::OPTIONAL),
+                Particle::element("scene3d", super::Occurs::OPTIONAL),
+                Particle::element("styleLbl", super::Occurs::STAR),
+                Particle::element("extLst", super::Occurs::OPTIONAL),
+            ],
+            super::Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "theme" => theme(),
             "themeOverride" => theme_override(),
             "chartSpace" => chart_space(),
             "wsDr" => worksheet_drawing(),
+            "userShapes" => user_shapes(),
+            "colorsDef" => colors_definition(),
+            "dataModel" => data_model(),
+            "layoutDef" => layout_definition(),
+            "styleDef" => style_definition(),
             _ => return None,
         })
     }
@@ -2306,6 +2382,51 @@ pub fn validate_drawing_particles_for_version(
                 root,
                 &drawing::worksheet_drawing(),
                 "xdr:wsDr",
+                &context,
+                &root_mc,
+            ));
+        }
+        "userShapes" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::user_shapes(),
+                "c:userShapes",
+                &context,
+                &root_mc,
+            ));
+        }
+        "colorsDef" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::colors_definition(),
+                "dgm:colorsDef",
+                &context,
+                &root_mc,
+            ));
+        }
+        "dataModel" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::data_model(),
+                "dgm:dataModel",
+                &context,
+                &root_mc,
+            ));
+        }
+        "layoutDef" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::layout_definition(),
+                "dgm:layoutDef",
+                &context,
+                &root_mc,
+            ));
+        }
+        "styleDef" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::style_definition(),
+                "dgm:styleDef",
                 &context,
                 &root_mc,
             ));
@@ -3218,6 +3339,52 @@ mod tests {
             &dr,
             &drawing::worksheet_drawing(),
             "xdr:wsDr",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn diagram_and_user_shapes_roots_resolve() {
+        assert!(drawing::particle_for("userShapes").is_some());
+        assert!(drawing::particle_for("colorsDef").is_some());
+        assert!(drawing::particle_for("dataModel").is_some());
+        assert!(drawing::particle_for("layoutDef").is_some());
+        assert!(drawing::particle_for("styleDef").is_some());
+        assert!(crate::validation::particle::particle_for("dataModel").is_some());
+
+        let mut model = crate::element::OpenXmlElement::new(
+            "dgm",
+            "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+            "dataModel",
+        );
+        model.append_child(crate::element::OpenXmlElement::new(
+            "dgm",
+            "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+            "ptLst",
+        ));
+        let errs = validate_particle_for_version(
+            &model,
+            &drawing::data_model(),
+            "dgm:dataModel",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut shapes = crate::element::OpenXmlElement::new(
+            "c",
+            "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            "userShapes",
+        );
+        shapes.append_child(crate::element::OpenXmlElement::new(
+            "cdr",
+            "http://schemas.openxmlformats.org/drawingml/2006/chartDrawing",
+            "relSizeAnchor",
+        ));
+        let errs = validate_particle_for_version(
+            &shapes,
+            &drawing::user_shapes(),
+            "c:userShapes",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");
