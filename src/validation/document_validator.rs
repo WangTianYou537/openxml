@@ -1,8 +1,8 @@
 //! Package/part validation orchestration (C# `DocumentValidator`).
 
 use super::{
-    validate_package_constraints, validate_word_document_full_for_version, ValidationCache,
-    ValidationContext, ValidationError, ValidationErrorType, ValidationSettings,
+    validate_package_constraints_for_version, validate_word_document_full_for_version,
+    ValidationCache, ValidationContext, ValidationError, ValidationErrorType, ValidationSettings,
 };
 use crate::element::{parse_element, OpenXmlElement};
 use crate::error::Result;
@@ -43,7 +43,8 @@ impl DocumentValidator {
         package: &OpcPackage,
         context: &mut ValidationContext,
     ) -> Result<()> {
-        for error in validate_package_constraints(package) {
+        // C# PackageValidator.Validate(version) — filter rules by target FileFormatVersions.
+        for error in validate_package_constraints_for_version(package, self.cache.version()) {
             if !context.try_add_error(error)? {
                 return Ok(());
             }

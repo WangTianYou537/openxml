@@ -1,6 +1,7 @@
 //! Package-structure validation (content types + relationship targets).
 
 use super::ValidationError;
+use crate::file_format::FileFormatVersions;
 use crate::namespace::rel;
 use crate::opc::{OpcPackage, PackUri};
 
@@ -10,7 +11,20 @@ use crate::opc::{OpcPackage, PackUri};
 /// - package has an officeDocument (main) relationship when `require_main` is true
 /// - main part exists and has a content-type override/default
 /// - internal relationship targets resolve to existing parts
+///
+/// Package relationship constraints use all Office versions; prefer
+/// [`validate_package_for_version`] when a target format is known.
 pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<ValidationError> {
+    validate_package_for_version(package, require_main, FileFormatVersions::ALL)
+}
+
+/// Like [`validate_package`] but filters part-constraint rules by `version`
+/// (C# `PackageValidator.Validate(version)`).
+pub fn validate_package_for_version(
+    package: &OpcPackage,
+    require_main: bool,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
     let main_rel = package
@@ -136,8 +150,8 @@ pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<Validat
     errors.extend(super::validate_digital_signatures(package));
     errors.extend(super::validate_signature_digests(package));
 
-    // Part relationship constraints (C# PackageValidator).
-    errors.extend(super::validate_package_constraints(package));
+    // Part relationship constraints (C# PackageValidator with version filter).
+    errors.extend(super::validate_package_constraints_for_version(package, version));
 
     errors
 }

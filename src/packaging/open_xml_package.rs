@@ -358,6 +358,14 @@ impl OpenXmlPackage {
         crate::validation::validate_package_constraints(&self.opc)
     }
 
+    /// Version-aware package constraints (C# `PackageValidator.Validate(version)`).
+    pub fn validate_package_constraints_for_version(
+        &self,
+        version: crate::file_format::FileFormatVersions,
+    ) -> Vec<crate::validation::ValidationError> {
+        crate::validation::validate_package_constraints_for_version(&self.opc, version)
+    }
+
     /// Feature bag (typed services attached to this package).
     pub fn features(&self) -> &FeatureCollection {
         &self.features

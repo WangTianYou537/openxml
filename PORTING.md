@@ -982,6 +982,10 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Version-aware lightweight child and ordered particle validation entry points
 - [x] `OpenXmlValidator` threads configured `FileFormatVersions` through Word validation
 
+- [x] PackageValidator version awareness: `relationship_introduced_in` + `PartConstraintRule.availability`/`applies_to`; `rules_for_version` / `try_get_rule_for_version` / `missing_required_for_version`
+- [x] `validate_package_constraints_for_version` / `validate_package_constraint_results_for_version` / `validate_part_constraints_for_version` / `validate_package_for_version` (C# `version.AtLeast(rule.FileFormat)` + `part.IsInVersion`)
+- [x] `DocumentValidator` / `OpenXmlValidator` / `OpenXmlPackage` pass target `FileFormatVersions` into package constraint walk
+
 **Still intentionally deferred / partial:**
 
 1. Exclusive W3C C14N + full X.509 certificate chain validation for Office digsig profiles  

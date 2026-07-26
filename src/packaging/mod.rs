@@ -34,7 +34,9 @@ pub use presentation_document::{
 pub use spreadsheet_document::{
     SpreadsheetDocument, SpreadsheetDocumentType, WorksheetInfo,
 };
-pub use part_constraints::{constraints_for, PartConstraintFeature, PartConstraintRule};
+pub use part_constraints::{
+    constraints_for, relationship_introduced_in, PartConstraintFeature, PartConstraintRule,
+};
 pub use typed_part::{
     add_typed_part, add_typed_part_element, delete_typed_part_by_id, find_typed_parts,
     find_typed_parts_recursive, open_typed_part, part_info_for_relationship, TypedPart,

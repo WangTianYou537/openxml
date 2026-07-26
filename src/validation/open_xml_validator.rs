@@ -4,7 +4,8 @@
 //! with a max-error budget and target [`FileFormatVersions`].
 
 use super::{
-    validate_package, validate_package_constraints, DocumentValidator, ValidationCache,
+    validate_package_for_version, validate_package_constraints_for_version, DocumentValidator,
+    ValidationCache,
     ValidationError, ValidationErrorEventArgs,
 };
 use crate::element::OpenXmlElement;
@@ -195,17 +196,19 @@ impl OpenXmlValidator {
 
     /// Validate OPC structure + part constraints (no full DOM schema pass).
     pub fn validate_package(&mut self, package: &OpcPackage) -> Vec<ValidationError> {
-        let errors = validate_package(package, true);
-        let _ = self.settings.file_format;
+        let errors = validate_package_for_version(package, true, self.settings.file_format);
         self.cap(errors)
     }
 
-    /// Part-constraint walk only (C# `PackageValidator` subset).
+    /// Part-constraint walk only (C# `PackageValidator.Validate(version)`).
     pub fn validate_package_constraints_only(
         &mut self,
         package: &OpcPackage,
     ) -> Vec<ValidationError> {
-        self.cap(validate_package_constraints(package))
+        self.cap(validate_package_constraints_for_version(
+            package,
+            self.settings.file_format,
+        ))
     }
 
     /// Typed package constraint results (C# `PackageValidator.Validate` results shell).

@@ -40,11 +40,13 @@ pub use attributes::{
     validate_undeclared_attributes, AttributeRule, AttributeType,
 };
 pub use compose_error::validation_resource_message;
-pub use package::validate_package;
+pub use package::{validate_package, validate_package_for_version};
 pub use document_validator::DocumentValidator;
 pub use package_validator::{
-    message_id as package_constraint_message_id, validate_package_constraints, validate_package_constraint_results,
-    validate_part_constraints, OpenXmlPackageValidationResult,
+    message_id as package_constraint_message_id, validate_package_constraints,
+    validate_package_constraints_for_version, validate_package_constraint_results,
+    validate_package_constraint_results_for_version, validate_part_constraints,
+    validate_part_constraints_for_version, OpenXmlPackageValidationResult,
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
 pub use traverser::{

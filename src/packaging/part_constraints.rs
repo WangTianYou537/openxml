@@ -1,7 +1,42 @@
 //! Part relationship constraints from generated [`PartInfo`] (C# `IPartConstraintFeature` shell).
 
+use crate::file_format::FileFormatVersions;
 use crate::generated::parts::{part_by_name, part_by_relationship_type, PartChildConstraint, PartInfo};
 use crate::opc::media_rel;
+
+/// Infer the Office version that introduced a relationship type from its URI
+/// (C# `PartConstraintRule.FileFormat` shell when generated tables lack version).
+pub fn relationship_introduced_in(relationship_type: &str) -> FileFormatVersions {
+    // Prefer explicit year segments used by Microsoft Office relationship URIs.
+    if relationship_type.contains("/2024/") || relationship_type.contains("/2025/") {
+        return FileFormatVersions::MICROSOFT365;
+    }
+    if relationship_type.contains("/2021/")
+        || relationship_type.contains("/2022/")
+        || relationship_type.contains("/2023/")
+    {
+        return FileFormatVersions::OFFICE2021;
+    }
+    if relationship_type.contains("/2019/") || relationship_type.contains("/2020/") {
+        return FileFormatVersions::OFFICE2019;
+    }
+    if relationship_type.contains("/2016/")
+        || relationship_type.contains("/2017/")
+        || relationship_type.contains("/2018/")
+    {
+        return FileFormatVersions::OFFICE2016;
+    }
+    if relationship_type.contains("/2013/") || relationship_type.contains("/2014/") {
+        return FileFormatVersions::OFFICE2013;
+    }
+    if relationship_type.contains("/2012/") {
+        return FileFormatVersions::OFFICE2013;
+    }
+    if relationship_type.contains("/2010/") || relationship_type.contains("/2009/") {
+        return FileFormatVersions::OFFICE2010;
+    }
+    FileFormatVersions::OFFICE2007
+}
 
 /// Rule describing whether a child part relationship is allowed (C# `PartConstraintRule`).
 #[derive(Debug, Clone, Copy)]
@@ -12,6 +47,8 @@ pub struct PartConstraintRule {
     pub max_occurs_greater_than_one: bool,
     pub min_occurs_non_zero: bool,
     pub is_data_part_reference: bool,
+    /// Office version that introduced this constraint (C# `FileFormat`).
+    pub availability: FileFormatVersions,
 }
 
 impl PartConstraintRule {
@@ -25,6 +62,7 @@ impl PartConstraintRule {
                 max_occurs_greater_than_one: child.max_occurs_greater_than_one,
                 min_occurs_non_zero: child.min_occurs_non_zero,
                 is_data_part_reference: true,
+                availability: relationship_introduced_in(relationship_type),
             });
         }
         let info = part_by_name(child.name)?;
@@ -35,6 +73,7 @@ impl PartConstraintRule {
             max_occurs_greater_than_one: child.max_occurs_greater_than_one,
             min_occurs_non_zero: child.min_occurs_non_zero,
             is_data_part_reference: false,
+            availability: relationship_introduced_in(info.relationship_type),
         })
     }
 
@@ -44,6 +83,13 @@ impl PartConstraintRule {
 
     pub fn required(&self) -> bool {
         self.min_occurs_non_zero
+    }
+
+    /// Whether this rule applies when validating against `version`
+    /// (C# `version.AtLeast(constraintRule.FileFormat)`).
+    pub fn applies_to(&self, version: FileFormatVersions) -> bool {
+        // C# uses AtLeast; also treat ALL / multi-bit targets via includes_introduction.
+        version.at_least(self.availability) || version.includes_introduction(self.availability)
     }
 }
 
@@ -108,6 +154,15 @@ impl PartConstraintFeature {
             .collect()
     }
 
+    /// Rules that apply when validating against `version`
+    /// (C# `version.AtLeast(constraintRule.FileFormat)` filter).
+    pub fn rules_for_version(&self, version: FileFormatVersions) -> Vec<PartConstraintRule> {
+        self.rules()
+            .into_iter()
+            .filter(|r| r.applies_to(version))
+            .collect()
+    }
+
     /// C# `TryGetRule` by relationship type URI.
     pub fn try_get_rule(&self, relationship_type: &str) -> Option<PartConstraintRule> {
         let parent = self.parent_info()?;
@@ -120,6 +175,16 @@ impl PartConstraintFeature {
         }
         let _ = part_by_relationship_type(relationship_type);
         None
+    }
+
+    /// [`try_get_rule`] that only returns rules available in `version`.
+    pub fn try_get_rule_for_version(
+        &self,
+        relationship_type: &str,
+        version: FileFormatVersions,
+    ) -> Option<PartConstraintRule> {
+        self.try_get_rule(relationship_type)
+            .filter(|r| r.applies_to(version))
     }
 
     pub fn is_relationship_allowed(&self, relationship_type: &str) -> bool {
@@ -156,9 +221,22 @@ impl PartConstraintFeature {
         &self,
         present_relationship_types: impl IntoIterator<Item = &'a str>,
     ) -> Vec<&'static str> {
+        self.missing_required_for_version(
+            present_relationship_types,
+            FileFormatVersions::ALL,
+        )
+    }
+
+    /// Required children for `version` that are missing given present relationship types
+    /// (C# required-part check with `version.AtLeast(rule.FileFormat)`).
+    pub fn missing_required_for_version<'a>(
+        &self,
+        present_relationship_types: impl IntoIterator<Item = &'a str>,
+        version: FileFormatVersions,
+    ) -> Vec<&'static str> {
         let present: std::collections::HashSet<&str> =
             present_relationship_types.into_iter().collect();
-        self.rules()
+        self.rules_for_version(version)
             .into_iter()
             .filter(|r| r.required() && !present.contains(r.relationship_type))
             .map(|r| r.part_name)
@@ -208,6 +286,59 @@ pub fn constraints_for(part_name: &'static str) -> PartConstraintFeature {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn relationship_introduced_in_years() {
+        assert_eq!(
+            relationship_introduced_in(
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
+            ),
+            FileFormatVersions::OFFICE2007
+        );
+        assert_eq!(
+            relationship_introduced_in(
+                "http://schemas.microsoft.com/office/2016/09/relationships/commentsIds"
+            ),
+            FileFormatVersions::OFFICE2016
+        );
+        assert_eq!(
+            relationship_introduced_in(
+                "http://schemas.microsoft.com/office/2019/04/relationships/namedSheetView"
+            ),
+            FileFormatVersions::OFFICE2019
+        );
+        assert_eq!(
+            relationship_introduced_in(
+                "http://schemas.microsoft.com/office/2014/relationships/chartEx"
+            ),
+            FileFormatVersions::OFFICE2013
+        );
+    }
+
+    #[test]
+    fn rules_for_version_filters_future_rules() {
+        let f = PartConstraintFeature::new("MainDocumentPart");
+        let comments_ids = part_by_name("WordprocessingCommentsIdsPart")
+            .unwrap()
+            .relationship_type;
+        // Rule is present when targeting all / 2016+
+        assert!(f
+            .try_get_rule_for_version(comments_ids, FileFormatVersions::OFFICE2016)
+            .is_some());
+        assert!(f
+            .try_get_rule_for_version(comments_ids, FileFormatVersions::ALL)
+            .is_some());
+        // Not applicable for Office 2007
+        assert!(f
+            .try_get_rule_for_version(comments_ids, FileFormatVersions::OFFICE2007)
+            .is_none());
+        let styles = part_by_name("StyleDefinitionsPart")
+            .unwrap()
+            .relationship_type;
+        assert!(f
+            .try_get_rule_for_version(styles, FileFormatVersions::OFFICE2007)
+            .is_some());
+    }
 
     #[test]
     fn main_document_allows_styles_once() {

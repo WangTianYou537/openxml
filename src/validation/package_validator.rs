@@ -9,10 +9,11 @@
 //! - `DataPartReferenceIsNotAllowed` — media/audio/video ref not allowed here
 
 use super::ValidationError;
+use crate::file_format::FileFormatVersions;
 use crate::generated::parts::{part_by_name, part_by_relationship_type, PartInfo, PARTS};
 use crate::namespace::rel;
 use crate::opc::{media_rel, OpcPackage, PackUri, RelationshipTargetMode};
-use crate::packaging::PartConstraintFeature;
+use crate::packaging::{relationship_introduced_in, PartConstraintFeature};
 use std::collections::{HashMap, HashSet};
 
 /// C# `OpenXmlPackageValidationResult` shell (internal packaging validation event).
@@ -250,18 +251,19 @@ fn is_known_data_part_rel(relationship_type: &str) -> bool {
 ///
 /// Does **not** re-check missing relationship targets (see [`super::validate_package`]);
 /// focuses on PartConstraintFeature rules walked from the main part.
-/// Run package constraint validation and return typed results
-/// (C# `PackageValidator.Validate` yield of `OpenXmlPackageValidationResult`).
-pub fn validate_package_constraint_results(
-    package: &OpcPackage,
-) -> Vec<OpenXmlPackageValidationResult> {
-    validate_package_constraints(package)
-        .iter()
-        .map(OpenXmlPackageValidationResult::from_validation_error)
-        .collect()
+/// Defaults to all Office versions (C# callers pass an explicit `FileFormatVersions`).
+pub fn validate_package_constraints(package: &OpcPackage) -> Vec<ValidationError> {
+    validate_package_constraints_for_version(package, FileFormatVersions::ALL)
 }
 
-pub fn validate_package_constraints(package: &OpcPackage) -> Vec<ValidationError> {
+/// Version-aware package constraint walk (C# `PackageValidator.Validate(version)`).
+///
+/// Rules whose relationship URI year is after `version` are treated as ExtendedPart
+/// (no Required / OnlyOne / InvalidContentType / PartIsNotAllowed for those rules).
+pub fn validate_package_constraints_for_version(
+    package: &OpcPackage,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     let mut processed: HashSet<String> = HashSet::new();
 
@@ -293,10 +295,30 @@ pub fn validate_package_constraints(package: &OpcPackage) -> Vec<ValidationError
         package,
         &main_uri,
         main_type,
+        version,
         &mut processed,
         &mut errors,
     );
     errors
+}
+
+/// Run package constraint validation and return typed results
+/// (C# `PackageValidator.Validate` yield of `OpenXmlPackageValidationResult`).
+pub fn validate_package_constraint_results(
+    package: &OpcPackage,
+) -> Vec<OpenXmlPackageValidationResult> {
+    validate_package_constraint_results_for_version(package, FileFormatVersions::ALL)
+}
+
+/// Version-aware typed package constraint results.
+pub fn validate_package_constraint_results_for_version(
+    package: &OpcPackage,
+    version: FileFormatVersions,
+) -> Vec<OpenXmlPackageValidationResult> {
+    validate_package_constraints_for_version(package, version)
+        .iter()
+        .map(OpenXmlPackageValidationResult::from_validation_error)
+        .collect()
 }
 
 /// Validate a single container (part) and recurse into its children.
@@ -305,22 +327,48 @@ pub fn validate_part_constraints(
     part_uri: &PackUri,
     parent_part_name: &str,
 ) -> Vec<ValidationError> {
+    validate_part_constraints_for_version(
+        package,
+        part_uri,
+        parent_part_name,
+        FileFormatVersions::ALL,
+    )
+}
+
+/// Version-aware single-container constraint walk.
+pub fn validate_part_constraints_for_version(
+    package: &OpcPackage,
+    part_uri: &PackUri,
+    parent_part_name: &str,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
     let mut errors = Vec::new();
     let mut processed: HashSet<String> = HashSet::new();
     validate_container(
         package,
         part_uri,
         parent_part_name,
+        version,
         &mut processed,
         &mut errors,
     );
     errors
 }
 
+/// Whether a part relationship type is "in" `version` (C# `part.IsInVersion(version)` shell).
+///
+/// Uses the year segment of Microsoft/OpenXML relationship URIs when present;
+/// otherwise treats the part as available in every version.
+fn relationship_is_in_version(relationship_type: &str, version: FileFormatVersions) -> bool {
+    let intro = relationship_introduced_in(relationship_type);
+    version.at_least(intro) || version.includes_introduction(intro)
+}
+
 fn validate_container(
     package: &OpcPackage,
     container_uri: &PackUri,
     parent_part_name: &str,
+    version: FileFormatVersions,
     processed: &mut HashSet<String>,
     errors: &mut Vec<ValidationError>,
 ) {
@@ -332,7 +380,7 @@ fn validate_container(
     let feature = PartConstraintFeature::for_name(parent_part_name);
     let Some(rels) = package.part_relationships(container_uri) else {
         // Still check required children when there are no relationships at all.
-        for missing in feature.missing_required(std::iter::empty()) {
+        for missing in feature.missing_required_for_version(std::iter::empty(), version) {
             errors.push(err(
                 container_uri.as_str(),
                 message_id::REQUIRED_PART_DO_NOT_EXIST,
@@ -388,24 +436,32 @@ fn validate_container(
     }
 
     // PartIsNotAllowed for each child relationship.
+    // C#: report only when the part IsInVersion(version) and no rule matches.
     for (rel_type, rel_id, _ct, _target) in &child_entries {
-        if feature.try_get_rule(rel_type).is_none() {
-            // Treat as ExtendedPart: ignore unknown non-Office relationship types;
-            // still report openxmlformats officeDocument relationships that are not allowed.
-            let is_office_rel = rel_type.contains("schemas.openxmlformats.org")
-                || rel_type.contains("schemas.microsoft.com/office");
-            if is_office_rel {
-                errors.push(err(
-                    format!("{}#{}", container_uri.as_str(), rel_id),
-                    message_id::PART_IS_NOT_ALLOWED,
-                    format!("relationship `{rel_type}` is not allowed on `{parent_part_name}`"),
-                ));
-            }
+        let rule = feature.try_get_rule(rel_type);
+        let rule_applies = rule.as_ref().is_some_and(|r| r.applies_to(version));
+        if rule_applies {
+            continue;
+        }
+        // No applicable rule: if the relationship itself is "in" this version and is
+        // an Office schema URI, report PartIsNotAllowed. Future-version relationships
+        // are treated as ExtendedPart (no error) — C# `part.IsInVersion(version)`.
+        if !relationship_is_in_version(rel_type, version) {
+            continue;
+        }
+        let is_office_rel = rel_type.contains("schemas.openxmlformats.org")
+            || rel_type.contains("schemas.microsoft.com/office");
+        if is_office_rel {
+            errors.push(err(
+                format!("{}#{}", container_uri.as_str(), rel_id),
+                message_id::PART_IS_NOT_ALLOWED,
+                format!("relationship `{rel_type}` is not allowed on `{parent_part_name}`"),
+            ));
         }
     }
 
-    // Required + maxOccurs rules.
-    for rule in feature.rules() {
+    // Required + maxOccurs rules (filtered by version.AtLeast(rule.FileFormat)).
+    for rule in feature.rules_for_version(version) {
         if rule.is_data_part_reference {
             continue;
         }
@@ -435,35 +491,40 @@ fn validate_container(
     // Content-type checks + recurse.
     for (rel_type, rel_id, ct, target) in &child_entries {
         if let Some(rule) = feature.try_get_rule(rel_type) {
-            if let Some(expected) = rule.content_type {
-                match ct.as_deref() {
-                    Some(actual) if actual == expected => {}
-                    Some(actual) => {
-                        errors.push(err(
-                            target.as_str(),
-                            message_id::INVALID_CONTENT_TYPE_PART,
-                            format!(
-                                "part content type `{actual}` != expected `{expected}` (via {rel_id})"
-                            ),
-                        ));
-                    }
-                    None => {
-                        errors.push(err(
-                            target.as_str(),
-                            message_id::INVALID_CONTENT_TYPE_PART,
-                            format!("part has no content type; expected `{expected}` (via {rel_id})"),
-                        ));
+            if rule.applies_to(version) {
+                if let Some(expected) = rule.content_type {
+                    match ct.as_deref() {
+                        Some(actual) if actual == expected => {}
+                        Some(actual) => {
+                            errors.push(err(
+                                target.as_str(),
+                                message_id::INVALID_CONTENT_TYPE_PART,
+                                format!(
+                                    "part content type `{actual}` != expected `{expected}` (via {rel_id})"
+                                ),
+                            ));
+                        }
+                        None => {
+                            errors.push(err(
+                                target.as_str(),
+                                message_id::INVALID_CONTENT_TYPE_PART,
+                                format!(
+                                    "part has no content type; expected `{expected}` (via {rel_id})"
+                                ),
+                            ));
+                        }
                     }
                 }
             }
-            // Recurse with child part type name from rule (more precise than CT lookup).
+            // Always recurse so nested parts under future-version children are still walked
+            // (C# still walks ExtendedPart children).
             if package.has_part(target) {
-                validate_container(package, target, rule.part_name, processed, errors);
+                validate_container(package, target, rule.part_name, version, processed, errors);
             }
         } else if package.has_part(target) {
             // Unknown / extended: try to infer type for deeper walk when possible.
             if let Some(name) = child_part_name(rel_type, ct.as_deref()) {
-                validate_container(package, target, name, processed, errors);
+                validate_container(package, target, name, version, processed, errors);
             }
         }
     }
@@ -724,5 +785,111 @@ mod tests {
         let pkg = OpcPackage::create();
         let results = validate_package_constraint_results(&pkg);
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn dual_comments_ids_only_one_allowed_when_version_includes_2016() {
+        let mut pkg = minimal_word();
+        let main = PackUri::new("/word/document.xml");
+        let c1 = PackUri::new("/word/commentsIds.xml");
+        let c2 = PackUri::new("/word/commentsIds2.xml");
+        let ct = part_by_name("WordprocessingCommentsIdsPart")
+            .unwrap()
+            .content_type
+            .unwrap();
+        let rel = part_by_name("WordprocessingCommentsIdsPart")
+            .unwrap()
+            .relationship_type;
+        pkg.set_part(c1, ct, b"<w16cid:commentsIds xmlns:w16cid=\"http://schemas.microsoft.com/office/word/2016/wordml/cid\"/>".to_vec());
+        pkg.set_part(c2, ct, b"<w16cid:commentsIds xmlns:w16cid=\"http://schemas.microsoft.com/office/word/2016/wordml/cid\"/>".to_vec());
+        pkg.part_relationships_mut(&main).add(
+            rel,
+            "commentsIds.xml",
+            RelationshipTargetMode::Internal,
+        );
+        pkg.part_relationships_mut(&main).add(
+            rel,
+            "commentsIds2.xml",
+            RelationshipTargetMode::Internal,
+        );
+
+        // Office 2016+ enforces maxOccurs=1.
+        let errs_2016 = validate_package_constraints_for_version(
+            &pkg,
+            crate::file_format::FileFormatVersions::OFFICE2016,
+        );
+        assert!(
+            errs_2016
+                .iter()
+                .any(|e| e.message.contains(message_id::ONLY_ONE_PART_ALLOWED)),
+            "{errs_2016:?}"
+        );
+
+        // Office 2007 treats the 2016 relationship as ExtendedPart — no OnlyOne error.
+        let errs_2007 = validate_package_constraints_for_version(
+            &pkg,
+            crate::file_format::FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            !errs_2007
+                .iter()
+                .any(|e| e.message.contains(message_id::ONLY_ONE_PART_ALLOWED)),
+            "{errs_2007:?}"
+        );
+    }
+
+    #[test]
+    fn future_version_relationship_not_reported_as_disallowed() {
+        // A 2019-only relationship type on MainDocumentPart should not yield
+        // PartIsNotAllowed when validating against Office 2007.
+        let mut pkg = minimal_word();
+        let main = PackUri::new("/word/document.xml");
+        let uri = PackUri::new("/word/tasks.xml");
+        let info = part_by_name("DocumentTasksPart").unwrap();
+        pkg.set_part(
+            uri,
+            info.content_type.unwrap(),
+            b"<tasks/>".to_vec(),
+        );
+        pkg.part_relationships_mut(&main).add(
+            info.relationship_type,
+            "tasks.xml",
+            RelationshipTargetMode::Internal,
+        );
+        let errs = validate_package_constraints_for_version(
+            &pkg,
+            crate::file_format::FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            !errs
+                .iter()
+                .any(|e| e.message.contains(message_id::PART_IS_NOT_ALLOWED)
+                    && e.message.contains("documenttasks")),
+            "{errs:?}"
+        );
+        // Against Microsoft365 / ALL the relationship is known for MainDocument if present;
+        // DocumentTasks may or may not be a MainDocument child — just ensure the API runs.
+        let _ = validate_package_constraints_for_version(
+            &pkg,
+            crate::file_format::FileFormatVersions::MICROSOFT365,
+        );
+    }
+
+    #[test]
+    fn relationship_introduced_in_used_by_rule_availability() {
+        let f = PartConstraintFeature::new("MainDocumentPart");
+        let rule = f
+            .try_get_rule(
+                part_by_name("WordprocessingCommentsIdsPart")
+                    .unwrap()
+                    .relationship_type,
+            )
+            .unwrap();
+        assert_eq!(
+            rule.availability,
+            crate::file_format::FileFormatVersions::OFFICE2016
+        );
+        assert!(rule.applies_to(crate::file_format::FileFormatVersions::OFFICE2016));
+        assert!(!rule.applies_to(crate::file_format::FileFormatVersions::OFFICE2010));
     }
 }
