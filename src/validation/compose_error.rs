@@ -60,6 +60,21 @@ pub fn validation_resource_message(message_id: &str) -> Option<&'static str> {
         "Sem_AttributeValueConditionToAnother" => {
             "Attribute '{0}' should have value(s) {1} when attribute '{2}' has value(s) {3}. Current value of attribute '{4}' is '{5}'."
         }
+        "Sem_InvalidRelationshipId" => {
+            "The relationship '{0}' referenced by attribute '{1}' does not exist."
+        }
+        "Sem_IncorrectRelationshipType" => {
+            "Relationship '{0}' referenced by attribute '{1}' has incorrect type. Its type should be '{2}'."
+        }
+        "Sem_UniqueAttributeValue" => {
+            "Attribute '{0}' should have unique value. Its current value '{1}' duplicates with others."
+        }
+        "Sem_MissingReferenceElement" => {
+            "Element '{0}' referenced by '{1}@{2}' does not exist in part '{3}'. The reference value is '{4}'."
+        }
+        "Sem_MissingIndexedElement" => {
+            "Element '{0}' referenced by '{1}@{2}' does not exist in part '{3}'. The index is '{4}'."
+        }
         "Sch_InvalidChildinLeafElement" => {
             "The element '{0}' is a leaf element and cannot contain children."
         }
