@@ -73,9 +73,11 @@ pub use validation_context::{ValidationCancellationToken, ValidationChild, Valid
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};
 pub use particle::{
     get_expected_elements, get_required_elements, particle_for, validate_particle,
-    validate_particle_for_version, validate_particle_with_context, validate_word_particles,
-    validate_word_particles_for_version, ExpectedChildren, Occurs, Particle, ParticleMatch,
-    ParticleMatchInfo, ParticleType, XsdAnyNamespace,
+    validate_particle_for_version, validate_particle_with_context,
+    validate_presentation_particles, validate_presentation_particles_for_version,
+    validate_spreadsheet_particles, validate_spreadsheet_particles_for_version,
+    validate_word_particles, validate_word_particles_for_version, ExpectedChildren, Occurs,
+    Particle, ParticleMatch, ParticleMatchInfo, ParticleType, XsdAnyNamespace,
 };
 pub use restrictions::{
     is_valid_qname, validate_any_uri, verify_ncname, verify_token, XsdType,

@@ -996,6 +996,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `VersionGate` matches C# `VersionedValidator` (InitialVersion/exact/all); `SimpleTypeValidator` + integer/OnOff convenience wrappers
 - [x] `NameProvider`/`NameProviderValidator`; `OfficeVersionValidator` skips empty values and MC-ignorable namespaces (C# parity)
 - [x] `OpenXmlElement` non-misc child/sibling helpers (`first_non_misc_element_child` / `next_non_misc_element_sibling_*` / `index_of_child`) — C# `GetFirstNonMiscElementChild` / `GetNextNonMiscElementSibling`
+- [x] `validate_spreadsheet_particles[_for_version]` / `validate_presentation_particles[_for_version]` recursive walks for worksheet/workbook and sld/presentation roots
 
 **Still intentionally deferred / partial:**
 

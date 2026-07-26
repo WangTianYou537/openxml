@@ -1423,6 +1423,199 @@ pub fn validate_word_particles_for_version(
     errors
 }
 
+/// Recursively validate a SpreadsheetML worksheet root with ordered particles.
+pub fn validate_spreadsheet_particles(root: &OpenXmlElement) -> Vec<ValidationError> {
+    validate_spreadsheet_particles_for_version(root, FileFormatVersions::OFFICE2007)
+}
+
+/// Version-aware SpreadsheetML particle walk for `worksheet` / `workbook` roots.
+pub fn validate_spreadsheet_particles_for_version(
+    root: &OpenXmlElement,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
+    let mut context = ValidationContext::new(ValidationSettings::new(version));
+    context.set_collect_expected_children(true);
+    let root_mc = McContext::new();
+    let mut errors = Vec::new();
+
+    match root.local_name.as_str() {
+        "workbook" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::workbook(),
+                "x:workbook",
+                &context,
+                &root_mc,
+            ));
+            let children = context.validation_children_with_context(root, &root_mc);
+            if let Some(sheets) = children
+                .iter()
+                .find(|c| c.element.local_name == "sheets")
+            {
+                errors.extend(validate_particle_with_context(
+                    sheets.element,
+                    &spreadsheet::sheets(),
+                    "x:workbook/x:sheets",
+                    &context,
+                    &sheets.mc_context,
+                ));
+            }
+        }
+        "worksheet" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::worksheet(),
+                "x:worksheet",
+                &context,
+                &root_mc,
+            ));
+            let children = context.validation_children_with_context(root, &root_mc);
+            if let Some(sd) = children
+                .iter()
+                .find(|c| c.element.local_name == "sheetData")
+            {
+                errors.extend(validate_particle_with_context(
+                    sd.element,
+                    &spreadsheet::sheet_data(),
+                    "x:worksheet/x:sheetData",
+                    &context,
+                    &sd.mc_context,
+                ));
+                let rows = context.validation_children_with_context(sd.element, &sd.mc_context);
+                for (i, row) in rows
+                    .iter()
+                    .filter(|c| c.element.local_name == "row")
+                    .enumerate()
+                {
+                    let path = format!("x:worksheet/x:sheetData/x:row[{i}]");
+                    errors.extend(validate_particle_with_context(
+                        row.element,
+                        &spreadsheet::row(),
+                        &path,
+                        &context,
+                        &row.mc_context,
+                    ));
+                    let cells =
+                        context.validation_children_with_context(row.element, &row.mc_context);
+                    for (j, cell) in cells
+                        .iter()
+                        .filter(|c| c.element.local_name == "c")
+                        .enumerate()
+                    {
+                        let cell_path = format!("{path}/x:c[{j}]");
+                        errors.extend(validate_particle_with_context(
+                            cell.element,
+                            &spreadsheet::cell(),
+                            &cell_path,
+                            &context,
+                            &cell.mc_context,
+                        ));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    errors
+}
+
+/// Recursively validate a PresentationML slide root with ordered particles.
+pub fn validate_presentation_particles(root: &OpenXmlElement) -> Vec<ValidationError> {
+    validate_presentation_particles_for_version(root, FileFormatVersions::OFFICE2007)
+}
+
+/// Version-aware PresentationML particle walk for `sld` / `presentation` roots.
+pub fn validate_presentation_particles_for_version(
+    root: &OpenXmlElement,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
+    let mut context = ValidationContext::new(ValidationSettings::new(version));
+    context.set_collect_expected_children(true);
+    let root_mc = McContext::new();
+    let mut errors = Vec::new();
+
+    match root.local_name.as_str() {
+        "presentation" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::presentation(),
+                "p:presentation",
+                &context,
+                &root_mc,
+            ));
+        }
+        "sld" | "sldLayout" | "sldMaster" => {
+            let particle = match root.local_name.as_str() {
+                "sld" => presentation::slide(),
+                "sldLayout" => presentation::slide_layout(),
+                _ => presentation::slide_master(),
+            };
+            let path = format!("p:{}", root.local_name);
+            errors.extend(validate_particle_with_context(
+                root, &particle, &path, &context, &root_mc,
+            ));
+            let children = context.validation_children_with_context(root, &root_mc);
+            if let Some(csld) = children.iter().find(|c| c.element.local_name == "cSld") {
+                let csld_path = format!("{path}/p:cSld");
+                errors.extend(validate_particle_with_context(
+                    csld.element,
+                    &presentation::common_slide_data(),
+                    &csld_path,
+                    &context,
+                    &csld.mc_context,
+                ));
+                let csld_children =
+                    context.validation_children_with_context(csld.element, &csld.mc_context);
+                if let Some(tree) = csld_children
+                    .iter()
+                    .find(|c| c.element.local_name == "spTree")
+                {
+                    let tree_path = format!("{csld_path}/p:spTree");
+                    errors.extend(validate_particle_with_context(
+                        tree.element,
+                        &presentation::shape_tree(),
+                        &tree_path,
+                        &context,
+                        &tree.mc_context,
+                    ));
+                    let shapes =
+                        context.validation_children_with_context(tree.element, &tree.mc_context);
+                    for (i, sp) in shapes
+                        .iter()
+                        .filter(|c| c.element.local_name == "sp")
+                        .enumerate()
+                    {
+                        let sp_path = format!("{tree_path}/p:sp[{i}]");
+                        errors.extend(validate_particle_with_context(
+                            sp.element,
+                            &presentation::shape(),
+                            &sp_path,
+                            &context,
+                            &sp.mc_context,
+                        ));
+                    }
+                    for (i, pic) in shapes
+                        .iter()
+                        .filter(|c| c.element.local_name == "pic")
+                        .enumerate()
+                    {
+                        let pic_path = format!("{tree_path}/p:pic[{i}]");
+                        errors.extend(validate_particle_with_context(
+                            pic.element,
+                            &presentation::picture(),
+                            &pic_path,
+                            &context,
+                            &pic.mc_context,
+                        ));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    errors
+}
+
 impl fmt::Display for Occurs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.max {
@@ -1952,5 +2145,35 @@ mod tests {
         assert!(presentation::particle_for("sp").is_some());
         assert!(crate::validation::particle::particle_for("sld").is_some());
         assert!(crate::validation::particle::particle_for("worksheet").is_some());
+    }
+
+    #[test]
+    fn validate_spreadsheet_particles_reports_missing_sheet_data() {
+        let ws = crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "worksheet",
+        );
+        let errs = validate_spreadsheet_particles(&ws);
+        assert!(
+            errs.iter().any(|e| e.message.contains("sheetData")
+                || e.id() == Some("Sch_IncompleteContentExpectingComplex")),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn validate_presentation_particles_reports_missing_csld() {
+        let sld = crate::element::OpenXmlElement::new(
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "sld",
+        );
+        let errs = validate_presentation_particles(&sld);
+        assert!(
+            errs.iter().any(|e| e.message.contains("cSld")
+                || e.id() == Some("Sch_IncompleteContentExpectingComplex")),
+            "{errs:?}"
+        );
     }
 }
