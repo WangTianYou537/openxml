@@ -910,6 +910,53 @@ impl OpenXmlElement {
         self.children.first_mut()
     }
 
+    /// First non-misc element child (C# `GetFirstNonMiscElementChild`).
+    pub fn first_non_misc_element_child(&self) -> Option<&OpenXmlElement> {
+        self.children.iter().find(|c| !c.is_misc_node())
+    }
+
+    /// Mutable first non-misc element child.
+    pub fn first_non_misc_element_child_mut(&mut self) -> Option<&mut OpenXmlElement> {
+        self.children.iter_mut().find(|c| !c.is_misc_node())
+    }
+
+    /// Next non-misc sibling after the child at `index`
+    /// (C# `GetNextNonMiscElementSibling` from parent index).
+    pub fn next_non_misc_element_sibling_at(&self, index: usize) -> Option<&OpenXmlElement> {
+        self.children
+            .iter()
+            .skip(index + 1)
+            .find(|c| !c.is_misc_node())
+    }
+
+    /// Mutable next non-misc sibling after the child at `index`.
+    pub fn next_non_misc_element_sibling_at_mut(
+        &mut self,
+        index: usize,
+    ) -> Option<&mut OpenXmlElement> {
+        self.children
+            .iter_mut()
+            .skip(index + 1)
+            .find(|c| !c.is_misc_node())
+    }
+
+    /// Index of `child` among direct children by pointer equality, if present.
+    pub fn index_of_child(&self, child: &OpenXmlElement) -> Option<usize> {
+        self.children
+            .iter()
+            .position(|c| std::ptr::eq(c as *const _, child as *const _))
+    }
+
+    /// Next non-misc sibling of `child` when `child` is a direct child of `self`
+    /// (C# `child.GetNextNonMiscElementSibling()` via parent).
+    pub fn next_non_misc_element_sibling_of(
+        &self,
+        child: &OpenXmlElement,
+    ) -> Option<&OpenXmlElement> {
+        let index = self.index_of_child(child)?;
+        self.next_non_misc_element_sibling_at(index)
+    }
+
     /// Last child element, if any (C# `LastChild`).
     pub fn last_child(&self) -> Option<&OpenXmlElement> {
         self.children.last()
@@ -1874,6 +1921,22 @@ mod element_api_parity_tests {
         assert_eq!(p.children.len(), 2);
         assert_eq!(p.children[0].local_name, "r");
         assert_eq!(p.children[1].local_name, "br");
+    }
+
+    #[test]
+    fn non_misc_child_and_sibling_helpers() {
+        let mut p = OpenXmlElement::w("p");
+        p.append_child(OpenXmlElement::comment("skip"));
+        p.append_child(OpenXmlElement::w("r").with_text("a"));
+        p.append_child(OpenXmlElement::comment("skip2"));
+        p.append_child(OpenXmlElement::w("br"));
+
+        let first = p.first_non_misc_element_child().unwrap();
+        assert_eq!(first.local_name, "r");
+        let next = p.next_non_misc_element_sibling_of(first).unwrap();
+        assert_eq!(next.local_name, "br");
+        assert!(p.next_non_misc_element_sibling_of(next).is_none());
+        assert_eq!(p.index_of_child(first), Some(1));
     }
 }
 
