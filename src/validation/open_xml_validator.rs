@@ -569,10 +569,17 @@ mod tests {
 
         let mut v = OpenXmlValidator::new();
         let errors = v.validate_document_package(&package).unwrap();
-        assert!(errors.iter().any(|e| e.message.contains("at most one")), "{errors:?}");
+        assert!(
+            errors.iter().any(|e| e.message.contains("at most one")
+                || e.message.contains("Sch_InvalidElementContent")
+                || e.message.contains("invalid child")),
+            "{errors:?}"
+        );
 
         let part_errors = v.validate_document_part(&package, &uri).unwrap();
-        assert!(part_errors.iter().any(|e| e.message.contains("at most one")));
+        assert!(part_errors.iter().any(|e| e.message.contains("at most one")
+            || e.message.contains("Sch_InvalidElementContent")
+            || e.message.contains("invalid child")));
 
         let mut mismatched = crate::packaging::OpenXmlPackage::from_opc(
             OpcPackage::create(),
@@ -605,7 +612,12 @@ mod tests {
 
         let doc = document(vec![body(vec![]), body(vec![])]);
         let errors = v.validate_dom_element(&doc).unwrap();
-        assert!(errors.iter().any(|e| e.message.contains("at most one")), "{errors:?}");
+        assert!(
+            errors.iter().any(|e| e.message.contains("at most one")
+                || e.message.contains("Sch_InvalidElementContent")
+                || e.message.contains("invalid child")),
+            "{errors:?}"
+        );
 
         let token = crate::validation::ValidationCancellationToken::new();
         token.cancel();

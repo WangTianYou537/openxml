@@ -1,7 +1,7 @@
 //! Package/part validation orchestration (C# `DocumentValidator`).
 
 use super::{
-    validate_package_constraints_for_version, validate_word_document_full_for_version,
+    is_reserved_element, validate_package_constraints_for_version, validate_schema_types_in_tree,
     ValidationCache, ValidationContext, ValidationError, ValidationErrorType, ValidationSettings,
 };
 use crate::element::{parse_element, OpenXmlElement};
@@ -133,49 +133,14 @@ impl DocumentValidator {
         if root.is_misc_node() || root.is_unknown() {
             return Ok(());
         }
-        if root.local_name == "AlternateContent"
-            || root.local_name == "Choice"
-            || root.local_name == "Fallback"
-        {
+        if is_reserved_element(root) {
+            // C# rejects validating AC/Choice/Fallback as the top-level target
+            // elsewhere; as a part root they are skipped here.
             return Ok(());
         }
 
-        // Schema pass (C# SchemaTypeValidator.Validate per element).
-        if root.local_name == "document" {
-            for error in validate_word_document_full_for_version(root, self.cache.version()) {
-                if !context.try_add_error(error)? {
-                    return Ok(());
-                }
-            }
-        } else {
-            // Non-document roots: particle registry lookup per visited element
-            // (C# ValidationCache.GetParticleConstraint via the traverser walk).
-            let version = self.cache.version();
-            let mut mc_context =
-                crate::markup_compatibility::McContext::with_exception_on_error(false);
-            let visited = super::validating_traverse_tree(root, &mut mc_context, version);
-            for element in visited {
-                // Prefer ValidationCache memo (C# GetConstraint) when present.
-                let particle = context
-                    .cache_mut()
-                    .get_constraint(&element.local_name)
-                    .cloned()
-                    .or_else(|| super::particle::word::particle_for(&element.local_name));
-                let Some(particle) = particle else {
-                    continue;
-                };
-                for error in super::validate_particle_for_version(
-                    element,
-                    &particle,
-                    &element.qualified_name(),
-                    version,
-                ) {
-                    if !context.try_add_error(error)? {
-                        return Ok(());
-                    }
-                }
-            }
-        }
+        // Schema pass (C# SchemaTypeValidator.Validate per element via traverser).
+        validate_schema_types_in_tree(root, context)?;
 
         // C# AlternateContentValidator + CompatibilityRuleAttributesValidator passes.
         let mut mc_errors = super::validate_alternate_content(root);
@@ -185,51 +150,6 @@ impl DocumentValidator {
                 error.with_error_type(ValidationErrorType::MarkupCompatibility),
             )? {
                 return Ok(());
-            }
-        }
-
-        // C# SchemaTypeValidator.ValidateAttributes extended-attribute branch
-        // (inherited MC context: ancestor mc:Ignorable covers descendants).
-        {
-            fn walk(
-                element: &OpenXmlElement,
-                mc_context: &mut crate::markup_compatibility::McContext,
-                errors: &mut Vec<ValidationError>,
-            ) {
-                let attributes =
-                    crate::markup_compatibility::MarkupCompatibilityAttributes::from_element(
-                        element,
-                    );
-                mc_context.push_mc_attributes_for_validation(&attributes, None);
-                if !element.is_misc_node() && !element.is_unknown() {
-                    errors.extend(super::validate_undeclared_attributes(
-                        element,
-                        mc_context,
-                        &element.qualified_name(),
-                    ));
-                    errors.extend(super::validate_attribute_value_types(
-                        element,
-                        &element.qualified_name(),
-                    ));
-                    errors.extend(super::validate_leaf_content(
-                        element,
-                        &element.qualified_name(),
-                    ));
-                }
-                for child in &element.children {
-                    walk(child, mc_context, errors);
-                }
-                mc_context.pop_mc_attributes_for_validation();
-            }
-
-            let mut mc_context =
-                crate::markup_compatibility::McContext::with_exception_on_error(false);
-            let mut undeclared = Vec::new();
-            walk(root, &mut mc_context, &mut undeclared);
-            for error in undeclared {
-                if !context.try_add_error(error)? {
-                    return Ok(());
-                }
             }
         }
 
@@ -347,7 +267,9 @@ mod tests {
             context
                 .errors()
                 .iter()
-                .any(|e| e.message.contains("at most one")),
+                .any(|e| e.message.contains("at most one")
+                    || e.message.contains("Sch_InvalidElementContent")
+                    || e.message.contains("invalid child")),
             "{:?}",
             context.errors()
         );

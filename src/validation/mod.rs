@@ -17,6 +17,7 @@ mod package_validator;
 mod open_xml_validator;
 mod particle;
 mod restrictions;
+mod schema_type_validator;
 mod schematron_constraints;
 mod schematron_rules;
 mod schematron_validate;
@@ -42,6 +43,10 @@ pub use attributes::{
 pub use compose_error::validation_resource_message;
 pub use package::{validate_package, validate_package_for_version};
 pub use document_validator::DocumentValidator;
+pub use schema_type_validator::{
+    is_reserved_element, validate_empty_root_complex_type, validate_schema_type,
+    validate_schema_type_standalone, validate_schema_types_in_tree,
+};
 pub use package_validator::{
     message_id as package_constraint_message_id, validate_package_constraints,
     validate_package_constraints_for_version, validate_package_constraint_results,
