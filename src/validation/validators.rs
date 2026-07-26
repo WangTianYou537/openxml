@@ -692,6 +692,114 @@ pub fn validate_value(
     result
 }
 
+/// Map a generated attribute `type_name` onto a framework validator
+/// (C# metadata `IValidator` list shell for common simple types).
+pub fn validator_for_type_name(type_name: &str) -> Option<TypeNameValidator> {
+    Some(match type_name {
+        "Int32Value" | "Int" | "IntegerValue" | "Integer" | "Int16Value" | "Short" => {
+            TypeNameValidator::Number(NumberValidator::new())
+        }
+        "UInt32Value" | "UnsignedInt" | "UInt16Value" | "UnsignedShort" | "ByteValue"
+        | "UnsignedByte" => TypeNameValidator::Number(NumberValidator::non_negative()),
+        "OnOffValue" | "TrueFalseValue" | "TrueFalseBlankValue" | "BooleanValue" => {
+            TypeNameValidator::OnOff
+        }
+        "HexBinaryValue" | "HexBinary" => TypeNameValidator::HexBinary,
+        "Token" => TypeNameValidator::String(StringValidator::token()),
+        "QName" | "QnameValue" => TypeNameValidator::String(StringValidator::qname()),
+        "NCName" => TypeNameValidator::String(StringValidator::ncname()),
+        "AnyURI" | "AnyUriValue" => TypeNameValidator::String(StringValidator::any_uri()),
+        // StringValue / EnumValue / DateTimeValue / Base64BinaryValue: no
+        // additional framework restriction beyond XsdType lexical checks.
+        _ => return None,
+    })
+}
+
+/// Concrete validator chosen for a generated `type_name`.
+#[derive(Debug, Clone)]
+pub enum TypeNameValidator {
+    Number(NumberValidator),
+    String(StringValidator),
+    OnOff,
+    HexBinary,
+}
+
+impl TypeNameValidator {
+    pub fn validate_text(
+        &self,
+        context: &mut ValidationContext,
+        qname: &str,
+        value: &str,
+    ) -> Result<()> {
+        match self {
+            Self::Number(v) => validate_value(context, qname, Some(value), true, &[v]),
+            Self::String(v) => validate_value(context, qname, Some(value), true, &[v]),
+            Self::OnOff => {
+                const OK: &[&str] = &["true", "false", "1", "0", "on", "off"];
+                if OK.contains(&value) {
+                    return Ok(());
+                }
+                context.stack_mut().push_property(qname, Some(value.to_string()), true);
+                let _ = emit_data_type_error(
+                    context,
+                    " The value must be one of: true, false, 1, 0, on, off.",
+                );
+                context.stack_mut().pop();
+                Ok(())
+            }
+            Self::HexBinary => {
+                let ok = !value.is_empty()
+                    && value.len() % 2 == 0
+                    && value.chars().all(|c| c.is_ascii_hexdigit());
+                if ok {
+                    return Ok(());
+                }
+                context.stack_mut().push_property(qname, Some(value.to_string()), true);
+                let _ = emit_data_type_error(
+                    context,
+                    " The value must be a hexadecimal number with an even number of digits.",
+                );
+                context.stack_mut().pop();
+                Ok(())
+            }
+        }
+    }
+}
+
+/// C# `SchemaTypeValidator.ValidateValue` for one declared attribute via the
+/// framework validator stack (falls back to no-op when type has no mapping).
+pub fn validate_attribute_with_type_name(
+    context: &mut ValidationContext,
+    qname: &str,
+    type_name: &str,
+    value: &str,
+) -> Result<()> {
+    if let Some(v) = validator_for_type_name(type_name) {
+        return v.validate_text(context, qname, value);
+    }
+    // Fall back to XsdType lexical for types without a dedicated Validator.
+    if let Some(xsd) = super::XsdType::from_type_name(type_name) {
+        if !xsd.validate_lexical(value) {
+            context
+                .stack_mut()
+                .push_property(qname, Some(value.to_string()), true);
+            let detail = match xsd {
+                super::XsdType::Base64Binary => " The value must be base64 encoded.",
+                super::XsdType::DateTime | super::XsdType::Date => {
+                    " The value must be an xsd:dateTime."
+                }
+                super::XsdType::Decimal | super::XsdType::Float | super::XsdType::Double => {
+                    " The value must be a number."
+                }
+                _ => " The value is invalid for its simple type.",
+            };
+            let _ = emit_data_type_error(context, detail);
+            context.stack_mut().pop();
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -874,5 +982,30 @@ mod tests {
             .unwrap();
         assert!(!context.errors().is_empty());
         context.stack_mut().pop();
+    }
+
+    #[test]
+    fn type_name_int_rejects_non_numeric() {
+        let mut context = ctx();
+        validate_attribute_with_type_name(&mut context, "w:val", "Int32Value", "abc").unwrap();
+        assert!(!context.errors().is_empty(), "{:?}", context.errors());
+    }
+
+    #[test]
+    fn type_name_on_off_accepts_on() {
+        let mut context = ctx();
+        validate_attribute_with_type_name(&mut context, "w:val", "OnOffValue", "on").unwrap();
+        assert!(context.errors().is_empty());
+    }
+
+    #[test]
+    fn type_name_hex_binary() {
+        let mut context = ctx();
+        validate_attribute_with_type_name(&mut context, "w:rsidR", "HexBinaryValue", "00AB12CD")
+            .unwrap();
+        assert!(context.errors().is_empty());
+        validate_attribute_with_type_name(&mut context, "w:rsidR", "HexBinaryValue", "xyz")
+            .unwrap();
+        assert!(!context.errors().is_empty());
     }
 }

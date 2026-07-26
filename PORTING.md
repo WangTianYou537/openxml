@@ -987,6 +987,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `DocumentValidator` / `OpenXmlValidator` / `OpenXmlPackage` pass target `FileFormatVersions` into package constraint walk
 - [x] `SchemaTypeValidator` shell: `validate_schema_type` / `validate_schema_types_in_tree` / `is_reserved_element` / empty-root leaf check; DocumentValidator schema pass routes through it with inherited MC Ignorable
 - [x] Framework `IValidator` shell: `Validator` trait + `VersionGate` / `RequiredValidator` / `StringValidator` / `NumberValidator` / `EnumValidator` / `UnionValidator` / `ListValidator` / `OfficeVersionValidator` + `validate_value` helper
+- [x] `validate_attribute_value_types` routes declared attributes through `validate_attribute_with_type_name` / `TypeNameValidator` (Number/OnOff/HexBinary/token-family) with XsdType lexical fallback
 
 **Still intentionally deferred / partial:**
 

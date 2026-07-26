@@ -3,7 +3,7 @@
 //! Not a full XSD type system — covers common simple-type checks used when
 //! wiring schema attribute metadata to runtime values.
 
-use super::{ValidationError, XsdType};
+use super::ValidationError;
 use crate::element::OpenXmlElement;
 use crate::markup_compatibility::McContext;
 use crate::simple_types::{
@@ -38,47 +38,13 @@ pub fn validate_leaf_content(element: &OpenXmlElement, path: &str) -> Vec<Valida
     Vec::new()
 }
 
-fn attribute_value_type_error(type_name: &str, value: &str) -> Option<&'static str> {
-    let Some(xsd_type) = XsdType::from_type_name(type_name) else {
-        return None; // unknown type names: no lexical restriction
-    };
-    if xsd_type.validate_lexical(value) {
-        return None;
-    }
-    Some(match xsd_type {
-        XsdType::HexBinary => {
-            " The value must be a hexadecimal number with an even number of digits."
-        }
-        XsdType::Base64Binary => " The value must be base64 encoded.",
-        XsdType::Integer
-        | XsdType::Long
-        | XsdType::Int
-        | XsdType::Short
-        | XsdType::Byte
-        | XsdType::PositiveInteger
-        | XsdType::NegativeInteger
-        | XsdType::NonPositiveInteger => " The value must be an integer.",
-        XsdType::NonNegativeInteger
-        | XsdType::UnsignedLong
-        | XsdType::UnsignedInt
-        | XsdType::UnsignedShort
-        | XsdType::UnsignedByte => " The value must be a non-negative integer.",
-        XsdType::Boolean | XsdType::SpecialBoolean => {
-            " The value must be one of: true, false, 1, 0, on, off."
-        }
-        XsdType::DateTime | XsdType::Date => " The value must be an xsd:dateTime.",
-        XsdType::Token => " The value must be a valid xsd:token.",
-        XsdType::QName => " The value must be a valid QName.",
-        XsdType::NCName => " The value must be a valid NCName.",
-        XsdType::AnyURI => " The value must be a valid anyURI.",
-        XsdType::Decimal | XsdType::Float | XsdType::Double => " The value must be a number.",
-        _ => " The value is invalid for its simple type.",
-    })
-}
-
 /// C# `SchemaTypeValidator.ValidateValue` for declared attributes: lexical
 /// checks against the generated `type_name`, reporting
 /// `Sch_AttributeValueDataTypeDetailed` on mismatch.
+///
+/// Routes numeric / OnOff / HexBinary / token-family types through the
+/// framework [`super::Validator`] stack when a mapping exists; other types keep
+/// the XsdType lexical path.
 pub fn validate_attribute_value_types(
     element: &OpenXmlElement,
     path: &str,
@@ -92,7 +58,11 @@ pub fn validate_attribute_value_types(
         return Vec::new();
     }
 
-    let mut errors = Vec::new();
+    let settings = super::ValidationSettings::new(crate::file_format::FileFormatVersions::ALL);
+    let mut context = super::ValidationContext::new(settings);
+    context.current_path = path.to_string();
+    context.stack_mut().push_element_path(path);
+
     for attribute in &element.attributes {
         let prefix = attribute.prefix.as_deref().unwrap_or("");
         let qname = if prefix.is_empty() {
@@ -103,18 +73,16 @@ pub fn validate_attribute_value_types(
         let Some(declared) = info.attributes.iter().find(|a| a.qname == qname) else {
             continue;
         };
-        if let Some(detail) = attribute_value_type_error(declared.type_name, &attribute.value) {
-            errors.push(ValidationError::with_id(
-                path,
-                "Sch_AttributeValueDataTypeDetailed",
-                format!(
-                    "The attribute '{qname}' has invalid value '{}'.{detail}",
-                    attribute.value
-                ),
-            ));
-        }
+        let _ = super::validate_attribute_with_type_name(
+            &mut context,
+            &qname,
+            declared.type_name,
+            &attribute.value,
+        );
     }
-    errors
+    context.stack_mut().pop();
+    // Ensure path on errors matches the caller's path (create_error uses current_path).
+    context.errors
 }
 
 /// C# `SchemaTypeValidator.ValidateAttributes` extended-attribute branch:
