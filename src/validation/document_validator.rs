@@ -161,7 +161,11 @@ impl DocumentValidator {
             | "externalLink"
             | "table"
             | "queryTable"
-            | "pivotTableDefinition" => {
+            | "pivotTableDefinition"
+            | "pivotCacheDefinition"
+            | "pivotCacheRecords"
+            | "metadata"
+            | "dialogsheet" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
@@ -183,7 +187,8 @@ impl DocumentValidator {
             }
             // Other Word part roots: single-root particle via registry.
             "styles" | "numbering" | "fonts" | "comments" | "footnotes" | "endnotes"
-            | "hdr" | "ftr" | "settings" | "webSettings" | "glossaryDocument" => {
+            | "hdr" | "ftr" | "settings" | "webSettings" | "glossaryDocument"
+            | "commentsEx" | "people" => {
                 if let Some(particle) = super::particle_for(&root.local_name) {
                     super::validate_particle_for_version(
                         root,

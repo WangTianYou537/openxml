@@ -1212,6 +1212,19 @@ pub mod word {
         crate::generated::wordprocessingml_2006_main::particle_glossary_document()
     }
 
+    /// `<w15:commentsEx>` extended comments part root.
+    pub fn comments_ex() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("commentEx", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<w15:people>` people part root.
+    pub fn people() -> Particle {
+        Particle::sequence(vec![Particle::element("person", Occurs::STAR)], Occurs::ONE)
+    }
+
     /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
@@ -1238,6 +1251,8 @@ pub mod word {
             "settings" => settings(),
             "webSettings" => web_settings(),
             "glossaryDocument" => glossary_document(),
+            "commentsEx" => comments_ex(),
+            "people" => people(),
             _ => return None,
         })
     }
@@ -1445,6 +1460,26 @@ pub mod spreadsheet {
         crate::generated::spreadsheetml_2006_main::particle_pivot_table_definition()
     }
 
+    /// `<x:pivotCacheDefinition>` pivot cache definition part root.
+    pub fn pivot_cache_definition() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_pivot_cache_definition()
+    }
+
+    /// `<x:pivotCacheRecords>` pivot cache records part root.
+    pub fn pivot_cache_records() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_pivot_cache_records()
+    }
+
+    /// `<x:metadata>` sheet metadata part root.
+    pub fn metadata() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_metadata()
+    }
+
+    /// `<x:dialogsheet>` dialog sheet part root.
+    pub fn dialog_sheet() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_dialog_sheet()
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1466,6 +1501,10 @@ pub mod spreadsheet {
             "table" => table(),
             "queryTable" => query_table(),
             "pivotTableDefinition" => pivot_table_definition(),
+            "pivotCacheDefinition" => pivot_cache_definition(),
+            "pivotCacheRecords" => pivot_cache_records(),
+            "metadata" => metadata(),
+            "dialogsheet" => dialog_sheet(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -2035,6 +2074,42 @@ pub fn validate_spreadsheet_particles_for_version(
                 root,
                 &spreadsheet::pivot_table_definition(),
                 "x:pivotTableDefinition",
+                &context,
+                &root_mc,
+            ));
+        }
+        "pivotCacheDefinition" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::pivot_cache_definition(),
+                "x:pivotCacheDefinition",
+                &context,
+                &root_mc,
+            ));
+        }
+        "pivotCacheRecords" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::pivot_cache_records(),
+                "x:pivotCacheRecords",
+                &context,
+                &root_mc,
+            ));
+        }
+        "metadata" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::metadata(),
+                "x:metadata",
+                &context,
+                &root_mc,
+            ));
+        }
+        "dialogsheet" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::dialog_sheet(),
+                "x:dialogsheet",
                 &context,
                 &root_mc,
             ));
@@ -3016,6 +3091,68 @@ mod tests {
             &link,
             &spreadsheet::external_link(),
             "x:externalLink",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn word_comments_ex_and_people_roots() {
+        assert!(word::particle_for("commentsEx").is_some());
+        assert!(word::particle_for("people").is_some());
+        let mut comments_ex = crate::element::OpenXmlElement::new(
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml",
+            "commentsEx",
+        );
+        comments_ex.append_child(crate::element::OpenXmlElement::new(
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml",
+            "commentEx",
+        ));
+        let errs = validate_particle_for_version(
+            &comments_ex,
+            &word::comments_ex(),
+            "w15:commentsEx",
+            FileFormatVersions::OFFICE2013,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut people = crate::element::OpenXmlElement::new(
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml",
+            "people",
+        );
+        people.append_child(crate::element::OpenXmlElement::new(
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml",
+            "person",
+        ));
+        let errs = validate_particle_for_version(
+            &people,
+            &word::people(),
+            "w15:people",
+            FileFormatVersions::OFFICE2013,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn pivot_and_metadata_roots_resolve() {
+        assert!(spreadsheet::particle_for("pivotCacheDefinition").is_some());
+        assert!(spreadsheet::particle_for("pivotCacheRecords").is_some());
+        assert!(spreadsheet::particle_for("metadata").is_some());
+        assert!(spreadsheet::particle_for("dialogsheet").is_some());
+        assert!(crate::validation::particle::particle_for("pivotCacheDefinition").is_some());
+        assert!(crate::validation::particle::particle_for("commentsEx").is_some());
+
+        let mut cache = crate::element::OpenXmlElement::x("pivotCacheDefinition");
+        cache.append_child(crate::element::OpenXmlElement::x("cacheSource"));
+        cache.append_child(crate::element::OpenXmlElement::x("cacheFields"));
+        let errs = validate_particle_for_version(
+            &cache,
+            &spreadsheet::pivot_cache_definition(),
+            "x:pivotCacheDefinition",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");
