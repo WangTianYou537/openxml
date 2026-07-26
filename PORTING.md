@@ -1010,6 +1010,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Spreadsheet particles: `sst` / `styleSheet` / `fonts` / `fills` / `borders` / `cellXfs`; walks + DocumentValidator roots
 - [x] Word particles: `sectPr` / `sdt` / `sdtContent` / `hyperlink` / `drawing`
 - [x] Presentation particles: `notes` / `notesMaster` roots in registry, walks, and DocumentValidator
+- [x] Word part-root particles: `styles` / `numbering` / `fonts` / `comments` / `footnotes` / `endnotes`
 
 **Still intentionally deferred / partial:**
 

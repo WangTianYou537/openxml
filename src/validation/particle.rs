@@ -1115,6 +1115,56 @@ pub mod word {
         )
     }
 
+    /// `<w:styles>` part root.
+    pub fn styles() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("docDefaults", Occurs::OPTIONAL),
+                Particle::element("latentStyles", Occurs::OPTIONAL),
+                Particle::element("style", Occurs::STAR),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<w:numbering>` part root.
+    pub fn numbering() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("numPicBullet", Occurs::STAR),
+                Particle::element("abstractNum", Occurs::STAR),
+                Particle::element("num", Occurs::STAR),
+                Particle::element("numIdMacAtCleanup", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<w:fonts>` part root.
+    pub fn fonts_table() -> Particle {
+        Particle::sequence(vec![Particle::element("font", Occurs::STAR)], Occurs::ONE)
+    }
+
+    /// `<w:comments>` part root.
+    pub fn comments() -> Particle {
+        Particle::sequence(vec![Particle::element("comment", Occurs::STAR)], Occurs::ONE)
+    }
+
+    /// `<w:footnotes>` / `<w:endnotes>` part roots.
+    pub fn footnotes() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("footnote", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn endnotes() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("endnote", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
     /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
@@ -1130,6 +1180,12 @@ pub mod word {
             "sdtContent" => sdt_content(),
             "hyperlink" => hyperlink(),
             "drawing" => drawing(),
+            "styles" => styles(),
+            "numbering" => numbering(),
+            "fonts" => fonts_table(),
+            "comments" => comments(),
+            "footnotes" => footnotes(),
+            "endnotes" => endnotes(),
             _ => return None,
         })
     }
@@ -1838,7 +1894,26 @@ mod tests {
         assert!(word::particle_for("sdtContent").is_some());
         assert!(word::particle_for("hyperlink").is_some());
         assert!(word::particle_for("drawing").is_some());
+        assert!(word::particle_for("styles").is_some());
+        assert!(word::particle_for("numbering").is_some());
+        assert!(word::particle_for("fonts").is_some());
+        assert!(word::particle_for("comments").is_some());
+        assert!(word::particle_for("footnotes").is_some());
         assert!(crate::validation::particle::particle_for("sectPr").is_some());
+    }
+
+    #[test]
+    fn styles_particle_accepts_doc_defaults_and_styles() {
+        let mut styles = crate::element::OpenXmlElement::w("styles");
+        styles.append_child(crate::element::OpenXmlElement::w("docDefaults"));
+        styles.append_child(crate::element::OpenXmlElement::w("style"));
+        let errs = validate_particle_for_version(
+            &styles,
+            &word::styles(),
+            "w:styles",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
     }
 
     #[test]
