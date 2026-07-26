@@ -1,10 +1,12 @@
 //! Validation constraint cache (C# `ValidationCache` shell).
 //!
 //! C# caches version-built particle constraints. This port keeps a lightweight
-//! version-scoped bag; particle tables are still looked up via the static
-//! `particle` module rather than per-element metadata.
+//! version-scoped bag and resolves hand-authored Word particles via
+//! [`crate::validation::particle::word::particle_for`], applying
+//! [`Particle::build_for`] for the cache's target version.
 
 use crate::file_format::FileFormatVersions;
+use crate::validation::particle::{word, Particle};
 use std::collections::HashMap;
 
 /// Version-scoped validation cache (C# `ValidationCache`).
@@ -13,6 +15,8 @@ pub struct ValidationCache {
     version: FileFormatVersions,
     /// Optional string-keyed memo for expensive version-specific lookups.
     memo: HashMap<String, String>,
+    /// Memo of version-built particles keyed by element local name.
+    particles: HashMap<String, Option<Particle>>,
 }
 
 impl ValidationCache {
@@ -20,6 +24,7 @@ impl ValidationCache {
         Self {
             version,
             memo: HashMap::new(),
+            particles: HashMap::new(),
         }
     }
 
@@ -31,11 +36,13 @@ impl ValidationCache {
         if version != self.version {
             self.version = version;
             self.memo.clear();
+            self.particles.clear();
         }
     }
 
     pub fn clear(&mut self) {
         self.memo.clear();
+        self.particles.clear();
     }
 
     /// Memoize a string value for `key` (application / particle helper use).
@@ -56,7 +63,25 @@ impl ValidationCache {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.memo.is_empty()
+        self.memo.is_empty() && self.particles.is_empty()
+    }
+
+    /// C# `ValidationCache.GetConstraint(element)` — resolve and version-build
+    /// the particle for `local_name`, memoizing the result for this cache version.
+    pub fn get_constraint(&mut self, local_name: &str) -> Option<&Particle> {
+        if !self.particles.contains_key(local_name) {
+            let built = word::particle_for(local_name)
+                .and_then(|particle| particle.build_for(self.version));
+            self.particles.insert(local_name.to_string(), built);
+        }
+        self.particles
+            .get(local_name)
+            .and_then(|entry| entry.as_ref())
+    }
+
+    /// Number of memoized particle entries (including negative hits).
+    pub fn particle_cache_len(&self) -> usize {
+        self.particles.len()
     }
 }
 
@@ -82,5 +107,26 @@ mod tests {
         assert!(c.is_empty());
         c.clear();
         assert!(c.is_empty());
+    }
+
+    #[test]
+    fn get_constraint_resolves_word_particles_and_memos() {
+        let mut c = ValidationCache::new(FileFormatVersions::OFFICE2007);
+        let p = c.get_constraint("document").expect("document particle");
+        assert_eq!(
+            p.particle_type(),
+            crate::validation::ParticleType::Sequence
+        );
+        assert_eq!(c.particle_cache_len(), 1);
+        // Second lookup hits the memo.
+        assert!(c.get_constraint("document").is_some());
+        assert_eq!(c.particle_cache_len(), 1);
+        assert!(c.get_constraint("not-a-real-element").is_none());
+        assert_eq!(c.particle_cache_len(), 2);
+
+        // Version change clears particle memo.
+        c.set_version(FileFormatVersions::OFFICE2010);
+        assert_eq!(c.particle_cache_len(), 0);
+        assert!(c.get_constraint("p").is_some());
     }
 }

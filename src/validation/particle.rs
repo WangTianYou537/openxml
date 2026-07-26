@@ -90,6 +90,39 @@ pub enum XsdAnyNamespace {
     TargetNamespace,
 }
 
+/// C# `ParticleType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParticleType {
+    Element = 0,
+    All,
+    Any,
+    Choice,
+    Group,
+    Sequence,
+    AnyWithUri,
+    Invalid,
+}
+
+impl Particle {
+    /// C# `ParticleConstraint.ParticleType`.
+    pub fn particle_type(&self) -> ParticleType {
+        match self {
+            Particle::Element { .. } => ParticleType::Element,
+            Particle::All { .. } => ParticleType::All,
+            Particle::Any { namespace, .. } => match namespace {
+                XsdAnyNamespace::Any
+                | XsdAnyNamespace::Other
+                | XsdAnyNamespace::Local
+                | XsdAnyNamespace::TargetNamespace => ParticleType::Any,
+            },
+            Particle::Choice { .. } => ParticleType::Choice,
+            Particle::Group { .. } => ParticleType::Group,
+            Particle::Sequence { .. } => ParticleType::Sequence,
+            Particle::Versioned { inner, .. } => inner.particle_type(),
+        }
+    }
+}
+
 impl XsdAnyNamespace {
     /// Wildcard token used in expected-children messages.
     pub fn token(self) -> &'static str {

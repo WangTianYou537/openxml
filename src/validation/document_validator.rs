@@ -152,8 +152,13 @@ impl DocumentValidator {
                 crate::markup_compatibility::McContext::with_exception_on_error(false);
             let visited = super::validating_traverse_tree(root, &mut mc_context, version);
             for element in visited {
-                let Some(particle) = super::particle::word::particle_for(&element.local_name)
-                else {
+                // Prefer ValidationCache memo (C# GetConstraint) when present.
+                let particle = context
+                    .cache_mut()
+                    .get_constraint(&element.local_name)
+                    .cloned()
+                    .or_else(|| super::particle::word::particle_for(&element.local_name));
+                let Some(particle) = particle else {
                     continue;
                 };
                 for error in super::validate_particle_for_version(

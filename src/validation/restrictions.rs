@@ -61,6 +61,155 @@ pub fn validate_any_uri(uri: &str) -> bool {
     true
 }
 
+
+/// C# `XsdType` — XML Schema built-in simple types used by attribute validators.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XsdType {
+    AnySimpleType,
+    String,
+    NormalizedString,
+    Token,
+    Base64Binary,
+    HexBinary,
+    Integer,
+    PositiveInteger,
+    NegativeInteger,
+    NonNegativeInteger,
+    NonPositiveInteger,
+    Long,
+    UnsignedLong,
+    Int,
+    UnsignedInt,
+    Short,
+    UnsignedShort,
+    Byte,
+    UnsignedByte,
+    Decimal,
+    Float,
+    Double,
+    Boolean,
+    Duration,
+    DateTime,
+    Date,
+    Time,
+    GYear,
+    GYearMonth,
+    GMonth,
+    GMonthDay,
+    GDay,
+    Name,
+    QName,
+    NCName,
+    AnyURI,
+    Language,
+    Id,
+    IdRef,
+    IdRefs,
+    Entity,
+    Entities,
+    Notation,
+    NmToken,
+    NmTokens,
+    Enum,
+    List,
+    Union,
+    Redirected,
+    SpecialBoolean,
+}
+
+impl XsdType {
+    /// Map generated attribute `type_name` strings onto an [`XsdType`].
+    pub fn from_type_name(type_name: &str) -> Option<Self> {
+        Some(match type_name {
+            "StringValue" | "String" => Self::String,
+            "HexBinaryValue" | "HexBinary" => Self::HexBinary,
+            "Base64BinaryValue" | "Base64Binary" => Self::Base64Binary,
+            "IntegerValue" | "Integer" => Self::Integer,
+            "Int32Value" | "Int" => Self::Int,
+            "UInt32Value" | "UnsignedInt" => Self::UnsignedInt,
+            "Int16Value" | "Short" => Self::Short,
+            "UInt16Value" | "UnsignedShort" => Self::UnsignedShort,
+            "ByteValue" | "Byte" | "UnsignedByte" => Self::UnsignedByte,
+            "OnOffValue" | "TrueFalseValue" | "TrueFalseBlankValue" | "BooleanValue" => {
+                Self::SpecialBoolean
+            }
+            "DateTimeValue" | "DateTime" => Self::DateTime,
+            "EnumValue" | "Enum" => Self::Enum,
+            "Token" => Self::Token,
+            "QName" | "QnameValue" => Self::QName,
+            "AnyURI" | "AnyUriValue" => Self::AnyURI,
+            "NCName" => Self::NCName,
+            "DecimalValue" | "Decimal" => Self::Decimal,
+            "DoubleValue" | "Double" => Self::Double,
+            "SingleValue" | "Float" => Self::Float,
+            _ => return None,
+        })
+    }
+
+    /// Lexical validation for a value of this type (C# simple-type restrictions shell).
+    pub fn validate_lexical(self, value: &str) -> bool {
+        match self {
+            Self::Token => verify_token(value),
+            Self::QName => is_valid_qname(value),
+            Self::NCName => verify_ncname(value),
+            Self::AnyURI => validate_any_uri(value),
+            Self::HexBinary => {
+                !value.is_empty()
+                    && value.len() % 2 == 0
+                    && value.chars().all(|c| c.is_ascii_hexdigit())
+            }
+            Self::Base64Binary => value.chars().all(|c| {
+                c.is_ascii_alphanumeric()
+                    || c == '+'
+                    || c == '/'
+                    || c == '='
+                    || c.is_ascii_whitespace()
+            }),
+            Self::Integer | Self::Long | Self::Int | Self::Short => value.parse::<i64>().is_ok(),
+            Self::NonNegativeInteger | Self::UnsignedLong | Self::UnsignedInt
+            | Self::UnsignedShort | Self::UnsignedByte | Self::Byte => {
+                value.parse::<u64>().is_ok()
+            }
+            Self::PositiveInteger => value.parse::<u64>().ok().is_some_and(|v| v > 0),
+            Self::NegativeInteger => value.parse::<i64>().ok().is_some_and(|v| v < 0),
+            Self::NonPositiveInteger => value.parse::<i64>().ok().is_some_and(|v| v <= 0),
+            Self::Decimal | Self::Float | Self::Double => value.parse::<f64>().is_ok(),
+            Self::Boolean | Self::SpecialBoolean => {
+                matches!(value, "true" | "false" | "1" | "0" | "on" | "off")
+            }
+            Self::DateTime | Self::Date => {
+                value.len() >= 10
+                    && value.as_bytes().get(4) == Some(&b'-')
+                    && value.as_bytes().get(7) == Some(&b'-')
+            }
+            Self::Name => verify_ncname(value) || is_valid_qname(value),
+            Self::String
+            | Self::NormalizedString
+            | Self::Enum
+            | Self::List
+            | Self::Union
+            | Self::Redirected
+            | Self::AnySimpleType
+            | Self::Language
+            | Self::Id
+            | Self::IdRef
+            | Self::IdRefs
+            | Self::Entity
+            | Self::Entities
+            | Self::Notation
+            | Self::NmToken
+            | Self::NmTokens
+            | Self::Duration
+            | Self::Time
+            | Self::GYear
+            | Self::GYearMonth
+            | Self::GMonth
+            | Self::GMonthDay
+            | Self::GDay => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,5 +252,17 @@ mod tests {
         assert!(validate_any_uri("  spaced  "));
         assert!(!validate_any_uri("   "));
         assert!(!validate_any_uri("bad##fragment"));
+    }
+
+    #[test]
+    fn xsd_type_from_type_name_and_lexical() {
+        assert_eq!(XsdType::from_type_name("HexBinaryValue"), Some(XsdType::HexBinary));
+        assert_eq!(XsdType::from_type_name("OnOffValue"), Some(XsdType::SpecialBoolean));
+        assert!(XsdType::HexBinary.validate_lexical("00AB"));
+        assert!(!XsdType::HexBinary.validate_lexical("0G"));
+        assert!(XsdType::Token.validate_lexical("a b"));
+        assert!(!XsdType::Token.validate_lexical(" a"));
+        assert!(XsdType::QName.validate_lexical("w:val"));
+        assert!(XsdType::AnyURI.validate_lexical("http://example.com"));
     }
 }

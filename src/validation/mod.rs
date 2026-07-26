@@ -57,9 +57,12 @@ pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEvent
 pub use particle::{
     get_expected_elements, get_required_elements, validate_particle,
     validate_particle_for_version, validate_word_particles, validate_word_particles_for_version,
-    ExpectedChildren, Occurs, Particle, ParticleMatch, ParticleMatchInfo, XsdAnyNamespace,
+    ExpectedChildren, Occurs, Particle, ParticleMatch, ParticleMatchInfo, ParticleType,
+    XsdAnyNamespace,
 };
-pub use restrictions::{is_valid_qname, validate_any_uri, verify_ncname, verify_token};
+pub use restrictions::{
+    is_valid_qname, validate_any_uri, verify_ncname, verify_token, XsdType,
+};
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,
     schematron_both_present_rules, schematron_conditional_attr_rules,
