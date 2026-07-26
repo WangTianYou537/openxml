@@ -1363,8 +1363,9 @@ impl OpenXmlPackage {
             .features
             .contains::<crate::features::PartFactoryFeature>()
         {
-            self.features
-                .set(crate::features::PartFactoryFeature::new());
+            let mut factory = crate::features::PartFactoryFeature::new();
+            factory.seed_from_generated_parts();
+            self.features.set(factory);
         }
         self.features
             .get_mut::<crate::features::PartFactoryFeature>()
@@ -1540,8 +1541,9 @@ impl OpenXmlPackage {
             .features
             .contains::<crate::features::RootElementFeature>()
         {
-            self.features
-                .set(crate::features::RootElementFeature::new());
+            let mut root = crate::features::RootElementFeature::new();
+            root.seed_common_part_roots();
+            self.features.set(root);
         }
         self.features
             .get_mut::<crate::features::RootElementFeature>()

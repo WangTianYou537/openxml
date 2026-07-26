@@ -919,6 +919,11 @@ impl PartFactoryFeature {
             .insert(relationship_type.into(), part_name.into());
     }
 
+    /// Remove a registered relationship mapping.
+    pub fn unregister(&mut self, relationship_type: &str) -> Option<String> {
+        self.by_relationship.remove(relationship_type)
+    }
+
     /// C# `IPartFactoryFeature.Create` — returns registered part name for `relationship_type`.
     pub fn create(&self, relationship_type: &str) -> Option<&str> {
         self.by_relationship
@@ -932,6 +937,29 @@ impl PartFactoryFeature {
 
     pub fn len(&self) -> usize {
         self.by_relationship.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_relationship.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.by_relationship.clear();
+    }
+
+    /// Registered `(relationship_type, part_name)` pairs.
+    pub fn registered_entries(&self) -> Vec<(String, String)> {
+        self.by_relationship
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
+    /// Seed from generated [`crate::generated::parts::PARTS`] relationship → name map.
+    pub fn seed_from_generated_parts(&mut self) {
+        for part in crate::generated::parts::PARTS {
+            self.register(part.relationship_type, part.name);
+        }
     }
 }
 
@@ -2490,6 +2518,16 @@ impl DefaultFeatures {
         if !bag.contains::<ElementMetadataFactoryFeature>() {
             bag.set(ElementMetadataFactoryFeature::new());
         }
+        if !bag.contains::<RootElementFeature>() {
+            let mut root = RootElementFeature::new();
+            root.seed_common_part_roots();
+            bag.set(root);
+        }
+        if !bag.contains::<PartFactoryFeature>() {
+            let mut factory = PartFactoryFeature::new();
+            factory.seed_from_generated_parts();
+            bag.set(factory);
+        }
     }
 }
 
@@ -2955,6 +2993,24 @@ mod tests {
         );
         assert!(factory.contains(
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+        ));
+        assert_eq!(
+            factory
+                .unregister(
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+                )
+                .as_deref(),
+            Some("ImagePart")
+        );
+        assert!(!factory.contains(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+        ));
+
+        let mut seeded = PartFactoryFeature::new();
+        seeded.seed_from_generated_parts();
+        assert!(!seeded.is_empty());
+        assert!(seeded.contains(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
         ));
 
         let known = KnownDataPartFeature::with_defaults();
