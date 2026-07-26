@@ -104,7 +104,8 @@ pub use semantic::{
     spreadsheet_relationship_rules, spreadsheet_unique_attribute_rules,
     validate_relationship_refs, validate_schematron_attributes, validate_schematron_subset,
     validate_semantic, validate_unique_attributes, word_relationship_rules,
-    word_unique_attribute_rules, RelationshipExistRule, UniqueAttributeRule,
+    word_unique_attribute_rules, RelationshipExistRule, SemanticConstraintGate,
+    SemanticValidationLevel, UniqueAttributeRule,
 };
 
 /// Re-export Markup Compatibility AlternateContent structural validation.

@@ -12,6 +12,100 @@ use crate::element::OpenXmlElement;
 use crate::opc::{OpcPackage, PackUri};
 use std::collections::HashMap;
 
+/// C# `SemanticValidationLevel` flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SemanticValidationLevel {
+    bits: u8,
+}
+
+impl SemanticValidationLevel {
+    pub const PACKAGE_ONLY: Self = Self { bits: 1 };
+    pub const PART_ONLY: Self = Self { bits: 2 };
+    pub const ELEMENT_ONLY: Self = Self { bits: 4 };
+
+    /// C# `Package = PackageOnly`.
+    pub const PACKAGE: Self = Self::PACKAGE_ONLY;
+    /// C# `Part = PackageOnly | PartOnly`.
+    pub const PART: Self = Self {
+        bits: Self::PACKAGE_ONLY.bits | Self::PART_ONLY.bits,
+    };
+    /// C# `Element = PackageOnly | PartOnly | ElementOnly`.
+    pub const ELEMENT: Self = Self {
+        bits: Self::PACKAGE_ONLY.bits | Self::PART_ONLY.bits | Self::ELEMENT_ONLY.bits,
+    };
+
+    pub const fn union(self, other: Self) -> Self {
+        Self {
+            bits: self.bits | other.bits,
+        }
+    }
+
+    pub const fn contains(self, other: Self) -> bool {
+        (self.bits & other.bits) == other.bits
+    }
+}
+
+impl std::ops::BitOr for SemanticValidationLevel {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        self.union(rhs)
+    }
+}
+
+/// Gating data shared by all semantic constraints (C# `SemanticConstraint` base).
+#[derive(Debug, Clone, Copy)]
+pub struct SemanticConstraintGate {
+    pub level: SemanticValidationLevel,
+    pub application: crate::features::ApplicationType,
+    pub version: crate::file_format::FileFormatVersions,
+}
+
+impl SemanticConstraintGate {
+    pub fn new(level: SemanticValidationLevel) -> Self {
+        Self {
+            level,
+            application: crate::features::ApplicationType::ALL,
+            version: crate::file_format::FileFormatVersions::OFFICE2007,
+        }
+    }
+
+    pub fn with_application(mut self, application: crate::features::ApplicationType) -> Self {
+        self.application = application;
+        self
+    }
+
+    pub fn with_version(mut self, version: crate::file_format::FileFormatVersions) -> Self {
+        self.version = version;
+        self
+    }
+
+    /// Derive the current validation level from the context stack
+    /// (C# `SemanticConstraint.Get`): package frame → Package, part frame →
+    /// Part, otherwise Element.
+    pub fn context_level(context: &super::ValidationContext) -> SemanticValidationLevel {
+        match context.stack().current() {
+            Some(frame) if frame.package_uri.is_some() => SemanticValidationLevel::PACKAGE,
+            Some(frame) if frame.part_uri.is_some() => SemanticValidationLevel::PART,
+            _ => SemanticValidationLevel::ELEMENT,
+        }
+    }
+
+    /// C# `SemanticConstraint.Validate` gate: run `ValidateCore` only when the
+    /// constraint's level flags include the context level, the target version is
+    /// at least the constraint's version, and the constraint's application set
+    /// contains the context application (`(Application & type) == type`).
+    pub fn applies(
+        &self,
+        context: &super::ValidationContext,
+        application: crate::features::ApplicationType,
+    ) -> bool {
+        let level = Self::context_level(context);
+        self.level.contains(level)
+            && context.file_format().at_least(self.version)
+            && self.application.contains(application)
+    }
+}
+
 /// A relationship-existence semantic rule.
 #[derive(Debug, Clone)]
 pub struct RelationshipExistRule {
@@ -504,5 +598,81 @@ mod tests {
             errs.iter().any(|e| e.message.contains("duplicate")),
             "{errs:?}"
         );
+    }
+
+    #[test]
+    fn semantic_level_flags_compose() {
+        assert!(SemanticValidationLevel::ELEMENT.contains(SemanticValidationLevel::PACKAGE_ONLY));
+        assert!(SemanticValidationLevel::ELEMENT.contains(SemanticValidationLevel::PART_ONLY));
+        assert!(SemanticValidationLevel::ELEMENT.contains(SemanticValidationLevel::ELEMENT_ONLY));
+        assert!(SemanticValidationLevel::PART.contains(SemanticValidationLevel::PACKAGE_ONLY));
+        assert!(!SemanticValidationLevel::PART.contains(SemanticValidationLevel::ELEMENT_ONLY));
+        assert!(!SemanticValidationLevel::PACKAGE.contains(SemanticValidationLevel::PART_ONLY));
+        assert_eq!(
+            SemanticValidationLevel::PACKAGE_ONLY | SemanticValidationLevel::PART_ONLY,
+            SemanticValidationLevel::PART
+        );
+    }
+
+    #[test]
+    fn semantic_gate_matches_context_level_version_and_application() {
+        use crate::features::ApplicationType;
+        use crate::file_format::FileFormatVersions;
+        use crate::validation::ValidationContext;
+
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2010);
+        assert_eq!(
+            SemanticConstraintGate::context_level(&context),
+            SemanticValidationLevel::ELEMENT
+        );
+
+        // Part-scoped validation (no package frame): Part level, inherited by
+        // nested element frames (C# Current.Part stays non-null).
+        context.stack_mut().push_part("/word/document.xml");
+        assert_eq!(
+            SemanticConstraintGate::context_level(&context),
+            SemanticValidationLevel::PART
+        );
+        context.stack_mut().push_element_path("/w:document[1]");
+        assert_eq!(
+            SemanticConstraintGate::context_level(&context),
+            SemanticValidationLevel::PART
+        );
+
+        let part_gate = SemanticConstraintGate::new(SemanticValidationLevel::PART);
+        assert!(part_gate.applies(&context, ApplicationType::WORD));
+
+        let element_only = SemanticConstraintGate::new(SemanticValidationLevel::ELEMENT_ONLY);
+        assert!(!element_only.applies(&context, ApplicationType::WORD));
+
+        let too_new = SemanticConstraintGate::new(SemanticValidationLevel::PART)
+            .with_version(FileFormatVersions::OFFICE2013);
+        assert!(!too_new.applies(&context, ApplicationType::WORD));
+
+        let excel_only = SemanticConstraintGate::new(SemanticValidationLevel::PART)
+            .with_application(ApplicationType::EXCEL);
+        assert!(!excel_only.applies(&context, ApplicationType::WORD));
+        assert!(excel_only.applies(&context, ApplicationType::EXCEL));
+
+        // Package-scoped validation: the package frame wins, and nested part
+        // frames inherit it (C# checks Current.Package first).
+        context.stack_mut().clear();
+        context.stack_mut().push_package("/");
+        assert_eq!(
+            SemanticConstraintGate::context_level(&context),
+            SemanticValidationLevel::PACKAGE
+        );
+        context.stack_mut().push_part("/word/document.xml");
+        assert_eq!(
+            SemanticConstraintGate::context_level(&context),
+            SemanticValidationLevel::PACKAGE
+        );
+        // Package level = PackageOnly bit, so every composite constraint applies.
+        assert!(part_gate.applies(&context, ApplicationType::WORD));
+        assert!(SemanticConstraintGate::new(SemanticValidationLevel::ELEMENT)
+            .applies(&context, ApplicationType::WORD));
+        // But a PartOnly/ElementOnly-scoped constraint does not.
+        assert!(!SemanticConstraintGate::new(SemanticValidationLevel::PART_ONLY)
+            .applies(&context, ApplicationType::WORD));
     }
 }
