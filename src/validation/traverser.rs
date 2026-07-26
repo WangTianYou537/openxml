@@ -132,6 +132,81 @@ where
     Ok(())
 }
 
+/// C# `GetFirstChildMc` / `GetNextChildMc` sequence — the logical MC children
+/// of `parent` in order: misc nodes skipped, AlternateContent replaced by its
+/// selected branch's children, Ignorable-namespace children skipped (with
+/// ProcessContent promotion), everything else returned (in-version or not).
+pub fn logical_children_mc<'a>(
+    parent: &'a OpenXmlElement,
+    mc_context: &mut McContext,
+    version: FileFormatVersions,
+) -> Vec<&'a OpenXmlElement> {
+    fn walk<'a>(
+        elements: &'a [OpenXmlElement],
+        mc_context: &mut McContext,
+        version: FileFormatVersions,
+        output: &mut Vec<&'a OpenXmlElement>,
+    ) {
+        for child in elements {
+            if child.is_misc_node() {
+                continue;
+            }
+            if !child.is_unknown() && child.local_name != "AlternateContent"
+                && in_version(child, version)
+            {
+                output.push(child);
+                continue;
+            }
+
+            let attributes = MarkupCompatibilityAttributes::from_element(child);
+            mc_context.push_mc_attributes_for_validation(&attributes, None);
+            if child.local_name == "AlternateContent" {
+                if let Ok(Some(selected)) = mc_context.get_content_from_ac_block(child, version) {
+                    walk(&selected.children, mc_context, version, output);
+                }
+            } else if mc_context.is_ignorable_ns(namespace_key(child)) {
+                if mc_context.is_process_content(namespace_key(child), &child.local_name) {
+                    walk(&child.children, mc_context, version, output);
+                }
+                // else: ignorable, skip entirely
+            } else {
+                output.push(child);
+            }
+            mc_context.pop_mc_attributes_for_validation();
+        }
+    }
+
+    let attributes = MarkupCompatibilityAttributes::from_element(parent);
+    mc_context.push_mc_attributes_for_validation(&attributes, None);
+    let mut output = Vec::new();
+    walk(&parent.children, mc_context, version, &mut output);
+    mc_context.pop_mc_attributes_for_validation();
+    output
+}
+
+/// First logical MC child (C# `GetFirstChildMc`).
+pub fn get_first_child_mc<'a>(
+    parent: &'a OpenXmlElement,
+    mc_context: &mut McContext,
+    version: FileFormatVersions,
+) -> Option<&'a OpenXmlElement> {
+    logical_children_mc(parent, mc_context, version).into_iter().next()
+}
+
+/// Logical MC child following `child` (C# `GetNextChildMc`), by identity.
+pub fn get_next_child_mc<'a>(
+    parent: &'a OpenXmlElement,
+    child: &OpenXmlElement,
+    mc_context: &mut McContext,
+    version: FileFormatVersions,
+) -> Option<&'a OpenXmlElement> {
+    let children = logical_children_mc(parent, mc_context, version);
+    let index = children
+        .iter()
+        .position(|candidate| std::ptr::eq(*candidate, child))?;
+    children.get(index + 1).copied()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,8 +291,69 @@ mod tests {
     }
 
     #[test]
-    fn context_traverse_pushes_frames_and_honors_cancellation() {
+    fn logical_mc_children_cursor() {
         let document = sample_document();
+
+        let mut mc_context = McContext::with_exception_on_error(false);
+        let children_2007 =
+            logical_children_mc(&document, &mut mc_context, FileFormatVersions::OFFICE2007);
+        assert_eq!(names(&children_2007), ["body", "sectPr"]);
+
+        let mut mc_context = McContext::with_exception_on_error(false);
+        let children_2010 =
+            logical_children_mc(&document, &mut mc_context, FileFormatVersions::OFFICE2010);
+        assert_eq!(names(&children_2010), ["choiceBody", "sectPr"]);
+
+        let mut mc_context = McContext::with_exception_on_error(false);
+        let first =
+            get_first_child_mc(&document, &mut mc_context, FileFormatVersions::OFFICE2007)
+                .unwrap();
+        assert_eq!(first.local_name, "body");
+        let mut mc_context = McContext::with_exception_on_error(false);
+        let next =
+            get_next_child_mc(&document, first, &mut mc_context, FileFormatVersions::OFFICE2007)
+                .unwrap();
+        assert_eq!(next.local_name, "sectPr");
+        let mut mc_context = McContext::with_exception_on_error(false);
+        assert!(get_next_child_mc(
+            &document,
+            next,
+            &mut mc_context,
+            FileFormatVersions::OFFICE2007
+        )
+        .is_none());
+
+        // Ignorable skip + ProcessContent promotion.
+        let mut root = OpenXmlElement::w("document");
+        root.set_attribute_ns(
+            "mc",
+            crate::namespace::ns::MARKUP_COMPATIBILITY.uri,
+            "Ignorable",
+            "w14 w15",
+        );
+        root.set_attribute_ns(
+            "mc",
+            crate::namespace::ns::MARKUP_COMPATIBILITY.uri,
+            "ProcessContent",
+            "w14:wrapper",
+        );
+        root.append_child(
+            OpenXmlElement::unknown("w14", "wrapper", "urn:w14")
+                .with_children(vec![OpenXmlElement::w("body")]),
+        );
+        root.append_child(
+            OpenXmlElement::unknown("w15", "skipped", "urn:w15")
+                .with_children(vec![OpenXmlElement::w("lost")]),
+        );
+        let mut mc_context = McContext::with_exception_on_error(false);
+        let children =
+            logical_children_mc(&root, &mut mc_context, FileFormatVersions::OFFICE2007);
+        assert_eq!(names(&children), ["body"]);
+        assert!(!mc_context.has_ignorable());
+    }
+
+    #[test]
+    fn context_traverse_pushes_frames_and_honors_cancellation() {        let document = sample_document();
 
         let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
         let mut visited = Vec::new();

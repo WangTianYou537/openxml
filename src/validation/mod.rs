@@ -46,7 +46,10 @@ pub use package_validator::{
     validate_part_constraints, OpenXmlPackageValidationResult,
 };
 pub use open_xml_validator::{OpenXmlValidator, ValidationSettings};
-pub use traverser::{descendants_with_options, validating_traverse, validating_traverse_tree, TraversalOptions};
+pub use traverser::{
+    descendants_with_options, get_first_child_mc, get_next_child_mc, logical_children_mc,
+    validating_traverse, validating_traverse_tree, TraversalOptions,
+};
 pub use validation_cache::ValidationCache;
 pub use validation_context::{ValidationCancellationToken, ValidationChild, ValidationContext};
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};
