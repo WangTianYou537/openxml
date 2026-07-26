@@ -1154,10 +1154,155 @@ pub mod spreadsheet {
     }
 }
 
-/// Combined particle registry (Word + Spreadsheet) for
+/// Hand-authored particles for core PresentationML types.
+pub mod presentation {
+    use super::{Occurs, Particle};
+
+    /// `<p:presentation>` — simplified ordered optional children.
+    pub fn presentation() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("sldMasterIdLst", Occurs::OPTIONAL),
+                Particle::element("notesMasterIdLst", Occurs::OPTIONAL),
+                Particle::element("handoutMasterIdLst", Occurs::OPTIONAL),
+                Particle::element("sldIdLst", Occurs::OPTIONAL),
+                Particle::element("sldSz", Occurs::OPTIONAL),
+                Particle::element("notesSz", Occurs::OPTIONAL),
+                Particle::element("embeddedFontLst", Occurs::OPTIONAL),
+                Particle::element("custShowLst", Occurs::OPTIONAL),
+                Particle::element("defaultTextStyle", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn slide() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("cSld", Occurs::ONE),
+                Particle::element("clrMapOvr", Occurs::OPTIONAL),
+                Particle::element("transition", Occurs::OPTIONAL),
+                Particle::element("timing", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn slide_layout() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("cSld", Occurs::ONE),
+                Particle::element("clrMapOvr", Occurs::OPTIONAL),
+                Particle::element("transition", Occurs::OPTIONAL),
+                Particle::element("timing", Occurs::OPTIONAL),
+                Particle::element("hf", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn slide_master() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("cSld", Occurs::ONE),
+                Particle::element("clrMap", Occurs::ONE),
+                Particle::element("sldLayoutIdLst", Occurs::OPTIONAL),
+                Particle::element("transition", Occurs::OPTIONAL),
+                Particle::element("timing", Occurs::OPTIONAL),
+                Particle::element("hf", Occurs::OPTIONAL),
+                Particle::element("txStyles", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn common_slide_data() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("bg", Occurs::OPTIONAL),
+                Particle::element("spTree", Occurs::ONE),
+                Particle::element("custDataLst", Occurs::OPTIONAL),
+                Particle::element("controls", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn shape_tree() -> Particle {
+        let shapes = Particle::choice(
+            vec![
+                Particle::element("sp", Occurs::ONE),
+                Particle::element("grpSp", Occurs::ONE),
+                Particle::element("graphicFrame", Occurs::ONE),
+                Particle::element("cxnSp", Occurs::ONE),
+                Particle::element("pic", Occurs::ONE),
+                Particle::element("contentPart", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        );
+        Particle::sequence(
+            vec![
+                Particle::element("nvGrpSpPr", Occurs::ONE),
+                Particle::element("grpSpPr", Occurs::ONE),
+                shapes,
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn shape() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("nvSpPr", Occurs::ONE),
+                Particle::element("spPr", Occurs::ONE),
+                Particle::element("style", Occurs::OPTIONAL),
+                Particle::element("txBody", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn picture() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("nvPicPr", Occurs::ONE),
+                Particle::element("blipFill", Occurs::ONE),
+                Particle::element("spPr", Occurs::ONE),
+                Particle::element("style", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn particle_for(local_name: &str) -> Option<Particle> {
+        Some(match local_name {
+            "presentation" => presentation(),
+            "sld" => slide(),
+            "sldLayout" => slide_layout(),
+            "sldMaster" => slide_master(),
+            "cSld" => common_slide_data(),
+            "spTree" => shape_tree(),
+            "sp" => shape(),
+            "pic" => picture(),
+            _ => return None,
+        })
+    }
+}
+
+/// Combined particle registry (Word + Spreadsheet + Presentation) for
 /// [`ValidationCache::get_constraint`] / SchemaTypeValidator.
 pub fn particle_for(local_name: &str) -> Option<Particle> {
-    word::particle_for(local_name).or_else(|| spreadsheet::particle_for(local_name))
+    word::particle_for(local_name)
+        .or_else(|| spreadsheet::particle_for(local_name))
+        .or_else(|| presentation::particle_for(local_name))
 }
 
 /// Recursively validate a Word document using ordered particles.
@@ -1772,5 +1917,40 @@ mod tests {
         assert!(cache.get_constraint("worksheet").is_some());
         assert!(cache.get_constraint("workbook").is_some());
         assert!(cache.get_constraint("document").is_some());
+    }
+
+    #[test]
+    fn presentation_slide_requires_csld() {
+        let sld = crate::element::OpenXmlElement::new(
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "sld",
+        );
+        let errs = validate_particle_for_version(
+            &sld,
+            &presentation::slide(),
+            "p:sld",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            errs.iter().any(|e| {
+                e.id() == Some("Sch_IncompleteContentExpectingComplex")
+                    || e.message.contains("cSld")
+                    || e.message.contains("incomplete")
+            }),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn presentation_particle_for_resolves_core_roots() {
+        assert!(presentation::particle_for("presentation").is_some());
+        assert!(presentation::particle_for("sld").is_some());
+        assert!(presentation::particle_for("sldMaster").is_some());
+        assert!(presentation::particle_for("cSld").is_some());
+        assert!(presentation::particle_for("spTree").is_some());
+        assert!(presentation::particle_for("sp").is_some());
+        assert!(crate::validation::particle::particle_for("sld").is_some());
+        assert!(crate::validation::particle::particle_for("worksheet").is_some());
     }
 }

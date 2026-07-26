@@ -992,6 +992,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Particle mismatch classification: `Sch_AllElement` for xs:all duplicates; `Sch_UnexpectedElementContentExpectingComplex` when parent can contain child; `Sch_InvalidElementContentWrongType` via `try_create_valid_child`
 - [x] Spreadsheet `Sem_CellValue` (C# `CellType` IValidator): `validate_spreadsheet_cell_values` for boolean/date/number `c@t` + `v` lexical checks; DocumentValidator constraint pass
 - [x] SpreadsheetML particle registry (`workbook`/`sheets`/`worksheet`/`sheetData`/`row`/`c`); combined `particle_for` + ValidationCache/SchemaTypeValidator routing
+- [x] PresentationML particle registry (`presentation`/`sld`/`sldLayout`/`sldMaster`/`cSld`/`spTree`/`sp`/`pic`); combined `particle_for` covers Word+Spreadsheet+Presentation
 
 **Still intentionally deferred / partial:**
 
