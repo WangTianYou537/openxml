@@ -1613,6 +1613,10 @@ pub mod presentation {
             "notesMaster" => notes_master(),
             "handoutMaster" => handout_master(),
             "presentationPr" => presentation_properties(),
+            "cmLst" => comment_list(),
+            "cmAuthorLst" => comment_author_list(),
+            "tagLst" => tag_list(),
+            "viewPr" => view_properties(),
             "cSld" => common_slide_data(),
             "spTree" => shape_tree(),
             "sp" => shape(),
@@ -1654,6 +1658,26 @@ pub mod presentation {
     pub fn presentation_properties() -> Particle {
         crate::generated::presentationml_2006_main::particle_presentation_properties()
     }
+
+    /// `<p:cmLst>` slide comments part root.
+    pub fn comment_list() -> Particle {
+        crate::generated::presentationml_2006_main::particle_comment_list()
+    }
+
+    /// `<p:cmAuthorLst>` comment authors part root.
+    pub fn comment_author_list() -> Particle {
+        crate::generated::presentationml_2006_main::particle_comment_author_list()
+    }
+
+    /// `<p:tagLst>` user-defined tags part root.
+    pub fn tag_list() -> Particle {
+        crate::generated::presentationml_2006_main::particle_tag_list()
+    }
+
+    /// `<p:viewPr>` / view properties part root.
+    pub fn view_properties() -> Particle {
+        crate::generated::presentationml_2006_main::particle_view_properties()
+    }
 }
 
 /// DrawingML part-root particles (`theme`, `themeOverride`, `chartSpace`).
@@ -1693,11 +1717,24 @@ pub mod drawing {
         )
     }
 
+    /// `<xdr:wsDr>` worksheet drawing part root.
+    pub fn worksheet_drawing() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("twoCellAnchor", super::Occurs::ONE),
+                Particle::element("oneCellAnchor", super::Occurs::ONE),
+                Particle::element("absoluteAnchor", super::Occurs::ONE),
+            ],
+            super::Occurs::STAR,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "theme" => theme(),
             "themeOverride" => theme_override(),
             "chartSpace" => chart_space(),
+            "wsDr" => worksheet_drawing(),
             _ => return None,
         })
     }
@@ -2111,12 +2148,48 @@ pub fn validate_presentation_particles_for_version(
                 &root_mc,
             ));
         }
+        "cmLst" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::comment_list(),
+                "p:cmLst",
+                &context,
+                &root_mc,
+            ));
+        }
+        "cmAuthorLst" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::comment_author_list(),
+                "p:cmAuthorLst",
+                &context,
+                &root_mc,
+            ));
+        }
+        "tagLst" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::tag_list(),
+                "p:tagLst",
+                &context,
+                &root_mc,
+            ));
+        }
+        "viewPr" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::view_properties(),
+                "p:viewPr",
+                &context,
+                &root_mc,
+            ));
+        }
         _ => {}
     }
     errors
 }
 
-/// Version-aware DrawingML particle walk for `theme` / `chartSpace` roots.
+/// Version-aware DrawingML particle walk for `theme` / `chartSpace` / `wsDr` roots.
 pub fn validate_drawing_particles_for_version(
     root: &OpenXmlElement,
     version: FileFormatVersions,
@@ -2149,6 +2222,15 @@ pub fn validate_drawing_particles_for_version(
                 root,
                 &drawing::chart_space(),
                 "c:chartSpace",
+                &context,
+                &root_mc,
+            ));
+        }
+        "wsDr" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::worksheet_drawing(),
+                "xdr:wsDr",
                 &context,
                 &root_mc,
             ));
@@ -2955,6 +3037,50 @@ mod tests {
             &pr,
             &presentation::presentation_properties(),
             "p:presentationPr",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn presentation_comment_and_tag_roots_resolve() {
+        assert!(presentation::particle_for("cmLst").is_some());
+        assert!(presentation::particle_for("cmAuthorLst").is_some());
+        assert!(presentation::particle_for("tagLst").is_some());
+        assert!(presentation::particle_for("viewPr").is_some());
+        assert!(crate::validation::particle::particle_for("cmLst").is_some());
+        assert!(crate::validation::particle::particle_for("wsDr").is_some());
+    }
+
+    #[test]
+    fn comment_list_particle_accepts_cm() {
+        let mut lst = crate::element::OpenXmlElement::p("cmLst");
+        lst.append_child(crate::element::OpenXmlElement::p("cm"));
+        let errs = validate_particle_for_version(
+            &lst,
+            &presentation::comment_list(),
+            "p:cmLst",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn worksheet_drawing_particle_accepts_two_cell_anchor() {
+        let mut dr = crate::element::OpenXmlElement::new(
+            "xdr",
+            "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+            "wsDr",
+        );
+        dr.append_child(crate::element::OpenXmlElement::new(
+            "xdr",
+            "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+            "twoCellAnchor",
+        ));
+        let errs = validate_particle_for_version(
+            &dr,
+            &drawing::worksheet_drawing(),
+            "xdr:wsDr",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");

@@ -164,11 +164,21 @@ impl DocumentValidator {
             | "pivotTableDefinition" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
-            "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" | "handoutMaster"
-            | "presentation" | "presentationPr" => {
+            "sld"
+            | "sldLayout"
+            | "sldMaster"
+            | "notes"
+            | "notesMaster"
+            | "handoutMaster"
+            | "presentation"
+            | "presentationPr"
+            | "cmLst"
+            | "cmAuthorLst"
+            | "tagLst"
+            | "viewPr" => {
                 super::validate_presentation_particles_for_version(root, version)
             }
-            "theme" | "themeOverride" | "chartSpace" => {
+            "theme" | "themeOverride" | "chartSpace" | "wsDr" => {
                 super::validate_drawing_particles_for_version(root, version)
             }
             // Other Word part roots: single-root particle via registry.
