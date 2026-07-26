@@ -1026,6 +1026,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `PartFactoryFeature` seed_from_generated_parts / unregister; DefaultFeatures.ensure_on seeds RootElement + PartFactory
 - [x] `TypedPartFactoryFeature` seed_from_generated_parts / unregister; DefaultFeatures + package accessor auto-seed
 - [x] `ElementMetadataFactoryFeature::seed_common_elements` from generated schema tables; DefaultFeatures auto-seeds
+- [x] `FileFormatVersions::ensure_element_in_version` + OpenXmlValidator DOM gate (C# `ThrowIfNotInVersion`)
 
 **Still intentionally deferred / partial:**
 

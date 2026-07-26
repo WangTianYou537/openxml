@@ -142,6 +142,25 @@ impl FileFormatVersions {
             || self.intersects(minimum)
     }
 
+    /// C# `ThrowIfNotInVersion(OpenXmlElement)` — element namespace must be in `self`.
+    pub fn ensure_element_in_version(
+        self,
+        element: &crate::element::OpenXmlElement,
+    ) -> crate::error::Result<()> {
+        self.ensure_supported()
+            .map_err(crate::error::Error::Validation)?;
+        if !element.is_in_version(self) {
+            let year = self
+                .office_year()
+                .map(|y| y.to_string())
+                .unwrap_or_else(|| self.to_string());
+            return Err(crate::error::Error::Validation(format!(
+                "The element has a namespace that is not valid for Office {year}."
+            )));
+        }
+        Ok(())
+    }
+
     /// C# `FileFormatVersionsExtensions.AndEarlier` shell.
     pub const fn and_earlier(self) -> Self {
         match self {

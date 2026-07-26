@@ -348,6 +348,9 @@ impl OpenXmlValidator {
             ));
         }
 
+        // C# `FileFormat.ThrowIfNotInVersion(openXmlElement)`.
+        self.settings.file_format.ensure_element_in_version(element)?;
+
         let validator = self.document_validator();
         let mut context = super::ValidationContext::with_cancellation_token(self.settings, token);
         context.stack_mut().push_element_path(element.qualified_name());
@@ -668,5 +671,29 @@ mod tests {
             v.validate_dom_element_with_token(&doc, token),
             Err(Error::Cancelled)
         ));
+    }
+
+    #[test]
+    fn dom_element_rejects_namespace_not_in_file_format() {
+        let mut v = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2007);
+        let w14 = OpenXmlElement::new(
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml",
+            "glow",
+        );
+        let err = v.validate_dom_element(&w14).unwrap_err();
+        match err {
+            Error::Validation(message) => {
+                assert!(
+                    message.contains("not valid for Office") || message.contains("2007"),
+                    "{message}"
+                );
+            }
+            other => panic!("expected Validation error, got {other:?}"),
+        }
+
+        let mut v2010 = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2010);
+        // w14 is in Office2010 — should not fail the version gate (may still produce schema errors).
+        assert!(v2010.validate_dom_element(&w14).is_ok());
     }
 }
