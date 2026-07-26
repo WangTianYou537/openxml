@@ -115,10 +115,13 @@ pub use semantic::{
     SemanticValidationLevel, UniqueAttributeRule,
 };
 pub use semantic_constraints::{
-    validate_element_constraints, AttributeAbsentConditionToValue, AttributeCannotOmitConstraint,
-    AttributeMinMaxConstraint, AttributeMutualExclusive, AttributeName, AttributePairConstraint,
-    AttributeRequiredConditionToValue, AttributeValueLengthConstraint,
-    AttributeValueRangeConstraint, AttributeValueSetConstraint, SemanticConstraint,
+    validate_element_constraints, AttributeAbsentConditionToNonValue,
+    AttributeAbsentConditionToValue, AttributeCannotOmitConstraint, AttributeMinMaxConstraint,
+    AttributeMutualExclusive, AttributeName, AttributePairConstraint,
+    AttributeRequiredConditionToValue, AttributeValueConditionToAnother,
+    AttributeValueLengthConstraint, AttributeValueLessEqualToAnother,
+    AttributeValuePatternConstraint, AttributeValueRangeConstraint, AttributeValueSetConstraint,
+    SemanticConstraint,
 };
 
 /// Re-export Markup Compatibility AlternateContent structural validation.

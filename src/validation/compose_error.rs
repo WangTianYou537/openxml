@@ -45,6 +45,21 @@ pub fn validation_resource_message(message_id: &str) -> Option<&'static str> {
             " The MaxExclusive constraint failed. The value must be less than {0}."
         }
         "Sch_EnumerationConstraintFailed" => " The Enumeration constraint failed.",
+        "Sch_PatternConstraintFailed" => {
+            " The Pattern constraint failed. The expected pattern is {0}."
+        }
+        "Sem_AttributeValueLessEqualToAnother" => {
+            "Attribute '{0}' has value '{1}'. It should be less than or equal to the value of attribute '{2}' which is '{3}'."
+        }
+        "Sem_AttributeValueLessEqualToAnotherEx" => {
+            "Attribute '{0}' has value '{1}'. It should be less than the value of attribute '{2}' which is '{3}'."
+        }
+        "Sem_AttributeAbsentConditionToNonValue" => {
+            "Attribute '{0}' should be absent when the value of attribute '{1}' is not {2}."
+        }
+        "Sem_AttributeValueConditionToAnother" => {
+            "Attribute '{0}' should have value(s) {1} when attribute '{2}' has value(s) {3}. Current value of attribute '{4}' is '{5}'."
+        }
         "Sch_InvalidChildinLeafElement" => {
             "The element '{0}' is a leaf element and cannot contain children."
         }

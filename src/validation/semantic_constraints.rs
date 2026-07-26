@@ -729,6 +729,469 @@ impl SemanticConstraint for AttributePairConstraint {
     }
 }
 
+fn format_value_list(values: &[String], last_sep: &str) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+    if values.len() == 1 {
+        return format!("'{}'", values[0]);
+    }
+    if values.len() == 2 {
+        return format!("'{}' {last_sep} '{}'", values[0], values[1]);
+    }
+    let head = values[..values.len() - 1]
+        .iter()
+        .map(|v| format!("'{v}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{head} {last_sep} '{}'", values[values.len() - 1])
+}
+
+/// Very small regex subset for C# `AttributeValuePatternConstraint`:
+/// anchors `^$`, literal chars, `.`, character classes `[...]`/`[^...]`,
+/// and quantifiers `* + ? {n} {n,} {n,m}`. Unsupported patterns fail closed
+/// (report as mismatch) only when the pattern itself is empty.
+fn simple_pattern_is_match(pattern: &str, value: &str) -> bool {
+    let mut pat = pattern;
+    if let Some(rest) = pat.strip_prefix('^') {
+        pat = rest;
+    }
+    if let Some(rest) = pat.strip_suffix('$') {
+        pat = rest;
+    }
+    match_pattern(pat.as_bytes(), value.as_bytes())
+}
+
+fn match_pattern(pattern: &[u8], value: &[u8]) -> bool {
+    // Recursive backtracking matcher for the supported subset.
+    fn walk(pat: &[u8], val: &[u8]) -> bool {
+        if pat.is_empty() {
+            return val.is_empty();
+        }
+        let (atom, rest, quant) = match parse_atom(pat) {
+            Some(v) => v,
+            None => return false,
+        };
+        match quant {
+            Quant::Exact(n) => {
+                if val.len() < n {
+                    return false;
+                }
+                for i in 0..n {
+                    if !atom_matches(&atom, val[i]) {
+                        return false;
+                    }
+                }
+                walk(rest, &val[n..])
+            }
+            Quant::Optional => {
+                if walk(rest, val) {
+                    return true;
+                }
+                if !val.is_empty() && atom_matches(&atom, val[0]) {
+                    return walk(rest, &val[1..]);
+                }
+                false
+            }
+            Quant::Star => {
+                let mut i = 0;
+                loop {
+                    if walk(rest, &val[i..]) {
+                        return true;
+                    }
+                    if i >= val.len() || !atom_matches(&atom, val[i]) {
+                        return false;
+                    }
+                    i += 1;
+                }
+            }
+            Quant::Plus => {
+                if val.is_empty() || !atom_matches(&atom, val[0]) {
+                    return false;
+                }
+                let mut i = 1;
+                loop {
+                    if walk(rest, &val[i..]) {
+                        return true;
+                    }
+                    if i >= val.len() || !atom_matches(&atom, val[i]) {
+                        return false;
+                    }
+                    i += 1;
+                }
+            }
+            Quant::Range(min, max) => {
+                let mut i = 0;
+                while i < min {
+                    if i >= val.len() || !atom_matches(&atom, val[i]) {
+                        return false;
+                    }
+                    i += 1;
+                }
+                loop {
+                    if walk(rest, &val[i..]) {
+                        return true;
+                    }
+                    if i >= max || i >= val.len() || !atom_matches(&atom, val[i]) {
+                        return false;
+                    }
+                    i += 1;
+                }
+            }
+        }
+    }
+    walk(pattern, value)
+}
+
+#[derive(Clone)]
+enum Atom {
+    Any,
+    Lit(u8),
+    Class { negated: bool, chars: Vec<u8> },
+}
+
+enum Quant {
+    Exact(usize),
+    Optional,
+    Star,
+    Plus,
+    Range(usize, usize),
+}
+
+fn parse_atom(pat: &[u8]) -> Option<(Atom, &[u8], Quant)> {
+    if pat.is_empty() {
+        return None;
+    }
+    let (atom, after_atom) = if pat[0] == b'.' {
+        (Atom::Any, &pat[1..])
+    } else if pat[0] == b'[' {
+        let mut i = 1;
+        let negated = if i < pat.len() && pat[i] == b'^' {
+            i += 1;
+            true
+        } else {
+            false
+        };
+        let mut chars = Vec::new();
+        while i < pat.len() && pat[i] != b']' {
+            if i + 2 < pat.len() && pat[i + 1] == b'-' && pat[i + 2] != b']' {
+                let start = pat[i];
+                let end = pat[i + 2];
+                for c in start..=end {
+                    chars.push(c);
+                }
+                i += 3;
+            } else {
+                chars.push(pat[i]);
+                i += 1;
+            }
+        }
+        if i >= pat.len() || pat[i] != b']' {
+            return None;
+        }
+        (Atom::Class { negated, chars }, &pat[i + 1..])
+    } else if pat[0] == b'\\' && pat.len() >= 2 {
+        (Atom::Lit(pat[1]), &pat[2..])
+    } else {
+        (Atom::Lit(pat[0]), &pat[1..])
+    };
+
+    let (quant, rest) = if after_atom.first() == Some(&b'*') {
+        (Quant::Star, &after_atom[1..])
+    } else if after_atom.first() == Some(&b'+') {
+        (Quant::Plus, &after_atom[1..])
+    } else if after_atom.first() == Some(&b'?') {
+        (Quant::Optional, &after_atom[1..])
+    } else if after_atom.first() == Some(&b'{') {
+        let close = after_atom.iter().position(|&b| b == b'}')?;
+        let body = std::str::from_utf8(&after_atom[1..close]).ok()?;
+        let quant = if let Some((a, b)) = body.split_once(',') {
+            let min = a.parse::<usize>().ok()?;
+            if b.is_empty() {
+                Quant::Range(min, usize::MAX)
+            } else {
+                Quant::Range(min, b.parse::<usize>().ok()?)
+            }
+        } else {
+            Quant::Exact(body.parse::<usize>().ok()?)
+        };
+        (quant, &after_atom[close + 1..])
+    } else {
+        (Quant::Exact(1), after_atom)
+    };
+    Some((atom, rest, quant))
+}
+
+fn atom_matches(atom: &Atom, byte: u8) -> bool {
+    match atom {
+        Atom::Any => true,
+        Atom::Lit(c) => *c == byte,
+        Atom::Class { negated, chars } => {
+            let contains = chars.contains(&byte);
+            if *negated {
+                !contains
+            } else {
+                contains
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AttributeValuePatternConstraint
+// ---------------------------------------------------------------------------
+
+/// C# `AttributeValuePatternConstraint`.
+#[derive(Debug, Clone)]
+pub struct AttributeValuePatternConstraint {
+    gate: SemanticConstraintGate,
+    attribute: AttributeName,
+    pattern: String,
+}
+
+impl AttributeValuePatternConstraint {
+    pub fn new(attribute: AttributeName, pattern: impl Into<String>) -> Self {
+        let mut pattern = pattern.into();
+        if !(pattern.starts_with('^') && pattern.ends_with('$')) {
+            pattern = format!("^{pattern}$");
+        }
+        Self {
+            gate: SemanticConstraintGate::new(SemanticValidationLevel::ELEMENT),
+            attribute,
+            pattern,
+        }
+    }
+}
+
+impl SemanticConstraint for AttributeValuePatternConstraint {
+    fn gate(&self) -> SemanticConstraintGate {
+        self.gate
+    }
+
+    fn validate_core(
+        &self,
+        element: &OpenXmlElement,
+        path: &str,
+    ) -> Option<ValidationError> {
+        let text = find_attribute_value(element, &self.attribute)?;
+        if text.is_empty() {
+            return None;
+        }
+        if simple_pattern_is_match(&self.pattern, text) {
+            return None;
+        }
+        let sub = format_resource("Sch_PatternConstraintFailed", &[&self.pattern]);
+        let qname = self.attribute.display();
+        Some(semantic_error(
+            path,
+            "Sem_AttributeValueDataTypeDetailed",
+            format_resource("Sem_AttributeValueDataTypeDetailed", &[&qname, text, &sub]),
+            ValidationErrorType::Schema,
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AttributeValueLessEqualToAnother
+// ---------------------------------------------------------------------------
+
+/// C# `AttributeValueLessEqualToAnother`.
+#[derive(Debug, Clone)]
+pub struct AttributeValueLessEqualToAnother {
+    gate: SemanticConstraintGate,
+    attribute: AttributeName,
+    other_attribute: AttributeName,
+    can_equal: bool,
+}
+
+impl AttributeValueLessEqualToAnother {
+    pub fn new(
+        attribute: AttributeName,
+        other_attribute: AttributeName,
+        can_equal: bool,
+    ) -> Self {
+        Self {
+            gate: SemanticConstraintGate::new(SemanticValidationLevel::ELEMENT),
+            attribute,
+            other_attribute,
+            can_equal,
+        }
+    }
+}
+
+impl SemanticConstraint for AttributeValueLessEqualToAnother {
+    fn gate(&self) -> SemanticConstraintGate {
+        self.gate
+    }
+
+    fn validate_core(
+        &self,
+        element: &OpenXmlElement,
+        path: &str,
+    ) -> Option<ValidationError> {
+        let text = find_attribute_value(element, &self.attribute)?;
+        let other_text = find_attribute_value(element, &self.other_attribute)?;
+        let val = parse_attr_num(text)?;
+        let other_val = parse_attr_num(other_text)?;
+        let ok = if self.can_equal {
+            val <= other_val
+        } else {
+            val < other_val
+        };
+        if ok {
+            return None;
+        }
+        let message_id = if self.can_equal {
+            "Sem_AttributeValueLessEqualToAnother"
+        } else {
+            "Sem_AttributeValueLessEqualToAnotherEx"
+        };
+        let a = self.attribute.display();
+        let b = self.other_attribute.display();
+        Some(semantic_error(
+            path,
+            "Sem_AttributeValueLessEqualToAnother",
+            format_resource(message_id, &[&a, text, &b, other_text]),
+            ValidationErrorType::Semantic,
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AttributeAbsentConditionToNonValue
+// ---------------------------------------------------------------------------
+
+/// C# `AttributeAbsentConditionToNonValue`.
+#[derive(Debug, Clone)]
+pub struct AttributeAbsentConditionToNonValue {
+    gate: SemanticConstraintGate,
+    absent_attribute: AttributeName,
+    condition_attribute: AttributeName,
+    values: Vec<String>,
+}
+
+impl AttributeAbsentConditionToNonValue {
+    pub fn new(
+        absent_attribute: AttributeName,
+        condition_attribute: AttributeName,
+        values: Vec<String>,
+    ) -> Self {
+        Self {
+            gate: SemanticConstraintGate::new(SemanticValidationLevel::ELEMENT),
+            absent_attribute,
+            condition_attribute,
+            values,
+        }
+    }
+}
+
+impl SemanticConstraint for AttributeAbsentConditionToNonValue {
+    fn gate(&self) -> SemanticConstraintGate {
+        self.gate
+    }
+
+    fn validate_core(
+        &self,
+        element: &OpenXmlElement,
+        path: &str,
+    ) -> Option<ValidationError> {
+        let _absent = find_attribute_value(element, &self.absent_attribute)?;
+        let condition = find_attribute_value(element, &self.condition_attribute)?;
+        if self
+            .values
+            .iter()
+            .any(|v| attribute_value_equals(condition, v, false))
+        {
+            return None;
+        }
+        let value_string = format_value_list(&self.values, "and");
+        let absent = self.absent_attribute.display();
+        let cond = self.condition_attribute.display();
+        Some(semantic_error(
+            path,
+            "Sem_AttributeAbsentConditionToNonValue",
+            format_resource(
+                "Sem_AttributeAbsentConditionToNonValue",
+                &[&absent, &cond, &value_string],
+            ),
+            ValidationErrorType::Semantic,
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AttributeValueConditionToAnother
+// ---------------------------------------------------------------------------
+
+/// C# `AttributeValueConditionToAnother`.
+#[derive(Debug, Clone)]
+pub struct AttributeValueConditionToAnother {
+    gate: SemanticConstraintGate,
+    attribute: AttributeName,
+    condition_attribute: AttributeName,
+    values: Vec<String>,
+    other_values: Vec<String>,
+}
+
+impl AttributeValueConditionToAnother {
+    pub fn new(
+        attribute: AttributeName,
+        condition_attribute: AttributeName,
+        values: Vec<String>,
+        other_values: Vec<String>,
+    ) -> Self {
+        Self {
+            gate: SemanticConstraintGate::new(SemanticValidationLevel::ELEMENT),
+            attribute,
+            condition_attribute,
+            values,
+            other_values,
+        }
+    }
+}
+
+impl SemanticConstraint for AttributeValueConditionToAnother {
+    fn gate(&self) -> SemanticConstraintGate {
+        self.gate
+    }
+
+    fn validate_core(
+        &self,
+        element: &OpenXmlElement,
+        path: &str,
+    ) -> Option<ValidationError> {
+        let text = find_attribute_value(element, &self.attribute)?;
+        if self
+            .values
+            .iter()
+            .any(|v| attribute_value_equals(text, v, false))
+        {
+            return None;
+        }
+        let condition = find_attribute_value(element, &self.condition_attribute)?;
+        if !self
+            .other_values
+            .iter()
+            .any(|v| attribute_value_equals(condition, v, false))
+        {
+            return None;
+        }
+        let attr_values = format_value_list(&self.values, "or");
+        let other_values = format_value_list(&self.other_values, "or");
+        let a = self.attribute.display();
+        let b = self.condition_attribute.display();
+        Some(semantic_error(
+            path,
+            "Sem_AttributeValueConditionToAnother",
+            format_resource(
+                "Sem_AttributeValueConditionToAnother",
+                &[&a, &attr_values, &b, &other_values, &a, text],
+            ),
+            ValidationErrorType::Semantic,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -845,6 +1308,65 @@ mod tests {
         assert!(pair.validate_core(&el, &path).is_some());
         el.set_attribute("y", "2");
         assert!(pair.validate_core(&el, &path).is_none());
+    }
+
+    #[test]
+    fn pattern_less_equal_absent_nonvalue_and_value_condition() {
+        assert!(simple_pattern_is_match("^[0-9]{2}$", "12"));
+        assert!(!simple_pattern_is_match("^[0-9]{2}$", "1a"));
+        assert!(simple_pattern_is_match("^a.*z$", "abcz"));
+        assert!(!simple_pattern_is_match("^a.*z$", "abc"));
+
+        let pattern =
+            AttributeValuePatternConstraint::new(AttributeName::local("id"), "[0-9a-fA-F]{4}");
+        let mut el = OpenXmlElement::w("item");
+        el.set_attribute("id", "12G4");
+        let path = el.qualified_name();
+        let err = pattern.validate_core(&el, &path).unwrap();
+        assert_eq!(err.id(), Some("Sem_AttributeValueDataTypeDetailed"));
+        assert!(err.description().contains("Pattern"));
+        el.set_attribute("id", "12aF");
+        assert!(pattern.validate_core(&el, &path).is_none());
+
+        let le = AttributeValueLessEqualToAnother::new(
+            AttributeName::local("min"),
+            AttributeName::local("max"),
+            true,
+        );
+        let mut el = OpenXmlElement::w("range");
+        el.set_attribute("min", "9");
+        el.set_attribute("max", "3");
+        let path = el.qualified_name();
+        assert!(le.validate_core(&el, &path).is_some());
+        el.set_attribute("min", "2");
+        assert!(le.validate_core(&el, &path).is_none());
+
+        let absent_non = AttributeAbsentConditionToNonValue::new(
+            AttributeName::local("auto"),
+            AttributeName::local("mode"),
+            vec!["manual".into()],
+        );
+        let mut el = OpenXmlElement::w("color");
+        el.set_attribute("auto", "1");
+        el.set_attribute("mode", "auto");
+        let path = el.qualified_name();
+        assert!(absent_non.validate_core(&el, &path).is_some());
+        el.set_attribute("mode", "manual");
+        assert!(absent_non.validate_core(&el, &path).is_none());
+
+        let cond = AttributeValueConditionToAnother::new(
+            AttributeName::local("val"),
+            AttributeName::local("type"),
+            vec!["left".into(), "right".into()],
+            vec!["align".into()],
+        );
+        let mut el = OpenXmlElement::w("jc");
+        el.set_attribute("val", "center");
+        el.set_attribute("type", "align");
+        let path = el.qualified_name();
+        assert!(cond.validate_core(&el, &path).is_some());
+        el.set_attribute("val", "left");
+        assert!(cond.validate_core(&el, &path).is_none());
     }
 
     #[test]
