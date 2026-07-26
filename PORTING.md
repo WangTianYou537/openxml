@@ -1004,6 +1004,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] DocumentValidator package structure errors use `Pkg_` MessageId prefix (C# `Pkg_` + PackageValidator MessageId)
 - [x] Align `Pkg_*` ValidationResources text with C# resx; `ExpectedChildren::expected_children_message` uses `Fmt_*` resources
 - [x] `format_validation_resource` public helper; package constraint errors use C# `Pkg_*` resource templates via `err_pkg`
+- [x] `UniqueAttributeValueConstraint` parent-scoped early-return matches C# (null when parent configured)
 
 **Still intentionally deferred / partial:**
 

@@ -1453,8 +1453,11 @@ impl SemanticConstraint for UniqueAttributeValueConstraint {
         &self,
         scx: &SemanticConstraintContext<'_>,
     ) -> Option<ValidationError> {
-        // C# returns null when a parent scope is configured but not yet used in
-        // the common metadata path; we implement parent scoping when provided.
+        // C# returns null when a parent scope is configured (parent-scoped
+        // uniqueness path is currently unused in the SDK metadata).
+        if self.parent_local_name.is_some() {
+            return None;
+        }
         let value = find_attribute_value(scx.element, &self.attribute)?;
         if value.is_empty() {
             return None;
@@ -1471,13 +1474,6 @@ impl SemanticConstraint for UniqueAttributeValueConstraint {
         for el in std::iter::once(root).chain(root.descendants()) {
             if el.local_name != element_name {
                 continue;
-            }
-            if let Some(parent_name) = &self.parent_local_name {
-                // Without parent pointers on descendants, approximate by checking
-                // that uniqueness only matters for the current element against
-                // peers with the same local name under the part root. Parent
-                // scoping is best-effort here.
-                let _ = parent_name;
             }
             let Some(other) = find_attribute_value(el, &self.attribute) else {
                 continue;
@@ -1980,6 +1976,21 @@ mod tests {
             validate_element_constraints(&context, &styles, &constraints, ApplicationType::WORD);
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert_eq!(errors[0].id(), Some("Sem_UniqueAttributeValue"));
+        context.stack_mut().clear();
+
+        // Parent-scoped uniqueness is intentionally a no-op (C# returns null).
+        let with_parent = UniqueAttributeValueConstraint::new(AttributeName::local("styleId"), true)
+            .with_parent_local_name("styles");
+        context.stack_mut().push_part("/word/styles.xml");
+        let constraints: [&dyn SemanticConstraint; 1] = [&with_parent];
+        let skipped =
+            validate_element_constraints(&context, &styles, &constraints, ApplicationType::WORD);
+        assert!(
+            skipped
+                .iter()
+                .all(|e| e.id() != Some("Sem_UniqueAttributeValue")),
+            "{skipped:?}"
+        );
         context.stack_mut().clear();
 
         // ParentTypeConstraint: w:t under w:r is ok; under w:p is not.
