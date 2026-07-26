@@ -391,6 +391,8 @@ pub struct NumberValidator {
     pub max_exclusive: Option<i64>,
     pub is_non_negative: bool,
     pub is_positive: bool,
+    /// C# `TotalDigits` — maximum number of decimal digits (sign/point excluded).
+    pub total_digits: Option<u32>,
 }
 
 impl NumberValidator {
@@ -403,6 +405,7 @@ impl NumberValidator {
             max_exclusive: None,
             is_non_negative: false,
             is_positive: false,
+            total_digits: None,
         }
     }
 
@@ -435,6 +438,11 @@ impl NumberValidator {
 
     pub const fn with_max_exclusive(mut self, n: i64) -> Self {
         self.max_exclusive = Some(n);
+        self
+    }
+
+    pub const fn with_total_digits(mut self, n: u32) -> Self {
+        self.total_digits = Some(n);
         self
     }
 }
@@ -504,6 +512,20 @@ impl Validator for NumberValidator {
                 return emit_data_type_error(
                     context,
                     &format!(" The MaxExclusive constraint failed. The value must be less than {max}."),
+                );
+            }
+        }
+        if let Some(digits) = self.total_digits {
+            let digit_count = text
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .count() as u32;
+            if digit_count > digits {
+                return emit_data_type_error(
+                    context,
+                    &format!(
+                        " The TotalDigits constraint failed. The expected number of digits is {digits}."
+                    ),
                 );
             }
         }
@@ -1271,6 +1293,38 @@ mod tests {
             .stack_mut()
             .push_property("w14:paraId", None::<String>, true);
         OfficeVersionValidator::new(FileFormatVersions::OFFICE2010)
+            .validate(&mut context)
+            .unwrap();
+        assert!(context.errors().is_empty());
+        context.stack_mut().pop();
+    }
+
+    #[test]
+    fn number_total_digits() {
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:val", Some("12345".to_string()), true);
+        NumberValidator::new()
+            .with_total_digits(4)
+            .validate(&mut context)
+            .unwrap();
+        assert!(
+            context
+                .errors()
+                .iter()
+                .any(|e| e.message.contains("TotalDigits")),
+            "{:?}",
+            context.errors()
+        );
+        context.stack_mut().pop();
+
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:val", Some("1234".to_string()), true);
+        NumberValidator::new()
+            .with_total_digits(4)
             .validate(&mut context)
             .unwrap();
         assert!(context.errors().is_empty());
