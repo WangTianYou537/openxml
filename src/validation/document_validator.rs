@@ -142,6 +142,36 @@ impl DocumentValidator {
         // Schema pass (C# SchemaTypeValidator.Validate per element via traverser).
         validate_schema_types_in_tree(root, context)?;
 
+        // Structured particle walks for known package roots give richer paths
+        // (same constraints as per-element particle_for, nested with context).
+        let version = self.cache.version();
+        let structured: Vec<ValidationError> = match root.local_name.as_str() {
+            "document" => super::validate_word_particles_for_version(root, version),
+            "worksheet" | "workbook" => {
+                super::validate_spreadsheet_particles_for_version(root, version)
+            }
+            "sld" | "sldLayout" | "sldMaster" | "presentation" => {
+                super::validate_presentation_particles_for_version(root, version)
+            }
+            _ => Vec::new(),
+        };
+        // Dedup against errors already produced by the schema-type walk.
+        for error in structured {
+            let duplicate = context.errors().iter().any(|e| {
+                e.id() == error.id()
+                    && e.message == error.message
+                    && (e.path == error.path
+                        || e.path.ends_with(&error.path)
+                        || error.path.ends_with(&e.path))
+            });
+            if duplicate {
+                continue;
+            }
+            if !context.try_add_error(error)? {
+                return Ok(());
+            }
+        }
+
         // C# AlternateContentValidator + CompatibilityRuleAttributesValidator passes.
         let mut mc_errors = super::validate_alternate_content(root);
         mc_errors.extend(super::validate_mc_attributes(root));
@@ -524,5 +554,43 @@ mod tests {
         ));
         assert!(context.stack().is_empty());
         assert!(context.errors().is_empty());
+    }
+
+    #[test]
+    fn worksheet_root_uses_spreadsheet_particle_walk() {
+        let root = parse_element(
+            br#"<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+        )
+        .unwrap();
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&root, &mut context).unwrap();
+        assert!(
+            context.errors().iter().any(|e| {
+                e.message.contains("sheetData")
+                    || e.id() == Some("Sch_IncompleteContentExpectingComplex")
+            }),
+            "{:?}",
+            context.errors()
+        );
+    }
+
+    #[test]
+    fn slide_root_uses_presentation_particle_walk() {
+        let root = parse_element(
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        )
+        .unwrap();
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&root, &mut context).unwrap();
+        assert!(
+            context.errors().iter().any(|e| {
+                e.message.contains("cSld")
+                    || e.id() == Some("Sch_IncompleteContentExpectingComplex")
+            }),
+            "{:?}",
+            context.errors()
+        );
     }
 }
