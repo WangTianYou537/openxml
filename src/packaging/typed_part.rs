@@ -54,11 +54,14 @@ impl TypedPart {
 
     /// Whether this part is available in `version` (C# `OpenXmlPart.IsInVersion`).
     ///
-    /// Generated metadata does not currently carry introduction versions, so the
-    /// default is `true` for all known parts (matching C# base `OpenXmlPart`).
-    /// Extended/unknown custom parts should override via application logic.
-    pub fn is_in_version(&self, _version: crate::file_format::FileFormatVersions) -> bool {
-        true
+    /// Uses the relationship type year heuristic from
+    /// [`crate::packaging::relationship_introduced_in`] (same approach as
+    /// PackageValidator), so Office 2010+ relationships are rejected when
+    /// validating against Office 2007.
+    pub fn is_in_version(&self, version: crate::file_format::FileFormatVersions) -> bool {
+        let intro =
+            crate::packaging::relationship_introduced_in(self.info.relationship_type);
+        version.at_least(intro) || version.includes_introduction(intro)
     }
 
     /// Load and parse the part root element from the package.
@@ -341,6 +344,18 @@ mod tests {
         let info = part_by_name("MainDocumentPart").expect("MainDocumentPart");
         let part = TypedPart::new(info, PackUri::new("/word/document.xml"));
         assert!(part.is_in_version(FileFormatVersions::OFFICE2007));
+        assert!(part.is_in_version(FileFormatVersions::OFFICE2016));
+    }
+
+    #[test]
+    fn is_in_version_uses_relationship_year() {
+        use crate::file_format::FileFormatVersions;
+        use crate::generated::parts::part_by_name;
+        // 2011 relationship → Office2010 introduction.
+        let info = part_by_name("WordprocessingCommentsExPart").expect("CommentsEx");
+        let part = TypedPart::new(info, PackUri::new("/word/commentsExtended.xml"));
+        assert!(!part.is_in_version(FileFormatVersions::OFFICE2007));
+        assert!(part.is_in_version(FileFormatVersions::OFFICE2010));
         assert!(part.is_in_version(FileFormatVersions::OFFICE2016));
     }
 }

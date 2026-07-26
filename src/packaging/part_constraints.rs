@@ -32,7 +32,10 @@ pub fn relationship_introduced_in(relationship_type: &str) -> FileFormatVersions
     if relationship_type.contains("/2012/") {
         return FileFormatVersions::OFFICE2013;
     }
-    if relationship_type.contains("/2010/") || relationship_type.contains("/2009/") {
+    if relationship_type.contains("/2010/")
+        || relationship_type.contains("/2009/")
+        || relationship_type.contains("/2011/")
+    {
         return FileFormatVersions::OFFICE2010;
     }
     FileFormatVersions::OFFICE2007
@@ -312,6 +315,12 @@ mod tests {
                 "http://schemas.microsoft.com/office/2014/relationships/chartEx"
             ),
             FileFormatVersions::OFFICE2013
+        );
+        assert_eq!(
+            relationship_introduced_in(
+                "http://schemas.microsoft.com/office/2011/relationships/commentsExtended"
+            ),
+            FileFormatVersions::OFFICE2010
         );
     }
 
