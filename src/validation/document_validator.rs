@@ -116,7 +116,8 @@ impl DocumentValidator {
             }
         };
 
-        self.validate_element(&root, context)
+        self.validate_element(&root, context)?;
+        self.validate_part_semantic(package, part_uri, &root, context)
     }
 
     /// C# `Validate(ValidationContext)` — schema pass then constraint pass over
@@ -225,11 +226,37 @@ impl DocumentValidator {
         }
 
         // Constraint pass (C# element.Metadata.Constraints per element).
-        let mut constraint_errors = super::validate_schematron_numeric_ranges(root);
-        constraint_errors.extend(super::validate_schematron_string_lengths(root));
-        constraint_errors.extend(super::validate_schematron_enums(root));
-        for error in constraint_errors {
+        // Full extractable Schematron attribute/content table pass.
+        for error in super::validate_schematron_constraints(root) {
             if !context.try_add_error(error)? {
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    /// Package-aware constraint pass for a part root (relationships, uniqueness,
+    /// cross-part index/count) — C# semantic constraints that need part/package.
+    fn validate_part_semantic(
+        &self,
+        package: &OpcPackage,
+        part_uri: &PackUri,
+        root: &OpenXmlElement,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        let rel_rules = super::merged_relationship_rules(super::word_relationship_rules());
+        let unique_rules = super::merged_unique_attribute_rules(super::word_unique_attribute_rules());
+        for error in super::validate_semantic(package, part_uri, root, &rel_rules, &unique_rules) {
+            if !context.try_add_error(
+                error.with_error_type(ValidationErrorType::Semantic),
+            )? {
+                return Ok(());
+            }
+        }
+        for error in super::validate_schematron_cross_part(package, root) {
+            if !context.try_add_error(
+                error.with_error_type(ValidationErrorType::Semantic),
+            )? {
                 return Ok(());
             }
         }
@@ -317,6 +344,35 @@ mod tests {
             context.errors()
         );
         assert!(context.stack().is_empty());
+    }
+
+    #[test]
+    fn package_validation_reports_missing_relationship_ids() {
+        use crate::namespace::rel as rel_ns;
+
+        let mut package = OpcPackage::create();
+        let uri = PackUri::new("/word/document.xml");
+        package.set_part(
+            uri.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:hyperlink r:id="rIdMissing"/></w:p></w:body></w:document>"#.to_vec(),
+        );
+        package.add_package_relationship(rel::OFFICE_DOCUMENT, &uri, RelationshipTargetMode::Internal);
+        // No rIdMissing relationship on the part.
+
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_package(&package, &mut context).unwrap();
+        assert!(
+            context.errors().iter().any(|e| {
+                e.message.contains("rIdMissing")
+                    || e.description().contains("rIdMissing")
+                    || e.message.contains("does not exist")
+            }),
+            "{:?}",
+            context.errors()
+        );
+        let _ = rel_ns::HYPERLINK; // keep import used if needed later
     }
 
     #[test]

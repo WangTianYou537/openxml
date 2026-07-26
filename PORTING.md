@@ -947,6 +947,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Element-level semantic constraint shells: `SemanticConstraint` trait + `AttributeCannotOmit` / `MutualExclusive` / `ValueLength` / `ValueRange` / `ValueSet` / `RequiredConditionToValue` / `AbsentConditionToValue` / `MinMax` / `Pair` + `validate_element_constraints`
 - [x] Remaining attribute semantic constraints: `AttributeValuePatternConstraint` (lightweight regex subset), `AttributeValueLessEqualToAnother`, `AttributeAbsentConditionToNonValue`, `AttributeValueConditionToAnother`
 - [x] Part/package semantic constraints: `SemanticConstraintContext` + `validate_element_constraints_with_part`; `RelationshipExist` / `RelationshipType` / `UniqueAttributeValue` / `ParentType` / `ReferenceExist` / `IndexReference`
+- [x] `DocumentValidator` constraint pass runs full `validate_schematron_constraints`; part validation adds relationship/uniqueness + cross-part Schematron via `validate_part_semantic`
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
