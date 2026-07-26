@@ -65,9 +65,11 @@ pub enum Particle {
     /// XSD `xs:all` — treat as unordered choice-star of each item once (simplified: choice of items each optional, then require each min).
     All { items: Vec<Particle>, occurs: Occurs },
     /// Any element (wildcard) with a namespace mode (C# `AnyParticle` + `XsdAny`).
+    /// When `uri` is `Some`, matches only that namespace (`ParticleType::AnyWithUri`).
     Any {
         occurs: Occurs,
         namespace: XsdAnyNamespace,
+        uri: Option<String>,
     },
     /// Version-gated particle (C# `ParticleConstraint.Version` + `Build`).
     Versioned {
@@ -109,12 +111,18 @@ impl Particle {
         match self {
             Particle::Element { .. } => ParticleType::Element,
             Particle::All { .. } => ParticleType::All,
-            Particle::Any { namespace, .. } => match namespace {
-                XsdAnyNamespace::Any
-                | XsdAnyNamespace::Other
-                | XsdAnyNamespace::Local
-                | XsdAnyNamespace::TargetNamespace => ParticleType::Any,
-            },
+            Particle::Any { namespace, uri, .. } => {
+                if uri.is_some() {
+                    ParticleType::AnyWithUri
+                } else {
+                    match namespace {
+                        XsdAnyNamespace::Any
+                        | XsdAnyNamespace::Other
+                        | XsdAnyNamespace::Local
+                        | XsdAnyNamespace::TargetNamespace => ParticleType::Any,
+                    }
+                }
+            }
             Particle::Choice { .. } => ParticleType::Choice,
             Particle::Group { .. } => ParticleType::Group,
             Particle::Sequence { .. } => ParticleType::Sequence,
@@ -141,6 +149,11 @@ impl XsdAnyNamespace {
             XsdAnyNamespace::Other => !element_ns.is_empty() && element_ns != target_ns,
             XsdAnyNamespace::TargetNamespace => !element_ns.is_empty() && element_ns == target_ns,
         }
+    }
+
+    /// C# `XsdAnyExtensions.GetNamespaceString`.
+    pub fn namespace_string(self) -> &'static str {
+        self.token()
     }
 }
 
@@ -172,11 +185,25 @@ impl Particle {
         Particle::Any {
             occurs,
             namespace: XsdAnyNamespace::Any,
+            uri: None,
         }
     }
 
     pub fn any_with_namespace(occurs: Occurs, namespace: XsdAnyNamespace) -> Self {
-        Particle::Any { occurs, namespace }
+        Particle::Any {
+            occurs,
+            namespace,
+            uri: None,
+        }
+    }
+
+    /// C# `AnyParticle` with an explicit namespace URI (`ParticleType::AnyWithUri`).
+    pub fn any_with_uri(occurs: Occurs, uri: impl Into<String>) -> Self {
+        Particle::Any {
+            occurs,
+            namespace: XsdAnyNamespace::Any,
+            uri: Some(uri.into()),
+        }
     }
 
     /// Gate `inner` on `version` (C# particle `Version` property).
@@ -421,9 +448,13 @@ pub fn get_required_elements(particle: &Particle, result: &mut ExpectedChildren)
                 false
             }
         }
-        Particle::Any { occurs, namespace } => {
+        Particle::Any { occurs, namespace, uri } => {
             if occurs.min > 0 {
-                result.add_any_namespace(namespace.token());
+                if let Some(uri) = uri {
+                    result.add_any_namespace(uri.clone());
+                } else {
+                    result.add_any_namespace(namespace.token());
+                }
                 true
             } else {
                 false
@@ -471,8 +502,12 @@ pub fn get_expected_elements(particle: &Particle, result: &mut ExpectedChildren)
             result.add_element(local_name.clone());
             true
         }
-        Particle::Any { namespace, .. } => {
-            result.add_any_namespace(namespace.token());
+        Particle::Any { namespace, uri, .. } => {
+            if let Some(uri) = uri {
+                result.add_any_namespace(uri.clone());
+            } else {
+                result.add_any_namespace(namespace.token());
+            }
             true
         }
         Particle::Sequence { items, .. }
@@ -626,11 +661,15 @@ fn match_once(
                 errors: Vec::new(),
             }
         }
-        Particle::Any { namespace, .. } => {
-            if children
-                .get(start)
-                .is_some_and(|child| namespace.matches(child.namespace_uri.as_str(), target_ns))
-            {
+        Particle::Any { namespace, uri, .. } => {
+            let matches = children.get(start).is_some_and(|child| {
+                if let Some(uri) = uri {
+                    child.namespace_uri.as_str() == uri.as_str()
+                } else {
+                    namespace.matches(child.namespace_uri.as_str(), target_ns)
+                }
+            });
+            if matches {
                 MatchResult {
                     consumed: 1,
                     errors: Vec::new(),
@@ -1261,6 +1300,21 @@ mod tests {
             &mut expected,
         );
         assert_eq!(expected.any_namespaces(), &[String::from("##other")]);
+
+        // AnyWithUri matches only the specified namespace URI.
+        let uri = "urn:custom";
+        let particle = Particle::any_with_uri(Occurs::ONE, uri);
+        assert_eq!(particle.particle_type(), ParticleType::AnyWithUri);
+        let parent = OpenXmlElement::new("w", w_ns, "container")
+            .with_child(OpenXmlElement::new("x", uri, "inner"));
+        assert!(validate_particle(&parent, &particle, "container").is_empty());
+        let parent_wrong = OpenXmlElement::new("w", w_ns, "container")
+            .with_child(OpenXmlElement::new("x", "urn:other", "inner"));
+        assert!(!validate_particle(&parent_wrong, &particle, "container").is_empty());
+        let mut expected = ExpectedChildren::new();
+        get_expected_elements(&particle, &mut expected);
+        assert_eq!(expected.any_namespaces(), &[String::from("urn:custom")]);
+        assert_eq!(XsdAnyNamespace::Other.namespace_string(), "##other");
     }
 
     #[test]

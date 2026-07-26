@@ -3,7 +3,7 @@
 //! Not a full XSD type system — covers common simple-type checks used when
 //! wiring schema attribute metadata to runtime values.
 
-use super::ValidationError;
+use super::{ValidationError, XsdType};
 use crate::element::OpenXmlElement;
 use crate::markup_compatibility::McContext;
 use crate::simple_types::{
@@ -39,46 +39,41 @@ pub fn validate_leaf_content(element: &OpenXmlElement, path: &str) -> Vec<Valida
 }
 
 fn attribute_value_type_error(type_name: &str, value: &str) -> Option<&'static str> {
-    let ok = match type_name {
-        "HexBinaryValue" => {
-            !value.is_empty()
-                && value.len() % 2 == 0
-                && value.chars().all(|c| c.is_ascii_hexdigit())
-        }
-        "Base64BinaryValue" => value.chars().all(|c| {
-            c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || c.is_ascii_whitespace()
-        }),
-        "Int32Value" => value.parse::<i32>().is_ok(),
-        "UInt32Value" => value.parse::<u32>().is_ok(),
-        "Int16Value" => value.parse::<i16>().is_ok(),
-        "UInt16Value" => value.parse::<u16>().is_ok(),
-        "ByteValue" => value.parse::<u8>().is_ok(),
-        "IntegerValue" => value.parse::<i64>().is_ok(),
-        "OnOffValue" => matches!(value, "true" | "false" | "1" | "0" | "on" | "off"),
-        "DateTimeValue" => {
-            // xsd:dateTime shape: YYYY-MM-DD… with a time separator.
-            value.len() >= 10
-                && value.as_bytes()[4] == b'-'
-                && value.as_bytes()[7] == b'-'
-                && value[..4].chars().all(|c| c.is_ascii_digit())
-        }
-        _ => true, // StringValue / EnumValue: no lexical restriction here
+    let Some(xsd_type) = XsdType::from_type_name(type_name) else {
+        return None; // unknown type names: no lexical restriction
     };
-    if ok {
-        None
-    } else {
-        Some(match type_name {
-            "HexBinaryValue" => " The value must be a hexadecimal number with an even number of digits.",
-            "Base64BinaryValue" => " The value must be base64 encoded.",
-            "Int32Value" | "Int16Value" | "IntegerValue" => " The value must be an integer.",
-            "UInt32Value" | "UInt16Value" | "ByteValue" => {
-                " The value must be a non-negative integer."
-            }
-            "OnOffValue" => " The value must be one of: true, false, 1, 0, on, off.",
-            "DateTimeValue" => " The value must be an xsd:dateTime.",
-            _ => "",
-        })
+    if xsd_type.validate_lexical(value) {
+        return None;
     }
+    Some(match xsd_type {
+        XsdType::HexBinary => {
+            " The value must be a hexadecimal number with an even number of digits."
+        }
+        XsdType::Base64Binary => " The value must be base64 encoded.",
+        XsdType::Integer
+        | XsdType::Long
+        | XsdType::Int
+        | XsdType::Short
+        | XsdType::Byte
+        | XsdType::PositiveInteger
+        | XsdType::NegativeInteger
+        | XsdType::NonPositiveInteger => " The value must be an integer.",
+        XsdType::NonNegativeInteger
+        | XsdType::UnsignedLong
+        | XsdType::UnsignedInt
+        | XsdType::UnsignedShort
+        | XsdType::UnsignedByte => " The value must be a non-negative integer.",
+        XsdType::Boolean | XsdType::SpecialBoolean => {
+            " The value must be one of: true, false, 1, 0, on, off."
+        }
+        XsdType::DateTime | XsdType::Date => " The value must be an xsd:dateTime.",
+        XsdType::Token => " The value must be a valid xsd:token.",
+        XsdType::QName => " The value must be a valid QName.",
+        XsdType::NCName => " The value must be a valid NCName.",
+        XsdType::AnyURI => " The value must be a valid anyURI.",
+        XsdType::Decimal | XsdType::Float | XsdType::Double => " The value must be a number.",
+        _ => " The value is invalid for its simple type.",
+    })
 }
 
 /// C# `SchemaTypeValidator.ValidateValue` for declared attributes: lexical

@@ -127,6 +127,8 @@ impl DocumentValidator {
         root: &OpenXmlElement,
         context: &mut ValidationContext,
     ) -> Result<()> {
+        // Keep context cache version aligned with this validator's cache.
+        context.cache_mut().set_version(self.cache.version());
         if root.is_misc_node() || root.is_unknown() {
             return Ok(());
         }

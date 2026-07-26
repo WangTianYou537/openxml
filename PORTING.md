@@ -949,6 +949,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Part/package semantic constraints: `SemanticConstraintContext` + `validate_element_constraints_with_part`; `RelationshipExist` / `RelationshipType` / `UniqueAttributeValue` / `ParentType` / `ReferenceExist` / `IndexReference`
 - [x] `DocumentValidator` constraint pass runs full `validate_schematron_constraints`; part validation adds relationship/uniqueness + cross-part Schematron via `validate_part_semantic`
 - [x] `XsdType` + `ParticleType` enums; `ValidationCache::get_constraint` version-builds/memos Word particles; DocumentValidator prefers cache for non-document roots
+- [x] Attribute lexical checks route through `XsdType::validate_lexical`; `Particle::Any` supports `AnyWithUri` + `any_with_uri` constructor; `XsdAnyNamespace::namespace_string`
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
