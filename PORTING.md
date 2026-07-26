@@ -1034,6 +1034,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Modern comments/slicers: `commentsIds` / `commentsExtensible` / `ThreadedComments` / `slicers` / `slicerCacheDefinition`
 - [x] Timelines/named views/authors: `timelines` / `timelineCacheDefinition` / `namedSheetViews` / `personList` / `authorLst`
 - [x] Form control/datastore/sort map/chart styles: `formControlPr` / `datastoreItem` / `worksheetSortMap` / `colorStyle` / `chartStyle`
+- [x] Package/UI particles: `coreProperties` / `Properties` / `customUI` / `webextension` / `taskpanes` / `macrosheet`
 
 **Still intentionally deferred / partial:**
 

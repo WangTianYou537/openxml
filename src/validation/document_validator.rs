@@ -181,7 +181,8 @@ impl DocumentValidator {
             | "personList"
             | "formControlPr"
             | "datastoreItem"
-            | "worksheetSortMap" => {
+            | "worksheetSortMap"
+            | "macrosheet" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
@@ -213,6 +214,19 @@ impl DocumentValidator {
             | "colorStyle"
             | "chartStyle" => {
                 super::validate_drawing_particles_for_version(root, version)
+            }
+            // Package / app / ribbon / web extension roots.
+            "coreProperties" | "Properties" | "customUI" | "webextension" | "taskpanes" => {
+                if let Some(particle) = super::particle_for(&root.local_name) {
+                    super::validate_particle_for_version(
+                        root,
+                        &particle,
+                        &root.qualified_name(),
+                        version,
+                    )
+                } else {
+                    Vec::new()
+                }
             }
             // Other Word part roots: single-root particle via registry.
             "styles" | "numbering" | "fonts" | "comments" | "footnotes" | "endnotes"

@@ -1675,6 +1675,26 @@ pub mod spreadsheet {
         )
     }
 
+    /// `<xne:macrosheet>` Excel macrosheet part root (subset of worksheet children).
+    pub fn macrosheet() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("sheetPr", Occurs::OPTIONAL),
+                Particle::element("dimension", Occurs::OPTIONAL),
+                Particle::element("sheetViews", Occurs::OPTIONAL),
+                Particle::element("sheetFormatPr", Occurs::OPTIONAL),
+                Particle::element("cols", Occurs::STAR),
+                Particle::element("sheetData", Occurs::OPTIONAL),
+                Particle::element("sheetProtection", Occurs::OPTIONAL),
+                Particle::element("autoFilter", Occurs::OPTIONAL),
+                Particle::element("drawing", Occurs::OPTIONAL),
+                Particle::element("legacyDrawing", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1716,6 +1736,7 @@ pub mod spreadsheet {
             "formControlPr" => form_control_properties(),
             "datastoreItem" => datastore_item(),
             "worksheetSortMap" => worksheet_sort_map(),
+            "macrosheet" => macrosheet(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -2136,6 +2157,99 @@ pub fn particle_for(local_name: &str) -> Option<Particle> {
         .or_else(|| spreadsheet::particle_for(local_name))
         .or_else(|| presentation::particle_for(local_name))
         .or_else(|| drawing::particle_for(local_name))
+        .or_else(|| package::particle_for(local_name))
+}
+
+/// Package / app / custom UI / web extension part-root particles.
+pub mod package {
+    use super::{Occurs, Particle};
+
+    /// `<cp:coreProperties>` core file properties part root.
+    pub fn core_properties() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("title", Occurs::ONE),
+                Particle::element("subject", Occurs::ONE),
+                Particle::element("creator", Occurs::ONE),
+                Particle::element("keywords", Occurs::ONE),
+                Particle::element("description", Occurs::ONE),
+                Particle::element("lastModifiedBy", Occurs::ONE),
+                Particle::element("revision", Occurs::ONE),
+                Particle::element("category", Occurs::ONE),
+                Particle::element("contentStatus", Occurs::ONE),
+                Particle::element("language", Occurs::ONE),
+                Particle::element("version", Occurs::ONE),
+                Particle::element("created", Occurs::ONE),
+                Particle::element("modified", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<ap:Properties>` / `<op:Properties>` extended/custom file properties.
+    pub fn properties() -> Particle {
+        // Many optional property children; accept any order of known leaves.
+        Particle::choice(
+            vec![
+                Particle::element("Template", Occurs::ONE),
+                Particle::element("Manager", Occurs::ONE),
+                Particle::element("Company", Occurs::ONE),
+                Particle::element("Pages", Occurs::ONE),
+                Particle::element("Words", Occurs::ONE),
+                Particle::element("Characters", Occurs::ONE),
+                Particle::element("Application", Occurs::ONE),
+                Particle::element("AppVersion", Occurs::ONE),
+                Particle::element("DocSecurity", Occurs::ONE),
+                Particle::element("property", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<mso:customUI>` / `<mso14:customUI>` ribbon customization root.
+    pub fn custom_ui() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("commands", Occurs::OPTIONAL),
+                Particle::element("ribbon", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<we:webextension>` Office web extension part root.
+    pub fn web_extension() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("reference", Occurs::OPTIONAL),
+                Particle::element("alternateReferences", Occurs::OPTIONAL),
+                Particle::element("properties", Occurs::OPTIONAL),
+                Particle::element("bindings", Occurs::OPTIONAL),
+                Particle::element("snapshot", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<wetp:taskpanes>` web extension taskpanes part root.
+    pub fn taskpanes() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("taskpane", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn particle_for(local_name: &str) -> Option<Particle> {
+        Some(match local_name {
+            "coreProperties" => core_properties(),
+            "Properties" => properties(),
+            "customUI" => custom_ui(),
+            "webextension" => web_extension(),
+            "taskpanes" => taskpanes(),
+            _ => return None,
+        })
+    }
 }
 
 /// Recursively validate a Word document using ordered particles.
@@ -2604,6 +2718,15 @@ pub fn validate_spreadsheet_particles_for_version(
                 root,
                 &spreadsheet::worksheet_sort_map(),
                 "xne:worksheetSortMap",
+                &context,
+                &root_mc,
+            ));
+        }
+        "macrosheet" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::macrosheet(),
+                "xne:macrosheet",
                 &context,
                 &root_mc,
             ));
@@ -3994,6 +4117,68 @@ mod tests {
             &drawing::color_style(),
             "cs:colorStyle",
             FileFormatVersions::OFFICE2013,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn package_ui_and_macrosheet_roots() {
+        assert!(package::particle_for("coreProperties").is_some());
+        assert!(package::particle_for("Properties").is_some());
+        assert!(package::particle_for("customUI").is_some());
+        assert!(package::particle_for("webextension").is_some());
+        assert!(package::particle_for("taskpanes").is_some());
+        assert!(spreadsheet::particle_for("macrosheet").is_some());
+        assert!(crate::validation::particle::particle_for("coreProperties").is_some());
+        assert!(crate::validation::particle::particle_for("customUI").is_some());
+
+        let mut core = crate::element::OpenXmlElement::new(
+            "cp",
+            "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+            "coreProperties",
+        );
+        core.append_child(crate::element::OpenXmlElement::new(
+            "dc",
+            "http://purl.org/dc/elements/1.1/",
+            "title",
+        ).with_text("T"));
+        let errs = validate_particle_for_version(
+            &core,
+            &package::core_properties(),
+            "cp:coreProperties",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut ui = crate::element::OpenXmlElement::new(
+            "mso",
+            "http://schemas.microsoft.com/office/2006/01/customui",
+            "customUI",
+        );
+        ui.append_child(crate::element::OpenXmlElement::new(
+            "mso",
+            "http://schemas.microsoft.com/office/2006/01/customui",
+            "ribbon",
+        ));
+        let errs = validate_particle_for_version(
+            &ui,
+            &package::custom_ui(),
+            "mso:customUI",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut macro_sheet = crate::element::OpenXmlElement::new(
+            "xne",
+            "http://schemas.microsoft.com/office/excel/2006/main",
+            "macrosheet",
+        );
+        macro_sheet.append_child(crate::element::OpenXmlElement::x("sheetData"));
+        let errs = validate_particle_for_version(
+            &macro_sheet,
+            &spreadsheet::macrosheet(),
+            "xne:macrosheet",
+            FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");
     }
