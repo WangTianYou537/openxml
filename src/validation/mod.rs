@@ -47,8 +47,9 @@ pub use validation_cache::ValidationCache;
 pub use validation_context::{ValidationCancellationToken, ValidationChild, ValidationContext};
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};
 pub use particle::{
-    validate_particle, validate_particle_for_version, validate_word_particles,
-    validate_word_particles_for_version, Occurs, Particle,
+    get_expected_elements, get_required_elements, validate_particle,
+    validate_particle_for_version, validate_word_particles, validate_word_particles_for_version,
+    ExpectedChildren, Occurs, Particle, ParticleMatch, ParticleMatchInfo,
 };
 pub use schematron_constraints::{
     schematron_ancestor_unique_rules, schematron_attr_compare_rules,

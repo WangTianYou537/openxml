@@ -157,6 +157,208 @@ struct MatchResult {
     errors: Vec<String>,
 }
 
+/// Particle match result (C# `ParticleMatch`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParticleMatch {
+    #[default]
+    Nomatch,
+    Partial,
+    Matched,
+}
+
+/// Expected children collected for error reporting (C# `ExpectedChildren`).
+#[derive(Debug, Clone, Default)]
+pub struct ExpectedChildren {
+    elements: Vec<String>,
+    xsd_any_namespaces: Vec<String>,
+}
+
+impl ExpectedChildren {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a known child element name (C# `Add(OpenXmlSchemaType)`).
+    pub fn add_element(&mut self, name: impl Into<String>) {
+        self.elements.push(name.into());
+    }
+
+    /// Add the namespace of an `xsd:any` child (C# `Add(string)`).
+    pub fn add_any_namespace(&mut self, namespace_uri: impl Into<String>) {
+        self.xsd_any_namespaces.push(namespace_uri.into());
+    }
+
+    /// Merge all entries from another set (C# `Add(ExpectedChildren)`).
+    pub fn add_all(&mut self, other: &ExpectedChildren) {
+        self.elements.extend(other.elements.iter().cloned());
+        self.xsd_any_namespaces
+            .extend(other.xsd_any_namespaces.iter().cloned());
+    }
+
+    pub fn count(&self) -> usize {
+        self.elements.len() + self.xsd_any_namespaces.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count() == 0
+    }
+
+    pub fn clear(&mut self) {
+        self.elements.clear();
+        self.xsd_any_namespaces.clear();
+    }
+
+    pub fn elements(&self) -> &[String] {
+        &self.elements
+    }
+
+    pub fn any_namespaces(&self) -> &[String] {
+        &self.xsd_any_namespaces
+    }
+
+    /// C# `GetExpectedChildrenMessage` — `" List of possible elements expected: <a>,<b>."`.
+    pub fn expected_children_message(&self) -> String {
+        if self.is_empty() {
+            return String::new();
+        }
+        let mut names: Vec<String> = self
+            .elements
+            .iter()
+            .map(|name| format!("<{name}>"))
+            .collect();
+        names.extend(
+            self.xsd_any_namespaces
+                .iter()
+                .map(|ns| format!("any element in namespace '{ns}'")),
+        );
+        format!(" List of possible elements expected: {}.", names.join(","))
+    }
+}
+
+/// Match bookkeeping for one particle-match attempt (C# `ParticleMatchInfo`).
+#[derive(Debug, Clone, Default)]
+pub struct ParticleMatchInfo {
+    pub match_result: ParticleMatch,
+    pub start_element: Option<String>,
+    pub last_matched_element: Option<String>,
+    pub error_message: Option<String>,
+    expected_children: ExpectedChildren,
+}
+
+impl ParticleMatchInfo {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_start_element(start_element: impl Into<String>) -> Self {
+        Self {
+            start_element: Some(start_element.into()),
+            ..Self::default()
+        }
+    }
+
+    pub fn expected_children(&self) -> &ExpectedChildren {
+        &self.expected_children
+    }
+
+    pub fn expected_children_mut(&mut self) -> &mut ExpectedChildren {
+        &mut self.expected_children
+    }
+
+    /// Replace the expected-children set (C# `SetExpectedChildren`).
+    pub fn set_expected_children(&mut self, expected: &ExpectedChildren) {
+        self.expected_children.clear();
+        if !expected.is_empty() {
+            self.expected_children.add_all(expected);
+        }
+    }
+
+    /// C# `Reset(startElement)` — keep the allocation, clear the state.
+    pub fn reset(&mut self, start_element: Option<&str>) {
+        self.start_element = start_element.map(str::to_string);
+        self.match_result = ParticleMatch::Nomatch;
+        self.last_matched_element = None;
+        self.error_message = None;
+        self.expected_children.clear();
+    }
+}
+
+/// Elements with `minOccurs > 0` in this particle (C# `GetRequiredElements`).
+pub fn get_required_elements(particle: &Particle, result: &mut ExpectedChildren) -> bool {
+    match particle {
+        Particle::Element { local_name, occurs } => {
+            if occurs.min > 0 {
+                result.add_element(local_name.clone());
+                true
+            } else {
+                false
+            }
+        }
+        Particle::Any { occurs } => {
+            if occurs.min > 0 {
+                result.add_any_namespace("##any");
+                true
+            } else {
+                false
+            }
+        }
+        Particle::Choice { items, occurs } => {
+            // C# ChoiceParticleValidator: required only when every alternative is required.
+            if occurs.min == 0 {
+                return false;
+            }
+            let mut choice_children = ExpectedChildren::new();
+            let mut required = !items.is_empty();
+            for item in items {
+                if !get_required_elements(item, &mut choice_children) {
+                    required = false;
+                }
+            }
+            if required {
+                result.add_all(&choice_children);
+            }
+            required
+        }
+        Particle::Sequence { items, occurs }
+        | Particle::Group { items, occurs }
+        | Particle::All { items, occurs } => {
+            if occurs.min == 0 {
+                return false;
+            }
+            let mut required = false;
+            for item in items {
+                if get_required_elements(item, result) {
+                    required = true;
+                }
+            }
+            required
+        }
+    }
+}
+
+/// All elements this particle may start with (C# `GetExpectedElements`).
+pub fn get_expected_elements(particle: &Particle, result: &mut ExpectedChildren) -> bool {
+    match particle {
+        Particle::Element { local_name, .. } => {
+            result.add_element(local_name.clone());
+            true
+        }
+        Particle::Any { .. } => {
+            result.add_any_namespace("##any");
+            true
+        }
+        Particle::Sequence { items, .. }
+        | Particle::Choice { items, .. }
+        | Particle::Group { items, .. }
+        | Particle::All { items, .. } => {
+            for item in items {
+                get_expected_elements(item, result);
+            }
+            true
+        }
+    }
+}
+
 /// Validate that `element`'s children match `particle` in order.
 pub fn validate_particle(
     element: &OpenXmlElement,
@@ -200,12 +402,18 @@ fn validate_particle_with_context(
 
     if result.consumed < children.len() {
         let extra = children[result.consumed];
+        let mut message = format!(
+            "unexpected child `<{}>` at position {} under `<{}>` (particle mismatch)",
+            extra.local_name, result.consumed, element.local_name
+        );
+        if context.collect_expected_children {
+            let mut expected = ExpectedChildren::new();
+            get_expected_elements(particle, &mut expected);
+            message.push_str(&expected.expected_children_message());
+        }
         errors.push(ValidationError {
             path: format!("{path}/{}", extra.local_name),
-            message: format!(
-                "unexpected child `<{}>` at position {} under `<{}>` (particle mismatch)",
-                extra.local_name, result.consumed, element.local_name
-            ),
+            message,
             ..Default::default()
         });
     }
@@ -769,5 +977,120 @@ mod tests {
         let doc = document(vec![body(vec![])]);
         let errs = validate_particle(&doc, &p, "w:document");
         assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn expected_children_message_and_merge() {
+        let mut expected = ExpectedChildren::new();
+        assert!(expected.is_empty());
+        assert_eq!(expected.expected_children_message(), "");
+
+        expected.add_element("w:background");
+        expected.add_element("w:body");
+        expected.add_any_namespace("urn:custom");
+        assert_eq!(expected.count(), 3);
+        assert_eq!(
+            expected.expected_children_message(),
+            " List of possible elements expected: <w:background>,<w:body>,any element in namespace 'urn:custom'."
+        );
+
+        let mut merged = ExpectedChildren::new();
+        merged.add_all(&expected);
+        assert_eq!(merged.count(), 3);
+        merged.clear();
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn required_and_expected_elements_from_particles() {
+        let particle = word::document();
+        let mut required = ExpectedChildren::new();
+        assert!(get_required_elements(&particle, &mut required));
+        assert_eq!(required.elements(), &[String::from("body")]);
+
+        let mut expected = ExpectedChildren::new();
+        assert!(get_expected_elements(&particle, &mut expected));
+        assert_eq!(
+            expected.elements(),
+            &[String::from("background"), String::from("body")]
+        );
+
+        // Choice is required only when every alternative is required.
+        let optional_choice = Particle::choice(
+            vec![
+                Particle::element("a", Occurs::ONE),
+                Particle::element("b", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        );
+        let mut required = ExpectedChildren::new();
+        assert!(!get_required_elements(&optional_choice, &mut required));
+        assert!(required.is_empty());
+
+        let required_choice = Particle::choice(
+            vec![
+                Particle::element("a", Occurs::ONE),
+                Particle::element("b", Occurs::ONE),
+            ],
+            Occurs::ONE,
+        );
+        let mut required = ExpectedChildren::new();
+        assert!(get_required_elements(&required_choice, &mut required));
+        assert_eq!(required.elements(), &["a", "b"]);
+    }
+
+    #[test]
+    fn particle_match_info_reset_and_expected_children() {
+        let mut info = ParticleMatchInfo::with_start_element("w:p");
+        assert_eq!(info.match_result, ParticleMatch::Nomatch);
+        info.match_result = ParticleMatch::Partial;
+        info.last_matched_element = Some("w:r".into());
+        info.error_message = Some("bad".into());
+
+        let mut expected = ExpectedChildren::new();
+        expected.add_element("w:t");
+        info.set_expected_children(&expected);
+        assert_eq!(info.expected_children().count(), 1);
+
+        info.reset(Some("w:tbl"));
+        assert_eq!(info.start_element.as_deref(), Some("w:tbl"));
+        assert_eq!(info.match_result, ParticleMatch::Nomatch);
+        assert!(info.last_matched_element.is_none());
+        assert!(info.error_message.is_none());
+        assert!(info.expected_children().is_empty());
+    }
+
+    #[test]
+    fn mismatch_error_appends_expected_children_when_collected() {
+        let mut context = ValidationContext::new(ValidationSettings::new(
+            FileFormatVersions::OFFICE2007,
+        ));
+        let doc = document(vec![body(vec![])]);
+        let mut bad = doc.clone();
+        bad.append_child(crate::element::OpenXmlElement::w("unexpected"));
+
+        let plain = validate_particle_with_context(
+            &bad,
+            &word::document(),
+            "w:document",
+            &context,
+            &McContext::new(),
+        );
+        assert!(plain[0].message.ends_with("(particle mismatch)"), "{plain:?}");
+
+        context.set_collect_expected_children(true);
+        let collected = validate_particle_with_context(
+            &bad,
+            &word::document(),
+            "w:document",
+            &context,
+            &McContext::new(),
+        );
+        assert!(
+            collected[0]
+                .message
+                .contains(" List of possible elements expected: <background>,<body>."),
+            "{collected:?}"
+        );
     }
 }

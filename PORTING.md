@@ -931,6 +931,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `DocumentValidator` orchestration: package frame + structure errors, reachable-part walk, per-part schema/constraint passes, `Sch_MissingPartRootElement` for empty XML parts, `ExceptionError` for malformed XML, cancellation-aware
 - [x] `OpenXmlValidator` document APIs: `validate_document_package/part/dom_element` (+`_with_token`) with MC process-settings version-mismatch guard and reserved-element rejection
 - [x] `DocumentValidator` schema pass includes `AlternateContentValidator` + `CompatibilityRuleAttributesValidator` (MC structural/attribute errors typed MarkupCompatibility)
+- [x] `ExpectedChildren` (elements + xsd:any namespaces, merge/count/clear, `Fmt_ListOfPossibleElements` message) + `ParticleMatch` / `ParticleMatchInfo` shells
+- [x] Particle `get_required_elements` / `get_expected_elements` walks (Choice requires all alternatives); mismatch errors append expected-children list under `CollectExpectedChildren`
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
