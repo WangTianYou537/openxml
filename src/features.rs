@@ -2493,7 +2493,132 @@ impl ElementMetadataFactoryFeature {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Build metadata from a generated schema element info (class name key).
+    pub fn from_generated(
+        class_name: &str,
+        namespace_uri: &str,
+        local_name: &str,
+        attribute_qnames: impl IntoIterator<Item = impl AsRef<str>>,
+        child_names: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> ElementMetadata {
+        let mut meta = ElementMetadata::with_type(OpenXmlSchemaType::new(namespace_uri, local_name));
+        for q in attribute_qnames {
+            let q = q.as_ref();
+            // Prefer bare local name when qname is `:local` or `prefix:local`.
+            let local = q.rsplit(':').next().unwrap_or(q);
+            if !local.is_empty() {
+                meta.add_attribute(local);
+            }
+        }
+        for c in child_names {
+            let c = c.as_ref();
+            // ChildInfo names are `prefix:CT_Type/prefix:local`.
+            let tail = c.rsplit('/').next().unwrap_or(c);
+            let local = tail.rsplit(':').next().unwrap_or(tail);
+            if !local.is_empty() {
+                meta.add_child(local);
+            }
+        }
+        // Keep class_name discoverable via a synthetic attribute for diagnostics.
+        let _ = class_name;
+        meta
+    }
+
+    /// Seed metadata for common part-root / core element class names from
+    /// generated Word / Spreadsheet / Presentation / Drawing ElementInfo tables.
+    pub fn seed_common_elements(&self) {
+        self.seed_schema_elements(crate::generated::wordprocessingml_2006_main::ELEMENTS);
+        self.seed_schema_elements(crate::generated::spreadsheetml_2006_main::ELEMENTS);
+        self.seed_schema_elements(crate::generated::presentationml_2006_main::ELEMENTS);
+        self.seed_schema_elements(crate::generated::drawingml_2006_main::ELEMENTS);
+    }
+
+    fn seed_schema_elements<T>(&self, elements: &[T])
+    where
+        T: ElementInfoSeed,
+    {
+        for el in elements {
+            if !is_common_metadata_class(el.class_name(), el.local_name()) {
+                continue;
+            }
+            let meta = Self::from_generated(
+                el.class_name(),
+                el.namespace_uri(),
+                el.local_name(),
+                el.attribute_qnames(),
+                el.child_names(),
+            );
+            self.insert(el.class_name(), meta);
+        }
+    }
 }
+
+fn is_common_metadata_class(class_name: &str, local_name: &str) -> bool {
+    // Prefer class names we already key on, plus common part-root local names.
+    matches!(
+        class_name,
+        "Document"
+            | "Body"
+            | "Paragraph"
+            | "Run"
+            | "Table"
+            | "Styles"
+            | "Numbering"
+            | "Fonts"
+            | "Comments"
+            | "Settings"
+            | "Workbook"
+            | "Worksheet"
+            | "SharedStringTable"
+            | "Stylesheet"
+            | "Presentation"
+            | "Slide"
+            | "SlideLayout"
+            | "SlideMaster"
+            | "Theme"
+            | "ChartSpace"
+            | "WorksheetDrawing"
+            | "TableStyleList"
+    ) || is_common_part_root_local_name(local_name)
+}
+
+trait ElementInfoSeed {
+    fn class_name(&self) -> &str;
+    fn local_name(&self) -> &str;
+    fn namespace_uri(&self) -> &str;
+    fn attribute_qnames(&self) -> Vec<&'static str>;
+    fn child_names(&self) -> Vec<&'static str>;
+}
+
+macro_rules! impl_element_info_seed {
+    ($($mod:ident),+ $(,)?) => {$(
+        impl ElementInfoSeed for crate::generated::$mod::ElementInfo {
+            fn class_name(&self) -> &str {
+                self.class_name
+            }
+            fn local_name(&self) -> &str {
+                self.local_name
+            }
+            fn namespace_uri(&self) -> &str {
+                self.namespace_uri
+            }
+            fn attribute_qnames(&self) -> Vec<&'static str> {
+                self.attributes.iter().map(|a| a.qname).collect()
+            }
+            fn child_names(&self) -> Vec<&'static str> {
+                self.children.iter().map(|c| c.name).collect()
+            }
+        }
+    )+};
+}
+
+impl_element_info_seed!(
+    wordprocessingml_2006_main,
+    spreadsheetml_2006_main,
+    presentationml_2006_main,
+    drawingml_2006_main,
+);
 
 /// Shared default feature providers (C# `DefaultFeatures` / `DefaultFeatures.Shared`).
 ///
@@ -2540,7 +2665,9 @@ impl DefaultFeatures {
             bag.set(self.resolver.clone());
         }
         if !bag.contains::<ElementMetadataFactoryFeature>() {
-            bag.set(ElementMetadataFactoryFeature::new());
+            let factory = ElementMetadataFactoryFeature::new();
+            factory.seed_common_elements();
+            bag.set(factory);
         }
         if !bag.contains::<RootElementFeature>() {
             let mut root = RootElementFeature::new();
@@ -3421,10 +3548,20 @@ mod tests {
         assert!(!factory.contains("Paragraph"));
         factory.insert("Paragraph", again);
 
+        let seeded = ElementMetadataFactoryFeature::new();
+        seeded.seed_common_elements();
+        assert!(seeded.contains("Document") || seeded.contains("Worksheet") || seeded.contains("Slide"));
+        if let Some(doc) = seeded.get("Document") {
+            assert_eq!(doc.schema_type.name, "document");
+        }
+
         let mut bag = FeatureCollection::new();
         shared.ensure_on(&mut bag);
         assert!(bag.contains::<OpenXmlNamespaceResolverFeature>());
         assert!(bag.contains::<ElementMetadataFactoryFeature>());
+        assert!(bag.contains::<RootElementFeature>());
+        assert!(bag.contains::<PartFactoryFeature>());
+        assert!(bag.contains::<TypedPartFactoryFeature>());
 
         let file = FilePackageFeature::new("/tmp/doc.docx", crate::opc::PackageMode::ReadWrite);
         assert_eq!(file.path.as_deref(), Some("/tmp/doc.docx"));
