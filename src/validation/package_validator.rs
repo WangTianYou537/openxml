@@ -43,6 +43,85 @@ impl OpenXmlPackageValidationResult {
         }
     }
 
+    /// C# `DocumentValidator.GetPartNameAndUri` — `"PartClass{/uri}"` shell.
+    ///
+    /// When `part_name` is empty, returns just `{uri}`.
+    pub fn part_name_and_uri(part_name: &str, uri: &str) -> String {
+        if part_name.is_empty() {
+            format!("{{{uri}}}")
+        } else {
+            format!("{part_name}{{{uri}}}")
+        }
+    }
+
+    /// Convert to a package [`ValidationError`] with the `Pkg_` MessageId prefix
+    /// and ValidationResources description (C# `ValidatePackageStructure` mapping).
+    pub fn into_pkg_validation_error(self) -> ValidationError {
+        let bare_id = self
+            .message_id
+            .as_deref()
+            .unwrap_or("PackageValidation");
+        let pkg_id = if bare_id.starts_with("Pkg_") {
+            bare_id.to_string()
+        } else {
+            format!("Pkg_{bare_id}")
+        };
+
+        let part = self
+            .part_uri
+            .as_deref()
+            .map(|u| Self::part_name_and_uri("", u))
+            .unwrap_or_default();
+        let sub = self
+            .sub_part_uri
+            .as_deref()
+            .map(|u| Self::part_name_and_uri("", u))
+            .or_else(|| self.relationship_type.clone())
+            .unwrap_or_default();
+
+        let description = match bare_id.strip_prefix("Pkg_").unwrap_or(bare_id) {
+            message_id::PART_IS_NOT_ALLOWED => super::format_validation_resource(
+                "Pkg_PartIsNotAllowed",
+                &[&part, &sub],
+            ),
+            message_id::REQUIRED_PART_DO_NOT_EXIST => super::format_validation_resource(
+                "Pkg_RequiredPartDoNotExist",
+                &[self.relationship_type.as_deref().unwrap_or(sub.as_str())],
+            ),
+            message_id::ONLY_ONE_PART_ALLOWED => super::format_validation_resource(
+                "Pkg_OnlyOnePartAllowed",
+                &[&part, self.relationship_type.as_deref().unwrap_or(sub.as_str())],
+            ),
+            message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED => super::format_validation_resource(
+                "Pkg_DataPartReferenceIsNotAllowed",
+                &[&part, self.relationship_type.as_deref().unwrap_or(sub.as_str())],
+            ),
+            message_id::INVALID_CONTENT_TYPE_PART => {
+                // C# asserts this path is unused; keep the original detail.
+                None
+            }
+            _ => None,
+        }
+        .unwrap_or_else(|| {
+            // Fall back to existing message detail after `Id: `.
+            self.message
+                .split_once(':')
+                .map(|(_, d)| d.trim().to_string())
+                .unwrap_or(self.message.clone())
+        });
+
+        let mut err = ValidationError {
+            path: self.part_uri.clone().unwrap_or_default(),
+            message: format!("{pkg_id}: {description}"),
+            ..Default::default()
+        }
+        .with_error_type(super::ValidationErrorType::Package);
+        if let Some(sub) = self.sub_part_uri {
+            err = err.with_related_part_uri(sub);
+        }
+        err
+    }
+
     pub fn with_relationship_type(mut self, relationship_type: impl Into<String>) -> Self {
         self.relationship_type = Some(relationship_type.into());
         self
@@ -790,6 +869,29 @@ mod tests {
         assert_eq!(
             back.message_id_str(),
             Some(message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED)
+        );
+    }
+
+    #[test]
+    fn into_pkg_validation_error_prefixes_and_formats() {
+        let r = OpenXmlPackageValidationResult::required_part_do_not_exist(
+            "/ppt/presentation.xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster",
+        );
+        let e = r.into_pkg_validation_error();
+        assert_eq!(e.id(), Some("Pkg_RequiredPartDoNotExist"));
+        assert!(
+            e.description().contains("required part")
+                || e.description().contains("slideMaster")
+                || e.message.contains("A required part"),
+            "{e:?}"
+        );
+        assert_eq!(
+            OpenXmlPackageValidationResult::part_name_and_uri(
+                "MainDocumentPart",
+                "/word/document.xml"
+            ),
+            "MainDocumentPart{/word/document.xml}"
         );
     }
 

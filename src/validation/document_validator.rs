@@ -44,24 +44,12 @@ impl DocumentValidator {
         context: &mut ValidationContext,
     ) -> Result<()> {
         // C# PackageValidator.Validate(version) — filter rules by target FileFormatVersions.
-        // C# DocumentValidator.ValidatePackageStructure prefixes MessageId with "Pkg_".
-        for mut error in validate_package_constraints_for_version(package, self.cache.version()) {
-            if let Some(id) = error.id() {
-                if !id.starts_with("Pkg_")
-                    && matches!(
-                        id,
-                        "PartIsNotAllowed"
-                            | "RequiredPartDoNotExist"
-                            | "OnlyOnePartAllowed"
-                            | "InvalidContentTypePart"
-                            | "DataPartReferenceIsNotAllowed"
-                    )
-                {
-                    let detail = error.description().to_string();
-                    error.message = format!("Pkg_{id}: {detail}");
-                }
-            }
-            if !context.try_add_error(error)? {
+        // C# DocumentValidator.ValidatePackageStructure prefixes MessageId with "Pkg_"
+        // and formats descriptions from ValidationResources.
+        for error in validate_package_constraints_for_version(package, self.cache.version()) {
+            let result = super::OpenXmlPackageValidationResult::from_validation_error(&error);
+            let packaged = result.into_pkg_validation_error();
+            if !context.try_add_error(packaged)? {
                 return Ok(());
             }
         }
