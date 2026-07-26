@@ -1511,6 +1511,43 @@ pub mod spreadsheet {
         )
     }
 
+    /// `<x:headers>` shared workbook revision headers part root.
+    pub fn headers() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("header", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x:revisions>` shared workbook revision log part root.
+    pub fn revisions() -> Particle {
+        Particle::choice(
+            vec![
+                Particle::element("rrc", Occurs::ONE),
+                Particle::element("rm", Occurs::ONE),
+                Particle::element("rcv", Occurs::ONE),
+                Particle::element("rsnm", Occurs::ONE),
+                Particle::element("ris", Occurs::ONE),
+                Particle::element("rcc", Occurs::ONE),
+                Particle::element("rfmt", Occurs::ONE),
+                Particle::element("raf", Occurs::ONE),
+                Particle::element("rdn", Occurs::ONE),
+                Particle::element("rcmt", Occurs::ONE),
+                Particle::element("rqt", Occurs::ONE),
+                Particle::element("rcft", Occurs::ONE),
+            ],
+            Occurs::STAR,
+        )
+    }
+
+    /// `<x:users>` shared workbook users part root.
+    pub fn users() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("userInfo", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1539,6 +1576,9 @@ pub mod spreadsheet {
             "volTypes" => volatile_types(),
             "singleXmlCells" => single_xml_cells(),
             "MapInfo" => map_info(),
+            "headers" => headers(),
+            "revisions" => revisions(),
+            "users" => users(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -1690,6 +1730,7 @@ pub mod presentation {
             "cmAuthorLst" => comment_author_list(),
             "tagLst" => tag_list(),
             "viewPr" => view_properties(),
+            "sldSyncPr" => slide_sync_properties(),
             "cSld" => common_slide_data(),
             "spTree" => shape_tree(),
             "sp" => shape(),
@@ -1750,6 +1791,15 @@ pub mod presentation {
     /// `<p:viewPr>` / view properties part root.
     pub fn view_properties() -> Particle {
         crate::generated::presentationml_2006_main::particle_view_properties()
+    }
+
+    /// `<p:sldSyncPr>` slide sync properties part root.
+    pub fn slide_sync_properties() -> Particle {
+        // Generated model uses outer STAR so an empty sldSyncPr matches.
+        Particle::sequence(
+            vec![Particle::element("extLst", Occurs::OPTIONAL)],
+            Occurs::STAR,
+        )
     }
 }
 
@@ -2257,6 +2307,33 @@ pub fn validate_spreadsheet_particles_for_version(
                 &root_mc,
             ));
         }
+        "headers" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::headers(),
+                "x:headers",
+                &context,
+                &root_mc,
+            ));
+        }
+        "revisions" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::revisions(),
+                "x:revisions",
+                &context,
+                &root_mc,
+            ));
+        }
+        "users" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::users(),
+                "x:users",
+                &context,
+                &root_mc,
+            ));
+        }
         _ => {}
     }
     errors
@@ -2398,6 +2475,15 @@ pub fn validate_presentation_particles_for_version(
                 root,
                 &presentation::view_properties(),
                 "p:viewPr",
+                &context,
+                &root_mc,
+            ));
+        }
+        "sldSyncPr" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::slide_sync_properties(),
+                "p:sldSyncPr",
                 &context,
                 &root_mc,
             ));
@@ -3378,6 +3464,45 @@ mod tests {
             &map,
             &spreadsheet::map_info(),
             "x:MapInfo",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn shared_workbook_and_slide_sync_roots() {
+        assert!(spreadsheet::particle_for("headers").is_some());
+        assert!(spreadsheet::particle_for("revisions").is_some());
+        assert!(spreadsheet::particle_for("users").is_some());
+        assert!(presentation::particle_for("sldSyncPr").is_some());
+        assert!(crate::validation::particle::particle_for("headers").is_some());
+        assert!(crate::validation::particle::particle_for("sldSyncPr").is_some());
+
+        let mut headers = crate::element::OpenXmlElement::x("headers");
+        headers.append_child(crate::element::OpenXmlElement::x("header"));
+        let errs = validate_particle_for_version(
+            &headers,
+            &spreadsheet::headers(),
+            "x:headers",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut users = crate::element::OpenXmlElement::x("users");
+        users.append_child(crate::element::OpenXmlElement::x("userInfo"));
+        let errs = validate_particle_for_version(
+            &users,
+            &spreadsheet::users(),
+            "x:users",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let sync = crate::element::OpenXmlElement::p("sldSyncPr");
+        let errs = validate_particle_for_version(
+            &sync,
+            &presentation::slide_sync_properties(),
+            "p:sldSyncPr",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");

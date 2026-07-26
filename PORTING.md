@@ -1030,6 +1030,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `TypedPart::is_in_version` uses relationship year heuristic; `/2011/` maps to Office2010
 - [x] Spreadsheet particles: `volTypes` / `singleXmlCells` / `MapInfo` + DocumentValidator walks
 - [x] OpenXmlValidator part path: `ensure_relationship_in_version` (C# `ThrowIfNotInVersion(OpenXmlPart)`)
+- [x] Spreadsheet shared-workbook particles (`headers` / `revisions` / `users`) + Presentation `sldSyncPr`
 
 **Still intentionally deferred / partial:**
 

@@ -168,7 +168,10 @@ impl DocumentValidator {
             | "dialogsheet"
             | "volTypes"
             | "singleXmlCells"
-            | "MapInfo" => {
+            | "MapInfo"
+            | "headers"
+            | "revisions"
+            | "users" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
@@ -182,7 +185,8 @@ impl DocumentValidator {
             | "cmLst"
             | "cmAuthorLst"
             | "tagLst"
-            | "viewPr" => {
+            | "viewPr"
+            | "sldSyncPr" => {
                 super::validate_presentation_particles_for_version(root, version)
             }
             "theme"
