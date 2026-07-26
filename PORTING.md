@@ -1012,6 +1012,8 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Presentation particles: `notes` / `notesMaster` roots in registry, walks, and DocumentValidator
 - [x] Word part-root particles: `styles` / `numbering` / `fonts` / `comments` / `footnotes` / `endnotes`
 - [x] Word particles: `hdr` / `ftr` / `abstractNum`; DocumentValidator routes styles/numbering/fonts/comments/footnotes/endnotes/hdr/ftr through particle registry
+- [x] Word particles: `settings` / `webSettings` / `glossaryDocument` (via generated content models); DocumentValidator routes them
+- [x] AC unprefixed-attribute parity (`MC_ErrorOnUnprefixedAttributeName`); `choice()` emits `mc:Requires`
 
 **Still intentionally deferred / partial:**
 

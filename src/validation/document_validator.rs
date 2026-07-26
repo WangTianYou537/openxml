@@ -159,7 +159,7 @@ impl DocumentValidator {
             }
             // Other Word part roots: single-root particle via registry.
             "styles" | "numbering" | "fonts" | "comments" | "footnotes" | "endnotes"
-            | "hdr" | "ftr" => {
+            | "hdr" | "ftr" | "settings" | "webSettings" | "glossaryDocument" => {
                 if let Some(particle) = super::particle_for(&root.local_name) {
                     super::validate_particle_for_version(
                         root,

@@ -1197,6 +1197,21 @@ pub mod word {
         )
     }
 
+    /// `<w:settings>` document settings part root (generated content model).
+    pub fn settings() -> Particle {
+        crate::generated::wordprocessingml_2006_main::particle_settings()
+    }
+
+    /// `<w:webSettings>` web settings part root (generated content model).
+    pub fn web_settings() -> Particle {
+        crate::generated::wordprocessingml_2006_main::particle_web_settings()
+    }
+
+    /// `<w:glossaryDocument>` glossary part root (generated content model).
+    pub fn glossary_document() -> Particle {
+        crate::generated::wordprocessingml_2006_main::particle_glossary_document()
+    }
+
     /// Particle registry lookup (C# `ValidationCache.GetParticleConstraint` shell).
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
@@ -1220,6 +1235,9 @@ pub mod word {
             "endnotes" => endnotes(),
             "hdr" | "ftr" => header_footer(),
             "abstractNum" => abstract_num(),
+            "settings" => settings(),
+            "webSettings" => web_settings(),
+            "glossaryDocument" => glossary_document(),
             _ => return None,
         })
     }
@@ -1936,7 +1954,11 @@ mod tests {
         assert!(word::particle_for("hdr").is_some());
         assert!(word::particle_for("ftr").is_some());
         assert!(word::particle_for("abstractNum").is_some());
+        assert!(word::particle_for("settings").is_some());
+        assert!(word::particle_for("webSettings").is_some());
+        assert!(word::particle_for("glossaryDocument").is_some());
         assert!(crate::validation::particle::particle_for("sectPr").is_some());
+        assert!(crate::validation::particle::particle_for("settings").is_some());
     }
 
     #[test]
@@ -1947,6 +1969,48 @@ mod tests {
             &hdr,
             &word::header_footer(),
             "w:hdr",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn settings_particle_accepts_common_children() {
+        let mut settings = crate::element::OpenXmlElement::w("settings");
+        settings.append_child(crate::element::OpenXmlElement::w("defaultTabStop"));
+        settings.append_child(crate::element::OpenXmlElement::w("documentProtection"));
+        settings.append_child(crate::element::OpenXmlElement::w("compat"));
+        let errs = validate_particle_for_version(
+            &settings,
+            &word::settings(),
+            "w:settings",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn web_settings_particle_accepts_optimize_and_png() {
+        let mut web = crate::element::OpenXmlElement::w("webSettings");
+        web.append_child(crate::element::OpenXmlElement::w("optimizeForBrowser"));
+        web.append_child(crate::element::OpenXmlElement::w("allowPNG"));
+        let errs = validate_particle_for_version(
+            &web,
+            &word::web_settings(),
+            "w:webSettings",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn glossary_document_particle_accepts_doc_parts() {
+        let mut glossary = crate::element::OpenXmlElement::w("glossaryDocument");
+        glossary.append_child(crate::element::OpenXmlElement::w("docParts"));
+        let errs = validate_particle_for_version(
+            &glossary,
+            &word::glossary_document(),
+            "w:glossaryDocument",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");

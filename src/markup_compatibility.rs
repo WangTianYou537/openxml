@@ -80,7 +80,7 @@ pub fn choice(
     children: impl IntoIterator<Item = OpenXmlElement>,
 ) -> OpenXmlElement {
     OpenXmlElement::new("mc", MC, "Choice")
-        .with_attribute("Requires", requires)
+        .with_attribute_qname("mc:Requires", requires)
         .with_children(children)
 }
 
@@ -909,8 +909,50 @@ fn resolve_prefix_ns(elem: &OpenXmlElement, prefix: &str) -> Option<String> {
     None
 }
 
+/// C# `AlternateContentValidator.ValidateMcAttributesOnAcb` — unprefixed
+/// attributes on AC/Choice/Fallback are illegal (except xmlns declarations and
+/// known MC-typed attributes that C# stores as properties, not ExtendedAttributes).
+fn validate_ac_unprefixed_attrs(elem: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
+    for a in &elem.attributes {
+        // xmlns / xmlns:prefix are namespace decls, not content attributes.
+        if a.local_name == "xmlns" || a.prefix.as_deref() == Some("xmlns") {
+            continue;
+        }
+        // Known MC attributes are typed properties in C# (not ExtendedAttributes).
+        // Accept bare local names for Requires / Ignorable / MustUnderstand /
+        // ProcessContent / PreserveElements / PreserveAttributes.
+        if matches!(
+            a.local_name.as_str(),
+            "Requires"
+                | "Ignorable"
+                | "MustUnderstand"
+                | "ProcessContent"
+                | "PreserveElements"
+                | "PreserveAttributes"
+        ) {
+            continue;
+        }
+        let has_prefix = a
+            .prefix
+            .as_deref()
+            .map(|p| !p.is_empty())
+            .unwrap_or(false);
+        if !has_prefix {
+            errors.push(ValidationError {
+                path: path.to_string(),
+                message: format!(
+                    "MC_ErrorOnUnprefixedAttributeName: attribute '{}' needs a proper prefix on <{}>",
+                    a.local_name, elem.local_name
+                ),
+                ..Default::default()
+            });
+        }
+    }
+}
+
 fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationError>) {
     validate_mc_xml_attrs(ac, path, errors);
+    validate_ac_unprefixed_attrs(ac, path, errors);
 
     let non_misc: Vec<&OpenXmlElement> = ac
         .children
@@ -955,6 +997,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
                     });
                     if child.local_name == "Fallback" {
                         validate_mc_xml_attrs(child, &cpath, errors);
+                        validate_ac_unprefixed_attrs(child, &cpath, errors);
                         status = 2;
                     }
                 }
@@ -964,6 +1007,7 @@ fn validate_one_ac(ac: &OpenXmlElement, path: &str, errors: &mut Vec<ValidationE
                     validate_choice(child, ac, &cpath, errors);
                 } else if child.local_name == "Fallback" {
                     validate_mc_xml_attrs(child, &cpath, errors);
+                    validate_ac_unprefixed_attrs(child, &cpath, errors);
                     status = 2;
                 } else {
                     errors.push(ValidationError {
@@ -1005,6 +1049,7 @@ fn validate_choice(
     errors: &mut Vec<ValidationError>,
 ) {
     validate_mc_xml_attrs(choice, path, errors);
+    validate_ac_unprefixed_attrs(choice, path, errors);
     let requires = choice
         .get_attribute("Requires")
         .or_else(|| choice.get_attribute_qname("mc:Requires"));
@@ -1102,6 +1147,27 @@ mod ac_validate_tests {
         );
         let errs = validate_alternate_content(&ac);
         assert!(errs.iter().any(|e| e.message.contains("after Fallback")));
+    }
+
+    #[test]
+    fn unprefixed_attribute_on_ac_rejected() {
+        let mut ac = alternate_content_with(
+            "w14",
+            vec![OpenXmlElement::w("r")],
+            vec![OpenXmlElement::w("r")],
+        );
+        ac = ac.with_ns_decl(
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml",
+        );
+        // Bare non-MC attribute is illegal on AlternateContent.
+        ac.set_attribute("foo", "bar");
+        let errs = validate_alternate_content(&ac);
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("ErrorOnUnprefixedAttributeName")),
+            "{errs:?}"
+        );
     }
 }
 
