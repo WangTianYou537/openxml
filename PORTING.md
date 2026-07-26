@@ -1028,6 +1028,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `ElementMetadataFactoryFeature::seed_common_elements` from generated schema tables; DefaultFeatures auto-seeds
 - [x] `FileFormatVersions::ensure_element_in_version` + OpenXmlValidator DOM gate (C# `ThrowIfNotInVersion`)
 - [x] `TypedPart::is_in_version` uses relationship year heuristic; `/2011/` maps to Office2010
+- [x] Spreadsheet particles: `volTypes` / `singleXmlCells` / `MapInfo` + DocumentValidator walks
 
 **Still intentionally deferred / partial:**
 

@@ -1480,6 +1480,37 @@ pub mod spreadsheet {
         crate::generated::spreadsheetml_2006_main::particle_dialog_sheet()
     }
 
+    /// `<x:volTypes>` volatile dependencies part root.
+    pub fn volatile_types() -> Particle {
+        // Generated outer STAR confuses matcher for empty roots; use ONE.
+        Particle::sequence(
+            vec![
+                Particle::element("volType", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x:singleXmlCells>` single-cell table part root.
+    pub fn single_xml_cells() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("singleXmlCell", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x:MapInfo>` custom XML mappings part root.
+    pub fn map_info() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("Schema", Occurs::STAR),
+                Particle::element("Map", Occurs::STAR),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1505,6 +1536,9 @@ pub mod spreadsheet {
             "pivotCacheRecords" => pivot_cache_records(),
             "metadata" => metadata(),
             "dialogsheet" => dialog_sheet(),
+            "volTypes" => volatile_types(),
+            "singleXmlCells" => single_xml_cells(),
+            "MapInfo" => map_info(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -2192,6 +2226,33 @@ pub fn validate_spreadsheet_particles_for_version(
                 root,
                 &spreadsheet::dialog_sheet(),
                 "x:dialogsheet",
+                &context,
+                &root_mc,
+            ));
+        }
+        "volTypes" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::volatile_types(),
+                "x:volTypes",
+                &context,
+                &root_mc,
+            ));
+        }
+        "singleXmlCells" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::single_xml_cells(),
+                "x:singleXmlCells",
+                &context,
+                &root_mc,
+            ));
+        }
+        "MapInfo" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::map_info(),
+                "x:MapInfo",
                 &context,
                 &root_mc,
             ));
@@ -3279,8 +3340,12 @@ mod tests {
         assert!(spreadsheet::particle_for("pivotCacheRecords").is_some());
         assert!(spreadsheet::particle_for("metadata").is_some());
         assert!(spreadsheet::particle_for("dialogsheet").is_some());
+        assert!(spreadsheet::particle_for("volTypes").is_some());
+        assert!(spreadsheet::particle_for("singleXmlCells").is_some());
+        assert!(spreadsheet::particle_for("MapInfo").is_some());
         assert!(crate::validation::particle::particle_for("pivotCacheDefinition").is_some());
         assert!(crate::validation::particle::particle_for("commentsEx").is_some());
+        assert!(crate::validation::particle::particle_for("volTypes").is_some());
 
         let mut cache = crate::element::OpenXmlElement::x("pivotCacheDefinition");
         cache.append_child(crate::element::OpenXmlElement::x("cacheSource"));
@@ -3289,6 +3354,30 @@ mod tests {
             &cache,
             &spreadsheet::pivot_cache_definition(),
             "x:pivotCacheDefinition",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn volatile_and_map_info_particles_accept_children() {
+        let mut vol = crate::element::OpenXmlElement::x("volTypes");
+        vol.append_child(crate::element::OpenXmlElement::x("volType"));
+        let errs = validate_particle_for_version(
+            &vol,
+            &spreadsheet::volatile_types(),
+            "x:volTypes",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut map = crate::element::OpenXmlElement::x("MapInfo");
+        map.append_child(crate::element::OpenXmlElement::x("Schema"));
+        map.append_child(crate::element::OpenXmlElement::x("Map"));
+        let errs = validate_particle_for_version(
+            &map,
+            &spreadsheet::map_info(),
+            "x:MapInfo",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");

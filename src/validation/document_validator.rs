@@ -165,7 +165,10 @@ impl DocumentValidator {
             | "pivotCacheDefinition"
             | "pivotCacheRecords"
             | "metadata"
-            | "dialogsheet" => {
+            | "dialogsheet"
+            | "volTypes"
+            | "singleXmlCells"
+            | "MapInfo" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
