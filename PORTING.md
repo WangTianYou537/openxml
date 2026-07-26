@@ -1029,6 +1029,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `FileFormatVersions::ensure_element_in_version` + OpenXmlValidator DOM gate (C# `ThrowIfNotInVersion`)
 - [x] `TypedPart::is_in_version` uses relationship year heuristic; `/2011/` maps to Office2010
 - [x] Spreadsheet particles: `volTypes` / `singleXmlCells` / `MapInfo` + DocumentValidator walks
+- [x] OpenXmlValidator part path: `ensure_relationship_in_version` (C# `ThrowIfNotInVersion(OpenXmlPart)`)
 
 **Still intentionally deferred / partial:**
 

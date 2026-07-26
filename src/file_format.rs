@@ -161,6 +161,27 @@ impl FileFormatVersions {
         Ok(())
     }
 
+    /// C# `ThrowIfNotInVersion(OpenXmlPart)` — part relationship introduction
+    /// must be available in `self`.
+    pub fn ensure_relationship_in_version(
+        self,
+        relationship_type: &str,
+    ) -> crate::error::Result<()> {
+        self.ensure_supported()
+            .map_err(crate::error::Error::Validation)?;
+        let intro = crate::packaging::relationship_introduced_in(relationship_type);
+        if !(self.at_least(intro) || self.includes_introduction(intro)) {
+            let year = self
+                .office_year()
+                .map(|y| y.to_string())
+                .unwrap_or_else(|| self.to_string());
+            return Err(crate::error::Error::Validation(format!(
+                "The part has a relationship that is not valid for Office {year}."
+            )));
+        }
+        Ok(())
+    }
+
     /// C# `FileFormatVersionsExtensions.AndEarlier` shell.
     pub const fn and_earlier(self) -> Self {
         match self {

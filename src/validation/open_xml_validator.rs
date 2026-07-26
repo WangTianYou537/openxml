@@ -306,6 +306,13 @@ impl OpenXmlValidator {
         token: super::ValidationCancellationToken,
     ) -> Result<Vec<ValidationError>> {
         self.ensure_mc_settings_match(package)?;
+        // C# `FileFormat.ThrowIfNotInVersion(openXmlPart)` — resolve relationship
+        // type for this part URI when present.
+        if let Some(rel_type) = relationship_type_for_part(package.opc(), part_uri) {
+            self.settings
+                .file_format
+                .ensure_relationship_in_version(rel_type)?;
+        }
         let validator = self.document_validator();
         let mut context = super::ValidationContext::with_cancellation_token(self.settings, token);
         validator.validate_part(package.opc(), part_uri, &mut context)?;
@@ -405,6 +412,38 @@ impl OpenXmlValidator {
     }
 }
 
+/// Resolve the relationship type that targets `part_uri` (package or part rels).
+fn relationship_type_for_part<'a>(
+    package: &'a OpcPackage,
+    part_uri: &crate::opc::PackUri,
+) -> Option<&'a str> {
+    for r in package.package_relationships().iter() {
+        if r.target_mode != crate::opc::RelationshipTargetMode::Internal {
+            continue;
+        }
+        if let Ok(resolved) = package.resolve_relationship(None, r) {
+            if &resolved == part_uri {
+                return Some(r.relationship_type.as_str());
+            }
+        }
+    }
+    for source in package.part_relationship_sources() {
+        if let Some(rels) = package.part_relationships(&source) {
+            for r in rels.iter() {
+                if r.target_mode != crate::opc::RelationshipTargetMode::Internal {
+                    continue;
+                }
+                if let Ok(resolved) = package.resolve_relationship(Some(&source), r) {
+                    if &resolved == part_uri {
+                        return Some(r.relationship_type.as_str());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -413,6 +452,7 @@ mod tests {
     use crate::namespace::content_type;
     use crate::namespace::rel;
     use crate::opc::{PackUri, RelationshipTargetMode};
+    use crate::packaging::OpenSettings;
     use crate::wordprocessing::{body, document, paragraph, run, text};
 
     #[test]
@@ -695,5 +735,52 @@ mod tests {
         let mut v2010 = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2010);
         // w14 is in Office2010 — should not fail the version gate (may still produce schema errors).
         assert!(v2010.validate_dom_element(&w14).is_ok());
+    }
+
+    #[test]
+    fn document_part_rejects_relationship_not_in_file_format() {
+        let mut opc = OpcPackage::create();
+        let doc = PackUri::new("/word/document.xml");
+        opc.set_part(
+            doc.clone(),
+            content_type::WORD_DOCUMENT,
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#.to_vec(),
+        );
+        opc.add_package_relationship(rel::OFFICE_DOCUMENT, &doc, RelationshipTargetMode::Internal);
+
+        // Office 2011 commentsExtended relationship under the main document.
+        let comments_ex = PackUri::new("/word/commentsExtended.xml");
+        opc.set_part(
+            comments_ex.clone(),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
+            br#"<w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"/>"#
+                .to_vec(),
+        );
+        opc.add_part_relationship(
+            &doc,
+            "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
+            &comments_ex,
+            RelationshipTargetMode::Internal,
+        );
+
+        let package = crate::packaging::OpenXmlPackage::from_opc(opc, OpenSettings::default());
+        let mut v = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2007);
+        let err = v
+            .validate_document_part(&package, &comments_ex)
+            .unwrap_err();
+        match err {
+            Error::Validation(message) => {
+                assert!(
+                    message.contains("not valid for Office") || message.contains("2007"),
+                    "{message}"
+                );
+            }
+            other => panic!("expected Validation error, got {other:?}"),
+        }
+
+        let mut v2010 = OpenXmlValidator::with_file_format(FileFormatVersions::OFFICE2010);
+        assert!(v2010
+            .validate_document_part(&package, &comments_ex)
+            .is_ok());
     }
 }
