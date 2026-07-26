@@ -15,6 +15,36 @@ pub fn validation_resource_message(message_id: &str) -> Option<&'static str> {
         "Sch_UndeclaredElement" => "The element '{0}' is not declared.",
         "Sch_MissRequiredAttribute" => "The required attribute '{0}' is missing.",
         "Sch_AttributeValueDataTypeDetailed" => "The attribute '{0}' has invalid value '{1}'.{2}",
+        "Sem_AttributeValueDataTypeDetailed" => "The attribute '{0}' has invalid value '{1}'.{2}",
+        "Sem_MissRequiredAttribute" => "The required attribute '{0}' is missing.",
+        "Sem_AttributeMutualExclusive" => {
+            "Attribute '{0}' and '{1}' cannot be present at the same time. Only one of these attributes '{2}' can be present at a given time."
+        }
+        "Sem_AttributeRequiredConditionToValue" => {
+            "Attribute '{0}' should be present when the value of attribute '{1}' is '{2}'."
+        }
+        "Sem_AttributeAbsentConditionToValue" => {
+            "Attribute '{0}' should be absent when the value of attribute '{1}' is {2}."
+        }
+        "Sem_MinLengthConstraintFailed" => {
+            " The actual length is less than the MinLength value. The length must be bigger than or equal to {0}."
+        }
+        "Sem_MaxLengthConstraintFailed" => {
+            " The actual length is greater than the MaxLength value. The length must be smaller than or equal to {0}."
+        }
+        "Sch_MinInclusiveConstraintFailed" => {
+            " The MinInclusive constraint failed. The value must be greater than or equal to {0}."
+        }
+        "Sch_MinExclusiveConstraintFailed" => {
+            " The MinExclusive constraint failed. The value must be greater than {0}."
+        }
+        "Sch_MaxInclusiveConstraintFailed" => {
+            " The MaxInclusive constraint failed. The value must be less than or equal to {0}."
+        }
+        "Sch_MaxExclusiveConstraintFailed" => {
+            " The MaxExclusive constraint failed. The value must be less than {0}."
+        }
+        "Sch_EnumerationConstraintFailed" => " The Enumeration constraint failed.",
         "Sch_InvalidChildinLeafElement" => {
             "The element '{0}' is a leaf element and cannot contain children."
         }

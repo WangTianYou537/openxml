@@ -944,6 +944,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `XsdAnyNamespace` modes on `Particle::Any` (##any/##other/##local/##targetNamespace vs parent target namespace) + wildcard tokens in expected-children
 - [x] `Particle::Versioned` + `build_for(version)` pruning (C# `ParticleConstraint.Build`); particle validation builds version-pruned trees first
 - [x] `logical_children_mc` / `get_first_child_mc` / `get_next_child_mc` MC child cursor (AC branch resolution, Ignorable skip, ProcessContent promotion)
+- [x] Element-level semantic constraint shells: `SemanticConstraint` trait + `AttributeCannotOmit` / `MutualExclusive` / `ValueLength` / `ValueRange` / `ValueSet` / `RequiredConditionToValue` / `AbsentConditionToValue` / `MinMax` / `Pair` + `validate_element_constraints`
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 

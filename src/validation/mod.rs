@@ -21,6 +21,7 @@ mod schematron_constraints;
 mod schematron_rules;
 mod schematron_validate;
 mod semantic;
+mod semantic_constraints;
 mod traverser;
 mod validation_cache;
 mod validation_context;
@@ -112,6 +113,12 @@ pub use semantic::{
     validate_semantic, validate_unique_attributes, word_relationship_rules,
     word_unique_attribute_rules, RelationshipExistRule, SemanticConstraintGate,
     SemanticValidationLevel, UniqueAttributeRule,
+};
+pub use semantic_constraints::{
+    validate_element_constraints, AttributeAbsentConditionToValue, AttributeCannotOmitConstraint,
+    AttributeMinMaxConstraint, AttributeMutualExclusive, AttributeName, AttributePairConstraint,
+    AttributeRequiredConditionToValue, AttributeValueLengthConstraint,
+    AttributeValueRangeConstraint, AttributeValueSetConstraint, SemanticConstraint,
 };
 
 /// Re-export Markup Compatibility AlternateContent structural validation.
