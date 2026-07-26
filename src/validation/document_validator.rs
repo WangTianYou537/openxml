@@ -1,0 +1,307 @@
+//! Package/part validation orchestration (C# `DocumentValidator`).
+
+use super::{
+    validate_package_constraints, validate_word_document_full_for_version, ValidationCache,
+    ValidationContext, ValidationError, ValidationErrorType, ValidationSettings,
+};
+use crate::element::{parse_element, OpenXmlElement};
+use crate::error::Result;
+use crate::namespace::rel;
+use crate::opc::{OpcPackage, PackUri};
+
+/// C# `DocumentValidator` — orchestrates package structure + per-part schema passes.
+#[derive(Debug)]
+pub struct DocumentValidator {
+    cache: ValidationCache,
+}
+
+impl DocumentValidator {
+    /// C# `DocumentValidator(ValidationCache)`.
+    pub fn new(cache: ValidationCache) -> Self {
+        Self { cache }
+    }
+
+    pub fn cache(&self) -> &ValidationCache {
+        &self.cache
+    }
+
+    /// C# `Validate(OpenXmlPackage, settings, token)` — package frame, package
+    /// structure errors, then every reachable XML part.
+    pub fn validate_package(
+        &self,
+        package: &OpcPackage,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        context.stack_mut().push_package("/");
+        let result = self.validate_package_inner(package, context);
+        context.stack_mut().pop();
+        result
+    }
+
+    fn validate_package_inner(
+        &self,
+        package: &OpcPackage,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        for error in validate_package_constraints(package) {
+            if !context.try_add_error(error)? {
+                return Ok(());
+            }
+        }
+
+        for part_uri in self.parts_to_be_validated(package) {
+            self.validate_part_uri(package, &part_uri, context)?;
+        }
+        Ok(())
+    }
+
+    /// C# `Validate(OpenXmlPart, settings, token)`.
+    pub fn validate_part(
+        &self,
+        package: &OpcPackage,
+        part_uri: &PackUri,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        self.validate_part_uri(package, part_uri, context)
+    }
+
+    fn validate_part_uri(
+        &self,
+        package: &OpcPackage,
+        part_uri: &PackUri,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        context.stack_mut().push_part(part_uri.as_str());
+        let result = self.validate_part_inner(package, part_uri, context);
+        context.stack_mut().pop();
+        result
+    }
+
+    fn validate_part_inner(
+        &self,
+        package: &OpcPackage,
+        part_uri: &PackUri,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        let Ok(Some(bytes)) = package.load_part(part_uri) else {
+            return Ok(());
+        };
+
+        if bytes.is_empty() {
+            // C# `part.IsEmptyPart()` → Sch_MissingPartRootElement
+            context.try_add_error(
+                ValidationError::with_id(
+                    part_uri.as_str(),
+                    "Sch_MissingPartRootElement",
+                    format!("The '{}' part is missing its root element.", part_uri.as_str()),
+                )
+                .with_error_type(ValidationErrorType::Schema),
+            )?;
+            return Ok(());
+        }
+
+        let root = match parse_element(&bytes) {
+            Ok(root) => root,
+            Err(error) => {
+                // C# XmlException → "ExceptionError" ValidationErrorInfo
+                context.try_add_error(
+                    ValidationError::with_id(
+                        part_uri.as_str(),
+                        "ExceptionError",
+                        format!("Inner exception: {error}."),
+                    )
+                    .with_error_type(ValidationErrorType::Schema),
+                )?;
+                return Ok(());
+            }
+        };
+
+        self.validate_element(&root, context)
+    }
+
+    /// C# `Validate(ValidationContext)` — schema pass then constraint pass over
+    /// the current element, both via the MC-aware traverser.
+    pub fn validate_element(
+        &self,
+        root: &OpenXmlElement,
+        context: &mut ValidationContext,
+    ) -> Result<()> {
+        if root.is_misc_node() || root.is_unknown() {
+            return Ok(());
+        }
+        if root.local_name == "AlternateContent"
+            || root.local_name == "Choice"
+            || root.local_name == "Fallback"
+        {
+            return Ok(());
+        }
+
+        // Schema pass (C# SchemaTypeValidator.Validate per element).
+        if root.local_name == "document" {
+            for error in validate_word_document_full_for_version(root, self.cache.version()) {
+                if !context.try_add_error(error)? {
+                    return Ok(());
+                }
+            }
+        }
+
+        // Constraint pass (C# element.Metadata.Constraints per element).
+        let mut constraint_errors = super::validate_schematron_numeric_ranges(root);
+        constraint_errors.extend(super::validate_schematron_string_lengths(root));
+        constraint_errors.extend(super::validate_schematron_enums(root));
+        for error in constraint_errors {
+            if !context.try_add_error(error)? {
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    /// C# `PartsToBeValidated` — reachable XML parts from the main-document root
+    /// (only parts defined in the target version are yielded).
+    pub fn parts_to_be_validated(&self, package: &OpcPackage) -> Vec<PackUri> {
+        let Some(main) = package
+            .package_relationships()
+            .get_by_type(rel::OFFICE_DOCUMENT)
+        else {
+            return Vec::new();
+        };
+        let root = PackUri::new("/");
+        let Ok(main_uri) = crate::opc::resolve_uri(&root, &main.target) else {
+            return Vec::new();
+        };
+
+        let mut visited = Vec::new();
+        let mut queue = vec![main_uri];
+        while let Some(uri) = queue.pop() {
+            if visited.contains(&uri) || !package.has_part(&uri) {
+                continue;
+            }
+            if let Some(rels) = package.part_relationships(&uri) {
+                for rel in rels.iter() {
+                    if rel.target_mode != crate::opc::RelationshipTargetMode::Internal {
+                        continue;
+                    }
+                    if let Ok(target) = crate::opc::resolve_uri(&uri, &rel.target) {
+                        if target.as_str().ends_with(".xml") {
+                            queue.push(target);
+                        }
+                    }
+                }
+            }
+            visited.push(uri);
+        }
+        visited
+    }
+}
+
+impl Default for DocumentValidator {
+    fn default() -> Self {
+        Self::new(ValidationCache::default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::file_format::FileFormatVersions;
+    use crate::namespace::content_type;
+    use crate::opc::RelationshipTargetMode;
+
+    fn minimal_package(document_xml: &[u8]) -> OpcPackage {
+        let mut package = OpcPackage::create();
+        let uri = PackUri::new("/word/document.xml");
+        package.set_part(uri.clone(), content_type::WORD_DOCUMENT, document_xml.to_vec());
+        package.add_package_relationship(rel::OFFICE_DOCUMENT, &uri, RelationshipTargetMode::Internal);
+        package
+    }
+
+    #[test]
+    fn validates_reachable_parts_and_reports_schema_errors() {
+        let package = minimal_package(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/><w:body/></w:document>"#,
+        );
+        let validator = DocumentValidator::default();
+        assert_eq!(
+            validator.parts_to_be_validated(&package),
+            [PackUri::new("/word/document.xml")]
+        );
+
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_package(&package, &mut context).unwrap();
+        assert!(
+            context
+                .errors()
+                .iter()
+                .any(|e| e.message.contains("at most one")),
+            "{:?}",
+            context.errors()
+        );
+        assert!(context.stack().is_empty());
+    }
+
+    #[test]
+    fn empty_part_reports_missing_root_element() {
+        let package = minimal_package(b"");
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_package(&package, &mut context).unwrap();
+        assert_eq!(context.errors().len(), 1);
+        assert_eq!(context.errors()[0].id(), Some("Sch_MissingPartRootElement"));
+        assert_eq!(
+            context.errors()[0].error_type(),
+            ValidationErrorType::Schema
+        );
+    }
+
+    #[test]
+    fn malformed_xml_reports_exception_error() {
+        let package = minimal_package(b"<w:document><unclosed>");
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_package(&package, &mut context).unwrap();
+        assert_eq!(context.errors().len(), 1);
+        assert_eq!(context.errors()[0].id(), Some("ExceptionError"));
+        assert!(context.errors()[0].description().starts_with("Inner exception:"));
+    }
+
+    #[test]
+    fn constraint_pass_reports_schematron_violations() {
+        let root = parse_element(
+            br#"<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:col min="0" max="1"/></x:worksheet>"#,
+        )
+        .unwrap();
+        let validator = DocumentValidator::default();
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&root, &mut context).unwrap();
+        assert!(
+            context.errors().iter().any(|e| e.path == "col/@min"),
+            "{:?}",
+            context.errors()
+        );
+
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator
+            .validate_element(&OpenXmlElement::comment("skip"), &mut context)
+            .unwrap();
+        assert!(context.errors().is_empty());
+    }
+
+    #[test]
+    fn cancellation_stops_package_validation() {
+        let package = minimal_package(b"");
+        let validator = DocumentValidator::default();
+        let token = super::super::ValidationCancellationToken::new();
+        let mut context = ValidationContext::with_cancellation_token(
+            ValidationSettings::new(FileFormatVersions::OFFICE2007),
+            token.clone(),
+        );
+        token.cancel();
+        assert!(matches!(
+            validator.validate_package(&package, &mut context),
+            Err(crate::error::Error::Cancelled)
+        ));
+        assert!(context.stack().is_empty());
+        assert!(context.errors().is_empty());
+    }
+}

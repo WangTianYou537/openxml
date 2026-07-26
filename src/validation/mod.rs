@@ -10,6 +10,7 @@
 mod attributes;
 mod digsig;
 mod digsig_crypto;
+mod document_validator;
 mod package;
 mod package_validator;
 mod open_xml_validator;
@@ -35,6 +36,7 @@ pub use attributes::{
     validate_spreadsheet_attribute_ranges, AttributeRule, AttributeType,
 };
 pub use package::validate_package;
+pub use document_validator::DocumentValidator;
 pub use package_validator::{
     message_id as package_constraint_message_id, validate_package_constraints, validate_package_constraint_results,
     validate_part_constraints, OpenXmlPackageValidationResult,
@@ -259,7 +261,8 @@ impl ValidationError {
             || head.starts_with("Only")
             || head.starts_with("Required")
             || head.starts_with("Invalid")
-            || head.starts_with("Data");
+            || head.starts_with("Data")
+            || head == "ExceptionError";
         ok.then_some(head)
     }
 
