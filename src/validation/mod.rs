@@ -51,8 +51,9 @@ pub use schema_type_validator::{
     validate_schema_type_standalone, validate_schema_types_in_tree,
 };
 pub use validators::{
-    validate_attribute_with_type_name, validate_value, validate_with_validators, validator_for_type_name,
-    EnumValidator, ListValidator, NumberValidator, OfficeVersionValidator, RequiredValidator,
+    integer_simple_type_validator, on_off_simple_type_validator, validate_attribute_with_type_name,
+    validate_value, validate_with_validators, validator_for_type_name, EnumValidator,
+    ListValidator, NumberValidator, OfficeVersionValidator, RequiredValidator, SimpleTypeValidator,
     StringValidator, TypeNameValidator, UnionValidator, Validator, VersionGate,
 };
 pub use package_validator::{

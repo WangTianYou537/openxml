@@ -16,29 +16,58 @@ pub trait Validator {
 }
 
 /// C# `VersionedValidator` — only runs when the target file format includes
-/// [`Self::version`].
+/// [`Self::version`] (or matches an exact version when set).
 #[derive(Debug, Clone, Copy)]
 pub struct VersionGate {
+    /// Inclusive lower bound (C# `InitialVersion`) — when set, requires
+    /// `target.at_least(initial)`.
+    pub initial_version: Option<FileFormatVersions>,
+    /// Exact version match (C# `Version`) — when set without initial, requires equality.
+    pub exact_version: Option<FileFormatVersions>,
+    /// Convenience single version used as initial when neither field is set via
+    /// the older `version` field semantics (at-least).
     pub version: FileFormatVersions,
 }
 
 impl VersionGate {
     pub const fn all() -> Self {
         Self {
+            initial_version: None,
+            exact_version: None,
             version: FileFormatVersions::ALL,
         }
     }
 
     pub const fn since(version: FileFormatVersions) -> Self {
-        Self { version }
+        Self {
+            initial_version: Some(version),
+            exact_version: None,
+            version,
+        }
     }
 
+    pub const fn exact(version: FileFormatVersions) -> Self {
+        Self {
+            initial_version: None,
+            exact_version: Some(version),
+            version,
+        }
+    }
+
+    /// C# `VersionedValidator.IsValid`.
     pub fn applies(self, target: FileFormatVersions) -> bool {
-        // C# VersionedValidator: run when context version is at least the gate.
-        target.at_least(self.version)
-            || target.includes_introduction(self.version)
-            || self.version == FileFormatVersions::ALL
-            || self.version == FileFormatVersions::NONE
+        if let Some(initial) = self.initial_version {
+            return target.at_least(initial) || target.includes_introduction(initial);
+        }
+        if let Some(exact) = self.exact_version {
+            return target == exact
+                || (target.contains(exact) && exact != FileFormatVersions::NONE);
+        }
+        // Legacy: treat `version` as InitialVersion when not ALL/NONE.
+        if self.version == FileFormatVersions::ALL || self.version == FileFormatVersions::NONE {
+            return true;
+        }
+        target.at_least(self.version) || target.includes_introduction(self.version)
     }
 }
 
@@ -800,6 +829,78 @@ pub fn validate_attribute_with_type_name(
     Ok(())
 }
 
+/// C# `SimpleTypeValidator<T>` shell — reparse the current simple value through
+/// a parse function, then run the inner validator on the (possibly rewritten)
+/// lexical form.
+///
+/// When `parse` returns `None`, an attribute/element data-type error is emitted
+/// and the inner validator is skipped.
+pub struct SimpleTypeValidator<F>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    pub parse: F,
+    pub inner: Box<dyn Validator + Send + Sync>,
+}
+
+impl<F> SimpleTypeValidator<F>
+where
+    F: Fn(&str) -> Option<String> + Send + Sync + 'static,
+{
+    pub fn new<V: Validator + Send + Sync + 'static>(parse: F, inner: V) -> Self {
+        Self {
+            parse,
+            inner: Box::new(inner),
+        }
+    }
+}
+
+impl<F> Validator for SimpleTypeValidator<F>
+where
+    F: Fn(&str) -> Option<String> + Send + Sync,
+{
+    fn validate(&self, context: &mut ValidationContext) -> Result<()> {
+        let Some(text) = current_value(context) else {
+            return self.inner.validate(context);
+        };
+        match (self.parse)(&text) {
+            Some(rewritten) if rewritten == text => self.inner.validate(context),
+            Some(rewritten) => {
+                context.stack_mut().push_value(rewritten);
+                let result = self.inner.validate(context);
+                context.stack_mut().pop();
+                result
+            }
+            None => emit_data_type_error(
+                context,
+                &format!(" The string '{text}' is not a valid value."),
+            ),
+        }
+    }
+}
+
+/// Convenience: integer simple-type wrapper around a number validator
+/// (C# `SimpleTypeValidator<IntegerValue>`-style).
+pub fn integer_simple_type_validator() -> SimpleTypeValidator<impl Fn(&str) -> Option<String>> {
+    SimpleTypeValidator::new(
+        |s| s.trim().parse::<i64>().ok().map(|n| n.to_string()),
+        NumberValidator::new(),
+    )
+}
+
+/// Convenience: OnOff simple-type wrapper.
+pub fn on_off_simple_type_validator() -> SimpleTypeValidator<impl Fn(&str) -> Option<String>> {
+    SimpleTypeValidator::new(
+        |s| match s.trim() {
+            "true" | "1" | "on" | "True" => Some("1".into()),
+            "false" | "0" | "off" | "False" | "" => Some("0".into()),
+            _ => None,
+        },
+        // After rewrite, any of 0/1 is fine — EnumValidator.
+        EnumValidator::new(["0", "1"]),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1007,5 +1108,62 @@ mod tests {
         validate_attribute_with_type_name(&mut context, "w:rsidR", "HexBinaryValue", "xyz")
             .unwrap();
         assert!(!context.errors().is_empty());
+    }
+
+    #[test]
+    fn version_gate_exact_and_since() {
+        assert!(VersionGate::all().applies(FileFormatVersions::OFFICE2007));
+        assert!(VersionGate::since(FileFormatVersions::OFFICE2010)
+            .applies(FileFormatVersions::OFFICE2016));
+        assert!(!VersionGate::since(FileFormatVersions::OFFICE2010)
+            .applies(FileFormatVersions::OFFICE2007));
+        assert!(VersionGate::exact(FileFormatVersions::OFFICE2013)
+            .applies(FileFormatVersions::OFFICE2013));
+        assert!(!VersionGate::exact(FileFormatVersions::OFFICE2013)
+            .applies(FileFormatVersions::OFFICE2016));
+    }
+
+    #[test]
+    fn simple_type_validator_integer_rewrite() {
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:val", Some(" 42 ".to_string()), true);
+        integer_simple_type_validator()
+            .validate(&mut context)
+            .unwrap();
+        assert!(context.errors().is_empty(), "{:?}", context.errors());
+        context.stack_mut().pop();
+
+        context
+            .stack_mut()
+            .push_property("w:val", Some("nope".to_string()), true);
+        integer_simple_type_validator()
+            .validate(&mut context)
+            .unwrap();
+        assert!(!context.errors().is_empty());
+        context.stack_mut().pop();
+    }
+
+    #[test]
+    fn simple_type_validator_on_off() {
+        let mut context = ctx();
+        context
+            .stack_mut()
+            .push_property("w:val", Some("on".to_string()), true);
+        on_off_simple_type_validator()
+            .validate(&mut context)
+            .unwrap();
+        assert!(context.errors().is_empty(), "{:?}", context.errors());
+        context.stack_mut().pop();
+
+        context
+            .stack_mut()
+            .push_property("w:val", Some("maybe".to_string()), true);
+        on_off_simple_type_validator()
+            .validate(&mut context)
+            .unwrap();
+        assert!(!context.errors().is_empty());
+        context.stack_mut().pop();
     }
 }
