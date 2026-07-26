@@ -69,6 +69,11 @@ pub enum Particle {
         occurs: Occurs,
         namespace: XsdAnyNamespace,
     },
+    /// Version-gated particle (C# `ParticleConstraint.Version` + `Build`).
+    Versioned {
+        version: FileFormatVersions,
+        inner: Box<Particle>,
+    },
 }
 
 /// C# `XsdAny` — namespace constraint modes for `xs:any` wildcards.
@@ -141,6 +146,49 @@ impl Particle {
         Particle::Any { occurs, namespace }
     }
 
+    /// Gate `inner` on `version` (C# particle `Version` property).
+    pub fn versioned(version: FileFormatVersions, inner: Particle) -> Self {
+        Particle::Versioned {
+            version,
+            inner: Box::new(inner),
+        }
+    }
+
+    /// C# `ParticleConstraint.Build(version)` — prune subtrees whose version is
+    /// not satisfied by the target. Returns `None` when this particle itself is
+    /// filtered out.
+    pub fn build_for(&self, version: FileFormatVersions) -> Option<Particle> {
+        match self {
+            Particle::Versioned {
+                version: required,
+                inner,
+            } => {
+                if version.at_least(*required) {
+                    inner.build_for(version)
+                } else {
+                    None
+                }
+            }
+            Particle::Element { .. } | Particle::Any { .. } => Some(self.clone()),
+            Particle::Sequence { items, occurs } => Some(Particle::Sequence {
+                items: items.iter().filter_map(|i| i.build_for(version)).collect(),
+                occurs: *occurs,
+            }),
+            Particle::Choice { items, occurs } => Some(Particle::Choice {
+                items: items.iter().filter_map(|i| i.build_for(version)).collect(),
+                occurs: *occurs,
+            }),
+            Particle::Group { items, occurs } => Some(Particle::Group {
+                items: items.iter().filter_map(|i| i.build_for(version)).collect(),
+                occurs: *occurs,
+            }),
+            Particle::All { items, occurs } => Some(Particle::All {
+                items: items.iter().filter_map(|i| i.build_for(version)).collect(),
+                occurs: *occurs,
+            }),
+        }
+    }
+
     fn occurs(&self) -> Occurs {
         match self {
             Particle::Element { occurs, .. }
@@ -149,6 +197,7 @@ impl Particle {
             | Particle::Group { occurs, .. }
             | Particle::All { occurs, .. }
             | Particle::Any { occurs, .. } => *occurs,
+            Particle::Versioned { inner, .. } => inner.occurs(),
         }
     }
 
@@ -378,6 +427,7 @@ pub fn get_required_elements(particle: &Particle, result: &mut ExpectedChildren)
             }
             required
         }
+        Particle::Versioned { inner, .. } => get_required_elements(inner, result),
     }
 }
 
@@ -401,6 +451,7 @@ pub fn get_expected_elements(particle: &Particle, result: &mut ExpectedChildren)
             }
             true
         }
+        Particle::Versioned { inner, .. } => get_expected_elements(inner, result),
     }
 }
 
@@ -441,6 +492,12 @@ fn validate_particle_with_context(
         .iter()
         .map(|child| child.element)
         .collect();
+
+    // C# ValidationCache.GetConstraint: build the version-pruned particle first.
+    let built = particle.build_for(context.file_format());
+    let Some(particle) = built.as_ref() else {
+        return Vec::new();
+    };
 
     let result = match_particle(particle, &children, 0, element.namespace_uri.as_str());
     let mut errors = Vec::new();
@@ -642,6 +699,9 @@ fn match_once(
                 }
             }
         }
+        // build_for strips Versioned wrappers before matching; treat a direct
+        // call as transparent.
+        Particle::Versioned { inner, .. } => match_once(inner, children, start, target_ns),
     }
 }
 
@@ -1168,6 +1228,63 @@ mod tests {
             &mut expected,
         );
         assert_eq!(expected.any_namespaces(), &[String::from("##other")]);
+    }
+
+    #[test]
+    fn versioned_particles_prune_by_target_version() {
+        use crate::element::OpenXmlElement;
+
+        let particle = Particle::sequence(
+            vec![
+                Particle::element("body", Occurs::ONE),
+                Particle::versioned(
+                    FileFormatVersions::OFFICE2010,
+                    Particle::element("glow", Occurs::ONE),
+                ),
+            ],
+            Occurs::ONE,
+        );
+
+        let built_2007 = particle.build_for(FileFormatVersions::OFFICE2007).unwrap();
+        let mut expected = ExpectedChildren::new();
+        get_expected_elements(&built_2007, &mut expected);
+        assert_eq!(expected.elements(), &[String::from("body")]);
+
+        let built_2010 = particle.build_for(FileFormatVersions::OFFICE2010).unwrap();
+        let mut expected = ExpectedChildren::new();
+        get_expected_elements(&built_2010, &mut expected);
+        assert_eq!(
+            expected.elements(),
+            &[String::from("body"), String::from("glow")]
+        );
+
+        // A 2010-only child is rejected under a 2007 build but accepted for 2010.
+        let doc = OpenXmlElement::w("document")
+            .with_children(vec![OpenXmlElement::w("body"), OpenXmlElement::w("glow")]);
+        let errors_2007 = validate_particle_for_version(
+            &doc,
+            &particle,
+            "w:document",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(
+            errors_2007.iter().any(|e| e.message.contains("unexpected")),
+            "{errors_2007:?}"
+        );
+        let errors_2010 = validate_particle_for_version(
+            &doc,
+            &particle,
+            "w:document",
+            FileFormatVersions::OFFICE2010,
+        );
+        assert!(errors_2010.is_empty(), "{errors_2010:?}");
+
+        assert!(Particle::versioned(
+            FileFormatVersions::OFFICE2013,
+            Particle::element("x", Occurs::ONE)
+        )
+        .build_for(FileFormatVersions::OFFICE2007)
+        .is_none());
     }
 
     #[test]

@@ -942,6 +942,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `Sch_InvalidChildinLeafElement` leaf-content check from generated `is_leaf`/`is_leaf_text` metadata (one error per element)
 - [x] `Sch_AttributeValueDataTypeDetailed` lexical checks against generated attribute `type_name` (hex/base64/int families/OnOff/dateTime)
 - [x] `XsdAnyNamespace` modes on `Particle::Any` (##any/##other/##local/##targetNamespace vs parent target namespace) + wildcard tokens in expected-children
+- [x] `Particle::Versioned` + `build_for(version)` pruning (C# `ParticleConstraint.Build`); particle validation builds version-pruned trees first
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
