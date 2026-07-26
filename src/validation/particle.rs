@@ -1600,6 +1600,48 @@ pub mod spreadsheet {
         )
     }
 
+    /// `<x15:timelines>` timelines part root.
+    pub fn timelines() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("timeline", Occurs::STAR)],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x15:timelineCacheDefinition>` timeline cache part root.
+    pub fn timeline_cache_definition() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("pivotTables", Occurs::OPTIONAL),
+                Particle::element("state", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<xnsv:namedSheetViews>` named sheet views part root.
+    pub fn named_sheet_views() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("namedSheetView", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<xltc:personList>` workbook person list part root.
+    pub fn person_list() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("person", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1634,6 +1676,10 @@ pub mod spreadsheet {
             "ThreadedComments" => threaded_comments(),
             "slicers" => slicers(),
             "slicerCacheDefinition" => slicer_cache_definition(),
+            "timelines" => timelines(),
+            "timelineCacheDefinition" => timeline_cache_definition(),
+            "namedSheetViews" => named_sheet_views(),
+            "personList" => person_list(),
             // Note: "comments" is Word's w:comments in the combined registry;
             // worksheet comments are resolved via spreadsheet::particle_for
             // when callers know the application, or via DocumentValidator
@@ -1786,6 +1832,7 @@ pub mod presentation {
             "tagLst" => tag_list(),
             "viewPr" => view_properties(),
             "sldSyncPr" => slide_sync_properties(),
+            "authorLst" => author_list(),
             "cSld" => common_slide_data(),
             "spTree" => shape_tree(),
             "sp" => shape(),
@@ -1854,6 +1901,14 @@ pub mod presentation {
         Particle::sequence(
             vec![Particle::element("extLst", Occurs::OPTIONAL)],
             Occurs::STAR,
+        )
+    }
+
+    /// `<p188:authorLst>` modern PowerPoint authors part root.
+    pub fn author_list() -> Particle {
+        Particle::sequence(
+            vec![Particle::element("author", Occurs::STAR)],
+            Occurs::ONE,
         )
     }
 }
@@ -2416,6 +2471,42 @@ pub fn validate_spreadsheet_particles_for_version(
                 &root_mc,
             ));
         }
+        "timelines" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::timelines(),
+                "x15:timelines",
+                &context,
+                &root_mc,
+            ));
+        }
+        "timelineCacheDefinition" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::timeline_cache_definition(),
+                "x15:timelineCacheDefinition",
+                &context,
+                &root_mc,
+            ));
+        }
+        "namedSheetViews" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::named_sheet_views(),
+                "xnsv:namedSheetViews",
+                &context,
+                &root_mc,
+            ));
+        }
+        "personList" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::person_list(),
+                "xltc:personList",
+                &context,
+                &root_mc,
+            ));
+        }
         _ => {}
     }
     errors
@@ -2566,6 +2657,15 @@ pub fn validate_presentation_particles_for_version(
                 root,
                 &presentation::slide_sync_properties(),
                 "p:sldSyncPr",
+                &context,
+                &root_mc,
+            ));
+        }
+        "authorLst" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::author_list(),
+                "p188:authorLst",
                 &context,
                 &root_mc,
             ));
@@ -3649,6 +3749,69 @@ mod tests {
             &spreadsheet::slicers(),
             "x14:slicers",
             FileFormatVersions::OFFICE2010,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn timeline_named_sheet_and_author_roots() {
+        assert!(spreadsheet::particle_for("timelines").is_some());
+        assert!(spreadsheet::particle_for("timelineCacheDefinition").is_some());
+        assert!(spreadsheet::particle_for("namedSheetViews").is_some());
+        assert!(spreadsheet::particle_for("personList").is_some());
+        assert!(presentation::particle_for("authorLst").is_some());
+
+        let mut timelines = crate::element::OpenXmlElement::new(
+            "x15",
+            "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main",
+            "timelines",
+        );
+        timelines.append_child(crate::element::OpenXmlElement::new(
+            "x15",
+            "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main",
+            "timeline",
+        ));
+        let errs = validate_particle_for_version(
+            &timelines,
+            &spreadsheet::timelines(),
+            "x15:timelines",
+            FileFormatVersions::OFFICE2013,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut nsv = crate::element::OpenXmlElement::new(
+            "xnsv",
+            "http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews",
+            "namedSheetViews",
+        );
+        nsv.append_child(crate::element::OpenXmlElement::new(
+            "xnsv",
+            "http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews",
+            "namedSheetView",
+        ));
+        let errs = validate_particle_for_version(
+            &nsv,
+            &spreadsheet::named_sheet_views(),
+            "xnsv:namedSheetViews",
+            FileFormatVersions::OFFICE2019,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+
+        let mut authors = crate::element::OpenXmlElement::new(
+            "p188",
+            "http://schemas.microsoft.com/office/powerpoint/2018/8/main",
+            "authorLst",
+        );
+        authors.append_child(crate::element::OpenXmlElement::new(
+            "p188",
+            "http://schemas.microsoft.com/office/powerpoint/2018/8/main",
+            "author",
+        ));
+        let errs = validate_particle_for_version(
+            &authors,
+            &presentation::author_list(),
+            "p188:authorLst",
+            FileFormatVersions::OFFICE2019,
         );
         assert!(errs.is_empty(), "{errs:?}");
     }

@@ -174,7 +174,11 @@ impl DocumentValidator {
             | "users"
             | "ThreadedComments"
             | "slicers"
-            | "slicerCacheDefinition" => {
+            | "slicerCacheDefinition"
+            | "timelines"
+            | "timelineCacheDefinition"
+            | "namedSheetViews"
+            | "personList" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld"
@@ -189,7 +193,8 @@ impl DocumentValidator {
             | "cmAuthorLst"
             | "tagLst"
             | "viewPr"
-            | "sldSyncPr" => {
+            | "sldSyncPr"
+            | "authorLst" => {
                 super::validate_presentation_particles_for_version(root, version)
             }
             "theme"
