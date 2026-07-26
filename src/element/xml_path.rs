@@ -217,6 +217,90 @@ impl OpenXmlElement {
     }
 }
 
+fn word_children_of(local_name: &str) -> Option<&'static [crate::generated::wordprocessingml_2006_main::ChildInfo]> {
+    crate::generated::wordprocessingml_2006_main::info_by_local_name(local_name)
+        .map(|info| info.children)
+}
+
+fn child_info_local_name(name: &str) -> &str {
+    // ChildInfo names are `prefix:CT_Type/prefix:localName`.
+    let tail = name.rsplit('/').next().unwrap_or(name);
+    tail.rsplit(':').next().unwrap_or(tail)
+}
+
+impl OpenXmlElement {
+    /// C# `GetXPathIndex` — 1-based index of `child` among same-name siblings
+    /// of `self`. Misc nodes are always `1`; unknown children match on
+    /// namespace + local name (same rule as known children in this DOM).
+    pub fn get_xpath_index(&self, child_index: usize) -> usize {
+        xpath_index_among_siblings(self, child_index)
+    }
+
+    /// C# `GetAttributeValueEx` — attribute value or `None` (no throw).
+    pub fn get_attribute_value_ex(&self, local_name: &str, namespace_uri: &str) -> Option<&str> {
+        self.get_attribute_ns(local_name, namespace_uri)
+    }
+
+    /// C# `CanContainChild` — whether the schema children table of `self`
+    /// (WordprocessingML metadata) lists `child`'s local name.
+    pub fn can_contain_child(&self, child: &OpenXmlElement) -> bool {
+        if child.is_misc_node() || child.is_unknown() {
+            return false;
+        }
+        let Some(children) = word_children_of(&self.local_name) else {
+            return false;
+        };
+        children
+            .iter()
+            .any(|info| child_info_local_name(info.name) == child.local_name)
+    }
+
+    /// C# `TryCreateValidChild` — create an empty child element when the parent
+    /// allows it and its namespace prefix is available in `file_format`.
+    pub fn try_create_valid_child(
+        &self,
+        file_format: crate::file_format::FileFormatVersions,
+        prefix: &str,
+        local_name: &str,
+    ) -> Option<OpenXmlElement> {
+        let children = word_children_of(&self.local_name)?;
+        if !children
+            .iter()
+            .any(|info| child_info_local_name(info.name) == local_name)
+        {
+            return None;
+        }
+        let info = crate::generated::wordprocessingml_2006_main::info_by_local_name(local_name);
+        let (resolved_prefix, namespace_uri) = match info {
+            Some(info) if prefix.is_empty() || info.prefix == prefix => {
+                (info.prefix, info.namespace_uri)
+            }
+            _ => {
+                let uri = crate::generated::namespaces::uri_for_prefix(prefix)?;
+                (prefix, uri)
+            }
+        };
+        if !file_format
+            .includes_introduction(crate::file_format::prefix_introduced_in(resolved_prefix))
+        {
+            return None;
+        }
+        Some(OpenXmlElement::new(resolved_prefix, namespace_uri, local_name))
+    }
+
+    /// C# `IsInVersion` — whether this element's namespace prefix is defined in
+    /// `version` (misc/unknown elements are never "in version").
+    pub fn is_in_version(&self, version: crate::file_format::FileFormatVersions) -> bool {
+        if !self.is_known_element() {
+            return false;
+        }
+        if self.prefix.is_empty() {
+            return true;
+        }
+        version.includes_introduction(crate::file_format::prefix_introduced_in(&self.prefix))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,6 +343,60 @@ mod tests {
         let p = XmlPath::for_part("/word/document.xml");
         assert!(p.xpath.is_empty());
         assert_eq!(p.part_uri.as_deref(), Some("/word/document.xml"));
+    }
+
+    #[test]
+    fn xpath_index_counts_same_name_siblings() {
+        let doc = body(vec![
+            paragraph(vec![]),
+            paragraph(vec![]),
+            paragraph(vec![]),
+        ]);
+        assert_eq!(doc.get_xpath_index(0), 1);
+        assert_eq!(doc.get_xpath_index(2), 3);
+
+        let mut mixed = body(vec![paragraph(vec![])]);
+        mixed.append_child(OpenXmlElement::comment("x"));
+        mixed.append_child(paragraph(vec![]));
+        assert_eq!(mixed.get_xpath_index(1), 1); // misc always 1
+        assert_eq!(mixed.get_xpath_index(2), 2);
+    }
+
+    #[test]
+    fn can_contain_and_create_valid_children() {
+        use crate::file_format::FileFormatVersions;
+
+        let p = paragraph(vec![]);
+        assert!(p.can_contain_child(&run(vec![])));
+        assert!(!p.can_contain_child(&body(vec![])));
+        assert!(!p.can_contain_child(&OpenXmlElement::comment("x")));
+        assert!(!p.can_contain_child(&OpenXmlElement::unknown("x", "r", "urn:x")));
+
+        let created = p
+            .try_create_valid_child(FileFormatVersions::OFFICE2007, "w", "r")
+            .expect("w:r allowed in w:p");
+        assert_eq!(created.local_name, "r");
+        assert_eq!(created.prefix, "w");
+        assert!(p
+            .try_create_valid_child(FileFormatVersions::OFFICE2007, "w", "body")
+            .is_none());
+    }
+
+    #[test]
+    fn element_is_in_version_by_prefix() {
+        use crate::file_format::FileFormatVersions;
+
+        assert!(paragraph(vec![]).is_in_version(FileFormatVersions::OFFICE2007));
+        let w14 = OpenXmlElement::new(
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml",
+            "glow",
+        );
+        assert!(!w14.is_in_version(FileFormatVersions::OFFICE2007));
+        assert!(w14.is_in_version(FileFormatVersions::OFFICE2010));
+        assert!(!OpenXmlElement::comment("c").is_in_version(FileFormatVersions::OFFICE2007));
+        assert!(!OpenXmlElement::unknown("x", "y", "urn:x")
+            .is_in_version(FileFormatVersions::OFFICE2007));
     }
 }
 
