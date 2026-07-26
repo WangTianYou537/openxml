@@ -151,7 +151,7 @@ impl DocumentValidator {
         let version = self.cache.version();
         let structured: Vec<ValidationError> = match root.local_name.as_str() {
             "document" => super::validate_word_particles_for_version(root, version),
-            "worksheet" | "workbook" => {
+            "worksheet" | "workbook" | "sst" | "styleSheet" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
             "sld" | "sldLayout" | "sldMaster" | "presentation" => {

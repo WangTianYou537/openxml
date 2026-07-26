@@ -1154,6 +1154,53 @@ pub mod spreadsheet {
         )
     }
 
+    /// `<x:sst>` shared string table.
+    pub fn shared_string_table() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("si", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x:styleSheet>` — ordered optional collections.
+    pub fn stylesheet() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("numFmts", Occurs::OPTIONAL),
+                Particle::element("fonts", Occurs::OPTIONAL),
+                Particle::element("fills", Occurs::OPTIONAL),
+                Particle::element("borders", Occurs::OPTIONAL),
+                Particle::element("cellStyleXfs", Occurs::OPTIONAL),
+                Particle::element("cellXfs", Occurs::OPTIONAL),
+                Particle::element("cellStyles", Occurs::OPTIONAL),
+                Particle::element("dxfs", Occurs::OPTIONAL),
+                Particle::element("tableStyles", Occurs::OPTIONAL),
+                Particle::element("colors", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn fonts() -> Particle {
+        Particle::sequence(vec![Particle::element("font", Occurs::STAR)], Occurs::ONE)
+    }
+
+    pub fn fills() -> Particle {
+        Particle::sequence(vec![Particle::element("fill", Occurs::STAR)], Occurs::ONE)
+    }
+
+    pub fn borders() -> Particle {
+        Particle::sequence(vec![Particle::element("border", Occurs::STAR)], Occurs::ONE)
+    }
+
+    pub fn cell_xfs() -> Particle {
+        Particle::sequence(vec![Particle::element("xf", Occurs::STAR)], Occurs::ONE)
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1162,6 +1209,12 @@ pub mod spreadsheet {
             "sheetData" => sheet_data(),
             "row" => row(),
             "c" => cell(),
+            "sst" => shared_string_table(),
+            "styleSheet" => stylesheet(),
+            "fonts" => fonts(),
+            "fills" => fills(),
+            "borders" => borders(),
+            "cellXfs" => cell_xfs(),
             _ => return None,
         })
     }
@@ -1526,6 +1579,24 @@ pub fn validate_spreadsheet_particles_for_version(
                     }
                 }
             }
+        }
+        "sst" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::shared_string_table(),
+                "x:sst",
+                &context,
+                &root_mc,
+            ));
+        }
+        "styleSheet" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::stylesheet(),
+                "x:styleSheet",
+                &context,
+                &root_mc,
+            ));
         }
         _ => {}
     }
@@ -2113,8 +2184,32 @@ mod tests {
         assert!(spreadsheet::particle_for("sheetData").is_some());
         assert!(spreadsheet::particle_for("row").is_some());
         assert!(spreadsheet::particle_for("c").is_some());
+        assert!(spreadsheet::particle_for("sst").is_some());
+        assert!(spreadsheet::particle_for("styleSheet").is_some());
+        assert!(spreadsheet::particle_for("fonts").is_some());
         assert!(crate::validation::particle::particle_for("worksheet").is_some());
         assert!(crate::validation::particle::particle_for("document").is_some());
+    }
+
+    #[test]
+    fn stylesheet_particle_accepts_fonts_then_fills() {
+        let mut ss = crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "styleSheet",
+        );
+        ss.append_child(crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "fonts",
+        ));
+        ss.append_child(crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "fills",
+        ));
+        let errs = validate_spreadsheet_particles(&ss);
+        assert!(errs.is_empty(), "{errs:?}");
     }
 
     #[test]
