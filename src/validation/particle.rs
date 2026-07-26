@@ -64,8 +64,46 @@ pub enum Particle {
     Group { items: Vec<Particle>, occurs: Occurs },
     /// XSD `xs:all` — treat as unordered choice-star of each item once (simplified: choice of items each optional, then require each min).
     All { items: Vec<Particle>, occurs: Occurs },
-    /// Any element (wildcard).
-    Any { occurs: Occurs },
+    /// Any element (wildcard) with a namespace mode (C# `AnyParticle` + `XsdAny`).
+    Any {
+        occurs: Occurs,
+        namespace: XsdAnyNamespace,
+    },
+}
+
+/// C# `XsdAny` — namespace constraint modes for `xs:any` wildcards.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum XsdAnyNamespace {
+    /// `##any` — elements from any namespace.
+    #[default]
+    Any,
+    /// `##other` — any namespace other than the parent's target namespace.
+    Other,
+    /// `##local` — unqualified elements only.
+    Local,
+    /// `##targetNamespace` — the parent's target namespace only.
+    TargetNamespace,
+}
+
+impl XsdAnyNamespace {
+    /// Wildcard token used in expected-children messages.
+    pub fn token(self) -> &'static str {
+        match self {
+            XsdAnyNamespace::Any => "##any",
+            XsdAnyNamespace::Other => "##other",
+            XsdAnyNamespace::Local => "##local",
+            XsdAnyNamespace::TargetNamespace => "##targetNamespace",
+        }
+    }
+
+    fn matches(self, element_ns: &str, target_ns: &str) -> bool {
+        match self {
+            XsdAnyNamespace::Any => true,
+            XsdAnyNamespace::Local => element_ns.is_empty(),
+            XsdAnyNamespace::Other => !element_ns.is_empty() && element_ns != target_ns,
+            XsdAnyNamespace::TargetNamespace => !element_ns.is_empty() && element_ns == target_ns,
+        }
+    }
 }
 
 impl Particle {
@@ -93,7 +131,14 @@ impl Particle {
     }
 
     pub fn any(occurs: Occurs) -> Self {
-        Particle::Any { occurs }
+        Particle::Any {
+            occurs,
+            namespace: XsdAnyNamespace::Any,
+        }
+    }
+
+    pub fn any_with_namespace(occurs: Occurs, namespace: XsdAnyNamespace) -> Self {
+        Particle::Any { occurs, namespace }
     }
 
     fn occurs(&self) -> Occurs {
@@ -103,7 +148,7 @@ impl Particle {
             | Particle::Choice { occurs, .. }
             | Particle::Group { occurs, .. }
             | Particle::All { occurs, .. }
-            | Particle::Any { occurs } => *occurs,
+            | Particle::Any { occurs, .. } => *occurs,
         }
     }
 
@@ -294,9 +339,9 @@ pub fn get_required_elements(particle: &Particle, result: &mut ExpectedChildren)
                 false
             }
         }
-        Particle::Any { occurs } => {
+        Particle::Any { occurs, namespace } => {
             if occurs.min > 0 {
-                result.add_any_namespace("##any");
+                result.add_any_namespace(namespace.token());
                 true
             } else {
                 false
@@ -343,8 +388,8 @@ pub fn get_expected_elements(particle: &Particle, result: &mut ExpectedChildren)
             result.add_element(local_name.clone());
             true
         }
-        Particle::Any { .. } => {
-            result.add_any_namespace("##any");
+        Particle::Any { namespace, .. } => {
+            result.add_any_namespace(namespace.token());
             true
         }
         Particle::Sequence { items, .. }
@@ -397,7 +442,7 @@ fn validate_particle_with_context(
         .map(|child| child.element)
         .collect();
 
-    let result = match_particle(particle, &children, 0);
+    let result = match_particle(particle, &children, 0, element.namespace_uri.as_str());
     let mut errors = Vec::new();
 
     if result.consumed < children.len() {
@@ -427,7 +472,12 @@ fn validate_particle_with_context(
     errors
 }
 
-fn match_particle(particle: &Particle, children: &[&OpenXmlElement], start: usize) -> MatchResult {
+fn match_particle(
+    particle: &Particle,
+    children: &[&OpenXmlElement],
+    start: usize,
+    target_ns: &str,
+) -> MatchResult {
     let occurs = particle.occurs();
     let mut total_consumed = 0usize;
     let mut count = 0u32;
@@ -443,7 +493,7 @@ fn match_particle(particle: &Particle, children: &[&OpenXmlElement], start: usiz
         if pos > children.len() {
             break;
         }
-        let one = match_once(particle, children, pos);
+        let one = match_once(particle, children, pos, target_ns);
         if one.consumed == 0 {
             errors.extend(one.errors);
             break;
@@ -465,7 +515,12 @@ fn match_particle(particle: &Particle, children: &[&OpenXmlElement], start: usiz
     }
 }
 
-fn match_once(particle: &Particle, children: &[&OpenXmlElement], start: usize) -> MatchResult {
+fn match_once(
+    particle: &Particle,
+    children: &[&OpenXmlElement],
+    start: usize,
+    target_ns: &str,
+) -> MatchResult {
     match particle {
         Particle::Element { local_name, .. } => {
             if let Some(child) = children.get(start) {
@@ -481,8 +536,11 @@ fn match_once(particle: &Particle, children: &[&OpenXmlElement], start: usize) -
                 errors: Vec::new(),
             }
         }
-        Particle::Any { .. } => {
-            if children.get(start).is_some() {
+        Particle::Any { namespace, .. } => {
+            if children
+                .get(start)
+                .is_some_and(|child| namespace.matches(child.namespace_uri.as_str(), target_ns))
+            {
                 MatchResult {
                     consumed: 1,
                     errors: Vec::new(),
@@ -498,7 +556,7 @@ fn match_once(particle: &Particle, children: &[&OpenXmlElement], start: usize) -
             let mut total = 0usize;
             let mut errors = Vec::new();
             for item in items {
-                let r = match_particle(item, children, start + total);
+                let r = match_particle(item, children, start + total, target_ns);
                 if r.consumed == 0 && item.occurs().min > 0 {
                     errors.extend(r.errors);
                     errors.push(format!(
@@ -521,7 +579,7 @@ fn match_once(particle: &Particle, children: &[&OpenXmlElement], start: usize) -
         Particle::Choice { items, .. } => {
             let mut best: Option<MatchResult> = None;
             for item in items {
-                let r = match_particle(item, children, start);
+                let r = match_particle(item, children, start, target_ns);
                 if r.consumed > 0 && r.errors.is_empty() {
                     match &best {
                         Some(b) if b.consumed >= r.consumed => {}
@@ -552,7 +610,7 @@ fn match_once(particle: &Particle, children: &[&OpenXmlElement], start: usize) -
                     if used[i] {
                         continue;
                     }
-                    let r = match_particle(item, children, pos);
+                    let r = match_particle(item, children, pos, target_ns);
                     if r.consumed > 0 && r.errors.is_empty() {
                         used[i] = true;
                         total += r.consumed;
@@ -1072,6 +1130,44 @@ mod tests {
         assert!(info.last_matched_element.is_none());
         assert!(info.error_message.is_none());
         assert!(info.expected_children().is_empty());
+    }
+
+    #[test]
+    fn xsd_any_namespace_modes_gate_matching() {
+        use crate::element::OpenXmlElement;
+
+        let w_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        let parent_with = |child: OpenXmlElement| {
+            OpenXmlElement::new("w", w_ns, "container").with_child(child)
+        };
+        let same_ns_child = OpenXmlElement::new("w", w_ns, "inner");
+        let other_ns_child = OpenXmlElement::new("x", "urn:other", "inner");
+        let local_child = OpenXmlElement::new("", "", "inner");
+
+        let check = |mode: XsdAnyNamespace, child: &OpenXmlElement| {
+            let particle = Particle::any_with_namespace(Occurs::ONE, mode);
+            validate_particle(&parent_with(child.clone()), &particle, "container").is_empty()
+        };
+
+        assert!(check(XsdAnyNamespace::Any, &same_ns_child));
+        assert!(check(XsdAnyNamespace::Any, &other_ns_child));
+
+        assert!(check(XsdAnyNamespace::Local, &local_child));
+        assert!(!check(XsdAnyNamespace::Local, &same_ns_child));
+
+        assert!(check(XsdAnyNamespace::Other, &other_ns_child));
+        assert!(!check(XsdAnyNamespace::Other, &same_ns_child));
+        assert!(!check(XsdAnyNamespace::Other, &local_child));
+
+        assert!(check(XsdAnyNamespace::TargetNamespace, &same_ns_child));
+        assert!(!check(XsdAnyNamespace::TargetNamespace, &other_ns_child));
+
+        let mut expected = ExpectedChildren::new();
+        get_expected_elements(
+            &Particle::any_with_namespace(Occurs::ONE, XsdAnyNamespace::Other),
+            &mut expected,
+        );
+        assert_eq!(expected.any_namespaces(), &[String::from("##other")]);
     }
 
     #[test]

@@ -941,6 +941,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `Sch_UndeclaredAttribute` extended-attribute check against generated attribute tables (inherited MC Ignorable, xml:/xmlns/mc: skips) wired into DocumentValidator
 - [x] `Sch_InvalidChildinLeafElement` leaf-content check from generated `is_leaf`/`is_leaf_text` metadata (one error per element)
 - [x] `Sch_AttributeValueDataTypeDetailed` lexical checks against generated attribute `type_name` (hex/base64/int families/OnOff/dateTime)
+- [x] `XsdAnyNamespace` modes on `Particle::Any` (##any/##other/##local/##targetNamespace vs parent target namespace) + wildcard tokens in expected-children
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
