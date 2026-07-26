@@ -1015,6 +1015,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Word particles: `settings` / `webSettings` / `glossaryDocument` (via generated content models); DocumentValidator routes them
 - [x] AC unprefixed-attribute parity (`MC_ErrorOnUnprefixedAttributeName`); `choice()` emits `mc:Requires`
 - [x] DrawingML particles: `theme` / `themeOverride` / `chartSpace`; Spreadsheet `chartsheet`; Presentation `handoutMaster` / `presentationPr`; combined registry + DocumentValidator walks
+- [x] Spreadsheet particles: `calcChain` / `connections` / `externalLink` / `table` / `queryTable` / `pivotTableDefinition` + DocumentValidator walks
 
 **Still intentionally deferred / partial:**
 

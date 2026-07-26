@@ -1400,6 +1400,51 @@ pub mod spreadsheet {
         crate::generated::spreadsheetml_2006_main::particle_chartsheet()
     }
 
+    /// `<x:calcChain>` calculation chain part root.
+    ///
+    /// Generated model uses outer `Occurs::STAR` + inner `c` PLUS; for the
+    /// hand-authored registry we use ONE + STAR which matches real packages
+    /// (zero or more `c` cells) and the matcher more reliably.
+    pub fn calculation_chain() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("c", Occurs::STAR),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    /// `<x:connections>` workbook connections part root.
+    pub fn connections() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_connections()
+    }
+
+    /// `<x:externalLink>` external workbook link part root.
+    pub fn external_link() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_external_link()
+    }
+
+    /// `<x:table>` table definition part root.
+    pub fn table() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_table()
+    }
+
+    /// `<x:comments>` worksheet comments part root (distinct from Word `w:comments`).
+    pub fn comments() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_comments()
+    }
+
+    /// `<x:queryTable>` query table part root.
+    pub fn query_table() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_query_table()
+    }
+
+    /// `<x:pivotTableDefinition>` pivot table part root.
+    pub fn pivot_table_definition() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_pivot_table_definition()
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1415,6 +1460,16 @@ pub mod spreadsheet {
             "borders" => borders(),
             "cellXfs" => cell_xfs(),
             "chartsheet" => chartsheet(),
+            "calcChain" => calculation_chain(),
+            "connections" => connections(),
+            "externalLink" => external_link(),
+            "table" => table(),
+            "queryTable" => query_table(),
+            "pivotTableDefinition" => pivot_table_definition(),
+            // Note: "comments" is Word's w:comments in the combined registry;
+            // worksheet comments are resolved via spreadsheet::particle_for
+            // when callers know the application, or via DocumentValidator
+            // content-type routing.
             _ => return None,
         })
     }
@@ -1889,6 +1944,60 @@ pub fn validate_spreadsheet_particles_for_version(
                 root,
                 &spreadsheet::chartsheet(),
                 "x:chartsheet",
+                &context,
+                &root_mc,
+            ));
+        }
+        "calcChain" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::calculation_chain(),
+                "x:calcChain",
+                &context,
+                &root_mc,
+            ));
+        }
+        "connections" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::connections(),
+                "x:connections",
+                &context,
+                &root_mc,
+            ));
+        }
+        "externalLink" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::external_link(),
+                "x:externalLink",
+                &context,
+                &root_mc,
+            ));
+        }
+        "table" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::table(),
+                "x:table",
+                &context,
+                &root_mc,
+            ));
+        }
+        "queryTable" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::query_table(),
+                "x:queryTable",
+                &context,
+                &root_mc,
+            ));
+        }
+        "pivotTableDefinition" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::pivot_table_definition(),
+                "x:pivotTableDefinition",
                 &context,
                 &root_mc,
             ));
@@ -2774,6 +2883,57 @@ mod tests {
             &cs,
             &spreadsheet::chartsheet(),
             "x:chartsheet",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn spreadsheet_workbook_part_roots_resolve() {
+        assert!(spreadsheet::particle_for("calcChain").is_some());
+        assert!(spreadsheet::particle_for("connections").is_some());
+        assert!(spreadsheet::particle_for("externalLink").is_some());
+        assert!(spreadsheet::particle_for("table").is_some());
+        assert!(spreadsheet::particle_for("queryTable").is_some());
+        assert!(spreadsheet::particle_for("pivotTableDefinition").is_some());
+        assert!(crate::validation::particle::particle_for("calcChain").is_some());
+        assert!(crate::validation::particle::particle_for("table").is_some());
+    }
+
+    #[test]
+    fn calc_chain_particle_accepts_c() {
+        let mut chain = crate::element::OpenXmlElement::x("calcChain");
+        chain.append_child(crate::element::OpenXmlElement::x("c"));
+        let errs = validate_particle_for_version(
+            &chain,
+            &spreadsheet::calculation_chain(),
+            "x:calcChain",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn table_definition_particle_accepts_columns() {
+        let mut table = crate::element::OpenXmlElement::x("table");
+        table.append_child(crate::element::OpenXmlElement::x("tableColumns"));
+        let errs = validate_particle_for_version(
+            &table,
+            &spreadsheet::table(),
+            "x:table",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn external_link_particle_accepts_external_book() {
+        let mut link = crate::element::OpenXmlElement::x("externalLink");
+        link.append_child(crate::element::OpenXmlElement::x("externalBook"));
+        let errs = validate_particle_for_version(
+            &link,
+            &spreadsheet::external_link(),
+            "x:externalLink",
             FileFormatVersions::OFFICE2007,
         );
         assert!(errs.is_empty(), "{errs:?}");
