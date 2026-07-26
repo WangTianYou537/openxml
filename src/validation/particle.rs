@@ -572,27 +572,46 @@ fn validate_particle_with_context(
 
     if result.consumed < children.len() {
         let extra = children[result.consumed];
-        let mut message = format!(
-            "unexpected child `<{}>` at position {} under `<{}>` (particle mismatch)",
-            extra.local_name, result.consumed, element.local_name
-        );
+        let mut expected_suffix = String::new();
         if context.collect_expected_children {
             let mut expected = ExpectedChildren::new();
             get_expected_elements(particle, &mut expected);
-            message.push_str(&expected.expected_children_message());
+            expected_suffix = expected.expected_children_message();
         }
-        errors.push(ValidationError {
-            path: format!("{path}/{}", extra.local_name),
-            message,
-            ..Default::default()
-        });
+        let child_name = if extra.prefix.is_empty() {
+            extra.local_name.clone()
+        } else {
+            format!("{}:{}", extra.prefix, extra.local_name)
+        };
+        let description = format!(
+            "The element has invalid child element '{child_name}'.{expected_suffix}"
+        );
+        errors.push(
+            ValidationError::with_id(
+                format!("{path}/{}", extra.local_name),
+                "Sch_InvalidElementContentExpectingComplex",
+                description,
+            )
+            .with_error_type(crate::validation::ValidationErrorType::Schema),
+        );
     }
     for e in result.errors {
-        errors.push(ValidationError {
-            path: path.to_string(),
-            message: e,
-            ..Default::default()
-        });
+        let incomplete = e.contains("requires at least") || e.contains("required particle");
+        let (id, description) = if incomplete {
+            (
+                "Sch_IncompleteContentExpectingComplex",
+                format!("The element has incomplete content. {e}"),
+            )
+        } else {
+            (
+                "Sch_InvalidElementContentExpectingComplex",
+                e,
+            )
+        };
+        errors.push(
+            ValidationError::with_id(path, id, description)
+                .with_error_type(crate::validation::ValidationErrorType::Schema),
+        );
     }
     errors
 }
@@ -1079,7 +1098,11 @@ mod tests {
         let mut doc = document(vec![body(vec![])]);
         doc.append_child(crate::element::OpenXmlElement::w("bogus"));
         let errs = validate_word_particles(&doc);
-        assert!(errs.iter().any(|e| e.message.contains("unexpected")));
+        assert!(errs.iter().any(|e| {
+            e.id() == Some("Sch_InvalidElementContentExpectingComplex")
+                || e.message.contains("invalid child")
+                || e.message.contains("unexpected")
+        }));
     }
 
     #[test]
@@ -1355,7 +1378,11 @@ mod tests {
             FileFormatVersions::OFFICE2007,
         );
         assert!(
-            errors_2007.iter().any(|e| e.message.contains("unexpected")),
+            errors_2007.iter().any(|e| {
+                e.id() == Some("Sch_InvalidElementContentExpectingComplex")
+                    || e.message.contains("invalid child")
+                    || e.message.contains("unexpected")
+            }),
             "{errors_2007:?}"
         );
         let errors_2010 = validate_particle_for_version(
@@ -1390,7 +1417,11 @@ mod tests {
             &context,
             &McContext::new(),
         );
-        assert!(plain[0].message.ends_with("(particle mismatch)"), "{plain:?}");
+        assert_eq!(
+            plain[0].id(),
+            Some("Sch_InvalidElementContentExpectingComplex"),
+            "{plain:?}"
+        );
 
         context.set_collect_expected_children(true);
         let collected = validate_particle_with_context(

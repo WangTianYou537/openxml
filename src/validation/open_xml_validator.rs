@@ -337,27 +337,32 @@ impl OpenXmlValidator {
         self.validate_dom_element(element)
     }
 
-    /// Validate a [`WordprocessingDocument`]: package + main DOM full rules.
+    /// Validate a [`WordprocessingDocument`]: full package orchestration via
+    /// [`DocumentValidator`] (structure, schema, MC, Schematron, relationships).
     pub fn validate_word(&mut self, doc: &mut WordprocessingDocument) -> Result<Vec<ValidationError>> {
-        let mut errors = doc.validate_package()?;
-        errors.extend(doc.validate_full()?);
-        Ok(self.cap(errors))
+        self.validate_document_package(doc.package())
     }
 
-    /// Validate a [`SpreadsheetDocument`]: package structure (+ constraints).
+    /// Validate a [`SpreadsheetDocument`]: package structure + constraints +
+    /// DocumentValidator package orchestration.
     pub fn validate_spreadsheet(
         &mut self,
         doc: &SpreadsheetDocument,
     ) -> Result<Vec<ValidationError>> {
-        Ok(self.cap(doc.validate_package()?))
+        let mut errors = self.validate_document_package(doc.package())?;
+        errors.extend(doc.validate_package_constraints()?);
+        Ok(self.cap(errors))
     }
 
-    /// Validate a [`PresentationDocument`]: package structure (+ constraints).
+    /// Validate a [`PresentationDocument`]: package structure + constraints +
+    /// DocumentValidator package orchestration.
     pub fn validate_presentation(
         &mut self,
         doc: &PresentationDocument,
     ) -> Result<Vec<ValidationError>> {
-        Ok(self.cap(doc.validate_package()?))
+        let mut errors = self.validate_document_package(doc.package())?;
+        errors.extend(doc.validate_package_constraints()?);
+        Ok(self.cap(errors))
     }
 }
 

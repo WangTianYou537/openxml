@@ -467,7 +467,10 @@ mod tests {
             context
                 .errors()
                 .iter()
-                .any(|e| e.message.contains("particle mismatch")),
+                .any(|e| {
+                    e.id() == Some("Sch_InvalidElementContentExpectingComplex")
+                        || e.message.contains("invalid child")
+                }),
             "{:?}",
             context.errors()
         );

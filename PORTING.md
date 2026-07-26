@@ -951,6 +951,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `XsdType` + `ParticleType` enums; `ValidationCache::get_constraint` version-builds/memos Word particles; DocumentValidator prefers cache for non-document roots
 - [x] Attribute lexical checks route through `XsdType::validate_lexical`; `Particle::Any` supports `AnyWithUri` + `any_with_uri` constructor; `XsdAnyNamespace::namespace_string`
 - [x] `OpenXmlValidator::validate_element` routes through `DocumentValidator`/`validate_dom_element`; `ValidationContext::get_particle_constraint` (C# `GetParticleConstraint`)
+- [x] Particle mismatch errors use `Sch_InvalidElementContentExpectingComplex` / `Sch_IncompleteContentExpectingComplex` ids; Word/Excel/PPT validate_* route through DocumentValidator package orchestration + package constraints
 - [x] `ValidationContext` embeds stack + state manager
 - [x] `OpenSettings` fluent builders + `from_other` copy ctor
 
