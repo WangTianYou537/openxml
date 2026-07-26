@@ -1395,6 +1395,11 @@ pub mod spreadsheet {
         Particle::sequence(vec![Particle::element("xf", Occurs::STAR)], Occurs::ONE)
     }
 
+    /// `<x:chartsheet>` chartsheet part root (generated content model).
+    pub fn chartsheet() -> Particle {
+        crate::generated::spreadsheetml_2006_main::particle_chartsheet()
+    }
+
     pub fn particle_for(local_name: &str) -> Option<Particle> {
         Some(match local_name {
             "workbook" => workbook(),
@@ -1409,6 +1414,7 @@ pub mod spreadsheet {
             "fills" => fills(),
             "borders" => borders(),
             "cellXfs" => cell_xfs(),
+            "chartsheet" => chartsheet(),
             _ => return None,
         })
     }
@@ -1550,6 +1556,8 @@ pub mod presentation {
             "sldMaster" => slide_master(),
             "notes" => notes_slide(),
             "notesMaster" => notes_master(),
+            "handoutMaster" => handout_master(),
+            "presentationPr" => presentation_properties(),
             "cSld" => common_slide_data(),
             "spTree" => shape_tree(),
             "sp" => shape(),
@@ -1581,14 +1589,72 @@ pub mod presentation {
             Occurs::ONE,
         )
     }
+
+    /// `<p:handoutMaster>` (generated content model).
+    pub fn handout_master() -> Particle {
+        crate::generated::presentationml_2006_main::particle_handout_master()
+    }
+
+    /// `<p:presentationPr>` presentation properties (generated content model).
+    pub fn presentation_properties() -> Particle {
+        crate::generated::presentationml_2006_main::particle_presentation_properties()
+    }
 }
 
-/// Combined particle registry (Word + Spreadsheet + Presentation) for
+/// DrawingML part-root particles (`theme`, `themeOverride`, `chartSpace`).
+pub mod drawing {
+    use super::Particle;
+
+    /// `<a:theme>` theme part root (generated content model).
+    pub fn theme() -> Particle {
+        crate::generated::drawingml_2006_main::particle_theme()
+    }
+
+    /// `<a:themeOverride>` theme override part root (generated content model).
+    pub fn theme_override() -> Particle {
+        crate::generated::drawingml_2006_main::particle_theme_override()
+    }
+
+    /// `<c:chartSpace>` chart part root.
+    pub fn chart_space() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("date1904", super::Occurs::OPTIONAL),
+                Particle::element("lang", super::Occurs::OPTIONAL),
+                Particle::element("roundedCorners", super::Occurs::OPTIONAL),
+                Particle::element("style", super::Occurs::OPTIONAL),
+                Particle::element("clrMapOvr", super::Occurs::OPTIONAL),
+                Particle::element("pivotSource", super::Occurs::OPTIONAL),
+                Particle::element("protection", super::Occurs::OPTIONAL),
+                Particle::element("chart", super::Occurs::OPTIONAL),
+                Particle::element("spPr", super::Occurs::OPTIONAL),
+                Particle::element("txPr", super::Occurs::OPTIONAL),
+                Particle::element("externalData", super::Occurs::OPTIONAL),
+                Particle::element("printSettings", super::Occurs::OPTIONAL),
+                Particle::element("userShapes", super::Occurs::OPTIONAL),
+                Particle::element("extLst", super::Occurs::OPTIONAL),
+            ],
+            super::Occurs::ONE,
+        )
+    }
+
+    pub fn particle_for(local_name: &str) -> Option<Particle> {
+        Some(match local_name {
+            "theme" => theme(),
+            "themeOverride" => theme_override(),
+            "chartSpace" => chart_space(),
+            _ => return None,
+        })
+    }
+}
+
+/// Combined particle registry (Word + Spreadsheet + Presentation + Drawing) for
 /// [`ValidationCache::get_constraint`] / SchemaTypeValidator.
 pub fn particle_for(local_name: &str) -> Option<Particle> {
     word::particle_for(local_name)
         .or_else(|| spreadsheet::particle_for(local_name))
         .or_else(|| presentation::particle_for(local_name))
+        .or_else(|| drawing::particle_for(local_name))
 }
 
 /// Recursively validate a Word document using ordered particles.
@@ -1818,6 +1884,15 @@ pub fn validate_spreadsheet_particles_for_version(
                 &root_mc,
             ));
         }
+        "chartsheet" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &spreadsheet::chartsheet(),
+                "x:chartsheet",
+                &context,
+                &root_mc,
+            ));
+        }
         _ => {}
     }
     errors
@@ -1848,12 +1923,13 @@ pub fn validate_presentation_particles_for_version(
                 &root_mc,
             ));
         }
-        "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" => {
+        "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" | "handoutMaster" => {
             let particle = match root.local_name.as_str() {
                 "sld" => presentation::slide(),
                 "sldLayout" => presentation::slide_layout(),
                 "notes" => presentation::notes_slide(),
                 "notesMaster" => presentation::notes_master(),
+                "handoutMaster" => presentation::handout_master(),
                 _ => presentation::slide_master(),
             };
             let path = format!("p:{}", root.local_name);
@@ -1916,6 +1992,57 @@ pub fn validate_presentation_particles_for_version(
                     }
                 }
             }
+        }
+        "presentationPr" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &presentation::presentation_properties(),
+                "p:presentationPr",
+                &context,
+                &root_mc,
+            ));
+        }
+        _ => {}
+    }
+    errors
+}
+
+/// Version-aware DrawingML particle walk for `theme` / `chartSpace` roots.
+pub fn validate_drawing_particles_for_version(
+    root: &OpenXmlElement,
+    version: FileFormatVersions,
+) -> Vec<ValidationError> {
+    let mut context = ValidationContext::new(ValidationSettings::new(version));
+    context.set_collect_expected_children(true);
+    let root_mc = McContext::new();
+    let mut errors = Vec::new();
+    match root.local_name.as_str() {
+        "theme" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::theme(),
+                "a:theme",
+                &context,
+                &root_mc,
+            ));
+        }
+        "themeOverride" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::theme_override(),
+                "a:themeOverride",
+                &context,
+                &root_mc,
+            ));
+        }
+        "chartSpace" => {
+            errors.extend(validate_particle_with_context(
+                root,
+                &drawing::chart_space(),
+                "c:chartSpace",
+                &context,
+                &root_mc,
+            ));
         }
         _ => {}
     }
@@ -2577,11 +2704,100 @@ mod tests {
         assert!(presentation::particle_for("sldMaster").is_some());
         assert!(presentation::particle_for("notes").is_some());
         assert!(presentation::particle_for("notesMaster").is_some());
+        assert!(presentation::particle_for("handoutMaster").is_some());
+        assert!(presentation::particle_for("presentationPr").is_some());
         assert!(presentation::particle_for("cSld").is_some());
         assert!(presentation::particle_for("spTree").is_some());
         assert!(presentation::particle_for("sp").is_some());
         assert!(crate::validation::particle::particle_for("sld").is_some());
         assert!(crate::validation::particle::particle_for("worksheet").is_some());
+        assert!(crate::validation::particle::particle_for("theme").is_some());
+        assert!(crate::validation::particle::particle_for("chartSpace").is_some());
+        assert!(crate::validation::particle::particle_for("chartsheet").is_some());
+    }
+
+    #[test]
+    fn drawing_theme_particle_accepts_theme_elements() {
+        let mut theme = crate::element::OpenXmlElement::new(
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "theme",
+        );
+        theme.append_child(crate::element::OpenXmlElement::new(
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "themeElements",
+        ));
+        let errs = validate_particle_for_version(
+            &theme,
+            &drawing::theme(),
+            "a:theme",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn chart_space_particle_accepts_chart() {
+        let mut cs = crate::element::OpenXmlElement::new(
+            "c",
+            "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            "chartSpace",
+        );
+        cs.append_child(crate::element::OpenXmlElement::new(
+            "c",
+            "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            "chart",
+        ));
+        let errs = validate_particle_for_version(
+            &cs,
+            &drawing::chart_space(),
+            "c:chartSpace",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn chartsheet_particle_accepts_sheet_views() {
+        let mut cs = crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "chartsheet",
+        );
+        cs.append_child(crate::element::OpenXmlElement::new(
+            "x",
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "sheetViews",
+        ));
+        let errs = validate_particle_for_version(
+            &cs,
+            &spreadsheet::chartsheet(),
+            "x:chartsheet",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn presentation_pr_particle_accepts_show_pr() {
+        let mut pr = crate::element::OpenXmlElement::new(
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "presentationPr",
+        );
+        pr.append_child(crate::element::OpenXmlElement::new(
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "showPr",
+        ));
+        let errs = validate_particle_for_version(
+            &pr,
+            &presentation::presentation_properties(),
+            "p:presentationPr",
+            FileFormatVersions::OFFICE2007,
+        );
+        assert!(errs.is_empty(), "{errs:?}");
     }
 
     #[test]

@@ -151,11 +151,15 @@ impl DocumentValidator {
         let version = self.cache.version();
         let structured: Vec<ValidationError> = match root.local_name.as_str() {
             "document" => super::validate_word_particles_for_version(root, version),
-            "worksheet" | "workbook" | "sst" | "styleSheet" => {
+            "worksheet" | "workbook" | "sst" | "styleSheet" | "chartsheet" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
-            "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" | "presentation" => {
+            "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" | "handoutMaster"
+            | "presentation" | "presentationPr" => {
                 super::validate_presentation_particles_for_version(root, version)
+            }
+            "theme" | "themeOverride" | "chartSpace" => {
+                super::validate_drawing_particles_for_version(root, version)
             }
             // Other Word part roots: single-root particle via registry.
             "styles" | "numbering" | "fonts" | "comments" | "footnotes" | "endnotes"

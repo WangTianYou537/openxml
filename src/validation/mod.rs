@@ -72,8 +72,9 @@ pub use validation_cache::ValidationCache;
 pub use validation_context::{ValidationCancellationToken, ValidationChild, ValidationContext};
 pub use validation_stack::{StateManager, ValidationElement, ValidationErrorEventArgs, ValidationErrorSink, ValidationStack};
 pub use particle::{
-    get_expected_elements, get_required_elements, particle_for, presentation as presentation_particles,
-    spreadsheet as spreadsheet_particles, validate_particle, validate_particle_for_version,
+    drawing as drawing_particles, get_expected_elements, get_required_elements, particle_for,
+    presentation as presentation_particles, spreadsheet as spreadsheet_particles, validate_particle,
+    validate_drawing_particles_for_version, validate_particle_for_version,
     validate_particle_with_context, validate_presentation_particles,
     validate_presentation_particles_for_version, validate_spreadsheet_particles,
     validate_spreadsheet_particles_for_version, validate_word_particles,
