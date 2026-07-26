@@ -154,7 +154,7 @@ impl DocumentValidator {
             "worksheet" | "workbook" | "sst" | "styleSheet" => {
                 super::validate_spreadsheet_particles_for_version(root, version)
             }
-            "sld" | "sldLayout" | "sldMaster" | "presentation" => {
+            "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" | "presentation" => {
                 super::validate_presentation_particles_for_version(root, version)
             }
             _ => Vec::new(),

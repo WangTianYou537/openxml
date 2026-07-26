@@ -1440,12 +1440,38 @@ pub mod presentation {
             "sld" => slide(),
             "sldLayout" => slide_layout(),
             "sldMaster" => slide_master(),
+            "notes" => notes_slide(),
+            "notesMaster" => notes_master(),
             "cSld" => common_slide_data(),
             "spTree" => shape_tree(),
             "sp" => shape(),
             "pic" => picture(),
             _ => return None,
         })
+    }
+
+    pub fn notes_slide() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("cSld", Occurs::ONE),
+                Particle::element("clrMapOvr", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
+    }
+
+    pub fn notes_master() -> Particle {
+        Particle::sequence(
+            vec![
+                Particle::element("cSld", Occurs::ONE),
+                Particle::element("clrMap", Occurs::ONE),
+                Particle::element("hf", Occurs::OPTIONAL),
+                Particle::element("notesStyle", Occurs::OPTIONAL),
+                Particle::element("extLst", Occurs::OPTIONAL),
+            ],
+            Occurs::ONE,
+        )
     }
 }
 
@@ -1714,10 +1740,12 @@ pub fn validate_presentation_particles_for_version(
                 &root_mc,
             ));
         }
-        "sld" | "sldLayout" | "sldMaster" => {
+        "sld" | "sldLayout" | "sldMaster" | "notes" | "notesMaster" => {
             let particle = match root.local_name.as_str() {
                 "sld" => presentation::slide(),
                 "sldLayout" => presentation::slide_layout(),
+                "notes" => presentation::notes_slide(),
+                "notesMaster" => presentation::notes_master(),
                 _ => presentation::slide_master(),
             };
             let path = format!("p:{}", root.local_name);
@@ -2358,6 +2386,8 @@ mod tests {
         assert!(presentation::particle_for("presentation").is_some());
         assert!(presentation::particle_for("sld").is_some());
         assert!(presentation::particle_for("sldMaster").is_some());
+        assert!(presentation::particle_for("notes").is_some());
+        assert!(presentation::particle_for("notesMaster").is_some());
         assert!(presentation::particle_for("cSld").is_some());
         assert!(presentation::particle_for("spTree").is_some());
         assert!(presentation::particle_for("sp").is_some());

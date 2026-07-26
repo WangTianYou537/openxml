@@ -1009,6 +1009,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] `from_validation_error` strips `Pkg_` prefix; `part_display_name` resolves class names from content type
 - [x] Spreadsheet particles: `sst` / `styleSheet` / `fonts` / `fills` / `borders` / `cellXfs`; walks + DocumentValidator roots
 - [x] Word particles: `sectPr` / `sdt` / `sdtContent` / `hyperlink` / `drawing`
+- [x] Presentation particles: `notes` / `notesMaster` roots in registry, walks, and DocumentValidator
 
 **Still intentionally deferred / partial:**
 
