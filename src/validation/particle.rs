@@ -544,11 +544,15 @@ pub fn validate_particle_for_version(
     path: &str,
     version: FileFormatVersions,
 ) -> Vec<ValidationError> {
-    let context = ValidationContext::new(ValidationSettings::new(version));
+    let mut context = ValidationContext::new(ValidationSettings::new(version));
+    // Always collect expected children for Sch_* mismatch messages (C# re-validates
+    // with CollectExpectedChildren when emitting invalid/incomplete content errors).
+    context.set_collect_expected_children(true);
     validate_particle_with_context(element, particle, path, &context, &McContext::new())
 }
 
-fn validate_particle_with_context(
+/// Particle validation using an existing [`ValidationContext`] and MC context.
+pub fn validate_particle_with_context(
     element: &OpenXmlElement,
     particle: &Particle,
     path: &str,
@@ -597,7 +601,7 @@ fn validate_particle_with_context(
     }
     for e in result.errors {
         let incomplete = e.contains("requires at least") || e.contains("required particle");
-        let (id, description) = if incomplete {
+        let (id, mut description) = if incomplete {
             (
                 "Sch_IncompleteContentExpectingComplex",
                 format!("The element has incomplete content. {e}"),
@@ -608,6 +612,16 @@ fn validate_particle_with_context(
                 e,
             )
         };
+        if context.collect_expected_children {
+            let mut expected = ExpectedChildren::new();
+            if incomplete {
+                get_required_elements(particle, &mut expected);
+            }
+            if expected.is_empty() {
+                get_expected_elements(particle, &mut expected);
+            }
+            description.push_str(&expected.expected_children_message());
+        }
         errors.push(
             ValidationError::with_id(path, id, description)
                 .with_error_type(crate::validation::ValidationErrorType::Schema),
@@ -941,7 +955,8 @@ pub fn validate_word_particles_for_version(
     root: &OpenXmlElement,
     version: FileFormatVersions,
 ) -> Vec<ValidationError> {
-    let context = ValidationContext::new(ValidationSettings::new(version));
+    let mut context = ValidationContext::new(ValidationSettings::new(version));
+    context.set_collect_expected_children(true);
     let root_mc_context = McContext::new();
     let mut errors = Vec::new();
     if root.local_name != "document" {
@@ -1077,6 +1092,13 @@ mod tests {
         let doc = document(vec![]);
         let errs = validate_word_particles(&doc);
         assert!(!errs.is_empty());
+        assert!(
+            errs.iter().any(|e| {
+                e.id() == Some("Sch_IncompleteContentExpectingComplex")
+                    && e.description().contains("List of possible elements expected")
+            }),
+            "{errs:?}"
+        );
     }
 
     #[test]
