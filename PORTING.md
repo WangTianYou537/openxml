@@ -1022,6 +1022,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Schema attribute/leaf validation covers Spreadsheet/Presentation/Drawing (not only Word): undeclared attrs, type lexical checks, leaf child rejection
 - [x] `CanContainChild` / `TryCreateValidChild` multi-schema (w/x/p/a); `StringValidator::id()` + ID type-name mapping
 - [x] Drawing `tblStyleLst` particle; `OpenXmlElement::descendants_named` (C# `Descendants<T>` by name)
+- [x] `RootElementFeature` unregister / try_create_element / seed_common_part_roots / registered_entries
 
 **Still intentionally deferred / partial:**
 

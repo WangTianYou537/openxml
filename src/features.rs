@@ -1570,9 +1570,34 @@ impl RootElementFeature {
         self.by_qname.insert(key, type_name.into());
     }
 
+    /// Remove a registered root mapping (returns previous type name if any).
+    pub fn unregister(
+        &mut self,
+        namespace_uri: &str,
+        local_name: &str,
+    ) -> Option<String> {
+        let key = format!("{namespace_uri}|{local_name}");
+        self.by_qname.remove(&key)
+    }
+
     pub fn try_create(&self, namespace_uri: &str, local_name: &str) -> Option<&str> {
         let key = format!("{namespace_uri}|{local_name}");
         self.by_qname.get(&key).map(|s| s.as_str())
+    }
+
+    /// C# `IRootElementFeature.TryCreate` shell — construct an empty element when
+    /// the qname is registered. Returns the element and the registered type name.
+    pub fn try_create_element(
+        &self,
+        namespace_uri: &str,
+        local_name: &str,
+        prefix: &str,
+    ) -> Option<(crate::element::OpenXmlElement, &str)> {
+        let type_name = self.try_create(namespace_uri, local_name)?;
+        Some((
+            crate::element::OpenXmlElement::new(prefix, namespace_uri, local_name),
+            type_name,
+        ))
     }
 
     pub fn len(&self) -> usize {
@@ -1594,6 +1619,100 @@ impl RootElementFeature {
     pub fn registered_type_names(&self) -> Vec<&str> {
         self.by_qname.values().map(|s| s.as_str()).collect()
     }
+
+    /// Registered qnames as `(namespace_uri, local_name, type_name)` triples.
+    pub fn registered_entries(&self) -> Vec<(String, String, String)> {
+        self.by_qname
+            .iter()
+            .filter_map(|(key, type_name)| {
+                let (ns, local) = key.split_once('|')?;
+                Some((ns.to_string(), local.to_string(), type_name.clone()))
+            })
+            .collect()
+    }
+
+    /// Seed common Word / Spreadsheet / Presentation / Drawing part-root mappings
+    /// from generated schema ElementInfo tables (class_name as type name).
+    pub fn seed_common_part_roots(&mut self) {
+        for el in crate::generated::wordprocessingml_2006_main::ELEMENTS {
+            if is_common_part_root_local_name(el.local_name) {
+                self.register(el.namespace_uri, el.local_name, el.class_name);
+            }
+        }
+        for el in crate::generated::spreadsheetml_2006_main::ELEMENTS {
+            if is_common_part_root_local_name(el.local_name) {
+                self.register(el.namespace_uri, el.local_name, el.class_name);
+            }
+        }
+        for el in crate::generated::presentationml_2006_main::ELEMENTS {
+            if is_common_part_root_local_name(el.local_name) {
+                self.register(el.namespace_uri, el.local_name, el.class_name);
+            }
+        }
+        for el in crate::generated::drawingml_2006_main::ELEMENTS {
+            if is_common_part_root_local_name(el.local_name) {
+                self.register(el.namespace_uri, el.local_name, el.class_name);
+            }
+        }
+    }
+}
+
+/// Local names commonly used as package part roots across OfficeML.
+fn is_common_part_root_local_name(local: &str) -> bool {
+    matches!(
+        local,
+        "document"
+            | "styles"
+            | "numbering"
+            | "fonts"
+            | "comments"
+            | "footnotes"
+            | "endnotes"
+            | "hdr"
+            | "ftr"
+            | "settings"
+            | "webSettings"
+            | "glossaryDocument"
+            | "commentsEx"
+            | "people"
+            | "workbook"
+            | "worksheet"
+            | "sst"
+            | "styleSheet"
+            | "chartsheet"
+            | "calcChain"
+            | "connections"
+            | "externalLink"
+            | "table"
+            | "queryTable"
+            | "pivotTableDefinition"
+            | "pivotCacheDefinition"
+            | "pivotCacheRecords"
+            | "metadata"
+            | "dialogsheet"
+            | "presentation"
+            | "sld"
+            | "sldLayout"
+            | "sldMaster"
+            | "notes"
+            | "notesMaster"
+            | "handoutMaster"
+            | "presentationPr"
+            | "cmLst"
+            | "cmAuthorLst"
+            | "tagLst"
+            | "viewPr"
+            | "theme"
+            | "themeOverride"
+            | "chartSpace"
+            | "wsDr"
+            | "userShapes"
+            | "colorsDef"
+            | "dataModel"
+            | "layoutDef"
+            | "styleDef"
+            | "tblStyleLst"
+    )
 }
 
 /// Save callbacks for containers (C# `ISaveFeature` shell).
@@ -2965,6 +3084,49 @@ mod tests {
         assert!(root
             .try_create("http://other", "document")
             .is_none());
+        let (el, ty) = root
+            .try_create_element(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "document",
+                "w",
+            )
+            .expect("create document root");
+        assert_eq!(ty, "Document");
+        assert_eq!(el.local_name, "document");
+        assert_eq!(el.prefix, "w");
+        assert_eq!(
+            root.unregister(
+                "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                "document"
+            )
+            .as_deref(),
+            Some("Document")
+        );
+        assert!(!root.contains(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document"
+        ));
+
+        let mut seeded = RootElementFeature::new();
+        seeded.seed_common_part_roots();
+        assert!(seeded.contains(
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            "document"
+        ));
+        assert!(seeded.contains(
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+            "worksheet"
+        ));
+        assert!(seeded.contains(
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "sld"
+        ));
+        assert!(seeded.contains(
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "theme"
+        ));
+        assert!(!seeded.is_empty());
+        assert!(!seeded.registered_entries().is_empty());
 
         let saved = Arc::new(Mutex::new(Vec::<String>::new()));
         let save = SaveFeature::new();
