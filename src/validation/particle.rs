@@ -375,17 +375,30 @@ impl ExpectedChildren {
         if self.is_empty() {
             return String::new();
         }
+        // C# uses ValidationResources Fmt_ElementName / Fmt_ElementNameSeparator /
+        // Fmt_AnyElementInNamespace / Fmt_ListOfPossibleElements.
+        let elem_fmt = crate::validation::validation_resource_message("Fmt_ElementName")
+            .unwrap_or("<{0}>");
+        let sep = crate::validation::validation_resource_message("Fmt_ElementNameSeparator")
+            .unwrap_or(",");
+        let any_fmt =
+            crate::validation::validation_resource_message("Fmt_AnyElementInNamespace")
+                .unwrap_or("any element in namespace '{0}'");
+        let list_fmt =
+            crate::validation::validation_resource_message("Fmt_ListOfPossibleElements")
+                .unwrap_or(" List of possible elements expected: {0}.");
+
         let mut names: Vec<String> = self
             .elements
             .iter()
-            .map(|name| format!("<{name}>"))
+            .map(|name| elem_fmt.replace("{0}", name))
             .collect();
         names.extend(
             self.xsd_any_namespaces
                 .iter()
-                .map(|ns| format!("any element in namespace '{ns}'")),
+                .map(|ns| any_fmt.replace("{0}", ns)),
         );
-        format!(" List of possible elements expected: {}.", names.join(","))
+        list_fmt.replace("{0}", &names.join(sep))
     }
 }
 

@@ -1002,6 +1002,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] DocumentValidator runs structured Word/Spreadsheet/Presentation particle walks for known package roots (deduped against schema-type pass); re-export `word`/`spreadsheet`/`presentation` particle modules
 - [x] `DocumentValidator::parts_to_be_validated` filters by `relationship_introduced_in` (C# `part.IsInVersion(version)`)
 - [x] DocumentValidator package structure errors use `Pkg_` MessageId prefix (C# `Pkg_` + PackageValidator MessageId)
+- [x] Align `Pkg_*` ValidationResources text with C# resx; `ExpectedChildren::expected_children_message` uses `Fmt_*` resources
 
 **Still intentionally deferred / partial:**
 

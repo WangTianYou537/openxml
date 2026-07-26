@@ -116,12 +116,18 @@ pub fn validation_resource_message(message_id: &str) -> Option<&'static str> {
             "Attribute '{0}' should have unique value in the whole document. Its current value '{1}' duplicates with others."
         }
         "Sem_CellValue" => "Cell contents have invalid value '{0}' for type '{1}'.",
-        "Pkg_PartIsNotAllowed" => "The part is not allowed.",
-        "Pkg_RequiredPartDoNotExist" => "A required part is missing.",
-        "Pkg_OnlyOnePartAllowed" => "Only one part of this type is allowed.",
-        "Pkg_DataPartReferenceIsNotAllowed" => "The data part reference is not allowed.",
+        "Pkg_PartIsNotAllowed" => {
+            "The package/part '{0}' cannot have a relationship that targets part '{1}'."
+        }
+        "Pkg_RequiredPartDoNotExist" => "A required part '{0}' is missing.",
+        "Pkg_OnlyOnePartAllowed" => {
+            "The package/part '{0}' can only have one instance of relationship that targets part '{1}'."
+        }
+        "Pkg_DataPartReferenceIsNotAllowed" => {
+            "The package/part '{0}' cannot have a relationship that targets '{1}'."
+        }
         "Pkg_ExtendedPartIsOpenXmlPart" => {
-            "An ExtendedPart has an Open XML relationship type."
+            "An ExtendedPart '{0}' was encountered with a relationship type that starts with \"http://schemas.openxmlformats.org\". Expected a defined part instead based on the relationship type."
         }
         "Fmt_ListOfPossibleElements" => " List of possible elements expected: {0}.",
         "Fmt_ElementName" => "<{0}>",
