@@ -196,6 +196,23 @@ fn err(path: impl Into<String>, message_id: &str, detail: impl Into<String>) -> 
     .with_error_type(super::ValidationErrorType::Package)
 }
 
+/// Compose a package constraint error with C# ValidationResources-style text.
+fn err_pkg(
+    path: impl Into<String>,
+    message_id: &str,
+    resource_id: &str,
+    args: &[&str],
+) -> ValidationError {
+    let description = super::format_validation_resource(resource_id, args)
+        .unwrap_or_else(|| args.join(" "));
+    ValidationError {
+        path: path.into(),
+        message: format!("{message_id}: {description}"),
+        ..Default::default()
+    }
+    .with_error_type(super::ValidationErrorType::Package)
+}
+
 /// Infer the parent part type name for the package container (C# package-level constraints).
 ///
 /// Package-level children are core/app/custom props, thumbnail, digsig origin, and the main
@@ -381,10 +398,11 @@ fn validate_container(
     let Some(rels) = package.part_relationships(container_uri) else {
         // Still check required children when there are no relationships at all.
         for missing in feature.missing_required_for_version(std::iter::empty(), version) {
-            errors.push(err(
+            errors.push(err_pkg(
                 container_uri.as_str(),
                 message_id::REQUIRED_PART_DO_NOT_EXIST,
-                format!("required child `{missing}` missing on `{parent_part_name}`"),
+                "Pkg_RequiredPartDoNotExist",
+                &[missing],
             ));
         }
         return;
@@ -399,13 +417,11 @@ fn validate_container(
         // Data-part references (audio/video/media) — allowed check only; not walked as parts.
         if is_known_data_part_rel(&rel_item.relationship_type) {
             if !feature.is_data_part_reference_allowed(&rel_item.relationship_type) {
-                errors.push(err(
+                errors.push(err_pkg(
                     format!("{}#{}", container_uri.as_str(), rel_item.id),
                     message_id::DATA_PART_REFERENCE_IS_NOT_ALLOWED,
-                    format!(
-                        "data part reference `{}` not allowed on `{parent_part_name}`",
-                        rel_item.relationship_type
-                    ),
+                    "Pkg_DataPartReferenceIsNotAllowed",
+                    &[parent_part_name, &rel_item.relationship_type],
                 ));
             }
             continue;
@@ -452,10 +468,11 @@ fn validate_container(
         let is_office_rel = rel_type.contains("schemas.openxmlformats.org")
             || rel_type.contains("schemas.microsoft.com/office");
         if is_office_rel {
-            errors.push(err(
+            errors.push(err_pkg(
                 format!("{}#{}", container_uri.as_str(), rel_id),
                 message_id::PART_IS_NOT_ALLOWED,
-                format!("relationship `{rel_type}` is not allowed on `{parent_part_name}`"),
+                "Pkg_PartIsNotAllowed",
+                &[parent_part_name, rel_type],
             ));
         }
     }
@@ -467,23 +484,19 @@ fn validate_container(
         }
         let occurs = part_occurs.get(rule.relationship_type).copied().unwrap_or(0);
         if rule.required() && occurs == 0 {
-            errors.push(err(
+            errors.push(err_pkg(
                 container_uri.as_str(),
                 message_id::REQUIRED_PART_DO_NOT_EXIST,
-                format!(
-                    "required child `{}` ({}) missing on `{parent_part_name}`",
-                    rule.part_name, rule.relationship_type
-                ),
+                "Pkg_RequiredPartDoNotExist",
+                &[rule.part_name],
             ));
         }
         if !rule.allows_multiple() && occurs > 1 {
-            errors.push(err(
+            errors.push(err_pkg(
                 container_uri.as_str(),
                 message_id::ONLY_ONE_PART_ALLOWED,
-                format!(
-                    "`{}` occurs {occurs} times on `{parent_part_name}` (maxOccurs=1)",
-                    rule.part_name
-                ),
+                "Pkg_OnlyOnePartAllowed",
+                &[parent_part_name, rule.part_name],
             ));
         }
     }

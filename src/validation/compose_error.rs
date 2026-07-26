@@ -188,6 +188,12 @@ fn format_positional(template: &str, args: &[&str]) -> String {
     message
 }
 
+/// Format a ValidationResources message id with positional `{0}`/`{1}` args
+/// (C# `SR.Format(ValidationResources.…)` shell).
+pub fn format_validation_resource(message_id: &str, args: &[&str]) -> Option<String> {
+    validation_resource_message(message_id).map(|template| format_positional(template, args))
+}
+
 impl ValidationContext {
     /// C# `ComposeValidationError` — build (not add) an error from a message id.
     pub fn compose_validation_error(
