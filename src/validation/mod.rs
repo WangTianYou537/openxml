@@ -34,8 +34,8 @@ pub use digsig_crypto::{
     verify_signature_value, DigestCheckResult,
 };
 pub use attributes::{
-    validate_attribute_range, validate_attribute_value, validate_attributes,
-    validate_leaf_content, validate_spreadsheet_attribute_ranges,
+    validate_attribute_range, validate_attribute_value, validate_attribute_value_types,
+    validate_attributes, validate_leaf_content, validate_spreadsheet_attribute_ranges,
     validate_undeclared_attributes, AttributeRule, AttributeType,
 };
 pub use compose_error::validation_resource_message;

@@ -198,6 +198,10 @@ impl DocumentValidator {
                         mc_context,
                         &element.qualified_name(),
                     ));
+                    errors.extend(super::validate_attribute_value_types(
+                        element,
+                        &element.qualified_name(),
+                    ));
                     errors.extend(super::validate_leaf_content(
                         element,
                         &element.qualified_name(),
@@ -407,8 +411,34 @@ mod tests {
     }
 
     #[test]
-    fn leaf_elements_reject_element_children() {
+    fn attribute_values_checked_against_declared_types() {
         use crate::wordprocessing::{paragraph, run, text};
+
+        let validator = DocumentValidator::default();
+
+        let mut good = paragraph(vec![run(vec![text("x")])]);
+        good.set_attribute_qname("w:rsidR", "00AB12CD");
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&good, &mut context).unwrap();
+        assert!(context.errors().is_empty(), "{:?}", context.errors());
+
+        let mut bad = paragraph(vec![run(vec![text("x")])]);
+        bad.set_attribute_qname("w:rsidR", "not-hex");
+        let mut context = ValidationContext::with_file_format(FileFormatVersions::OFFICE2007);
+        validator.validate_element(&bad, &mut context).unwrap();
+        let error = context
+            .errors()
+            .iter()
+            .find(|e| e.id() == Some("Sch_AttributeValueDataTypeDetailed"))
+            .expect("typed attribute error");
+        assert!(
+            error.description().contains("'w:rsidR' has invalid value 'not-hex'"),
+            "{error:?}"
+        );
+    }
+
+    #[test]
+    fn leaf_elements_reject_element_children() {        use crate::wordprocessing::{paragraph, run, text};
 
         let validator = DocumentValidator::default();
 

@@ -38,6 +38,90 @@ pub fn validate_leaf_content(element: &OpenXmlElement, path: &str) -> Vec<Valida
     Vec::new()
 }
 
+fn attribute_value_type_error(type_name: &str, value: &str) -> Option<&'static str> {
+    let ok = match type_name {
+        "HexBinaryValue" => {
+            !value.is_empty()
+                && value.len() % 2 == 0
+                && value.chars().all(|c| c.is_ascii_hexdigit())
+        }
+        "Base64BinaryValue" => value.chars().all(|c| {
+            c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || c.is_ascii_whitespace()
+        }),
+        "Int32Value" => value.parse::<i32>().is_ok(),
+        "UInt32Value" => value.parse::<u32>().is_ok(),
+        "Int16Value" => value.parse::<i16>().is_ok(),
+        "UInt16Value" => value.parse::<u16>().is_ok(),
+        "ByteValue" => value.parse::<u8>().is_ok(),
+        "IntegerValue" => value.parse::<i64>().is_ok(),
+        "OnOffValue" => matches!(value, "true" | "false" | "1" | "0" | "on" | "off"),
+        "DateTimeValue" => {
+            // xsd:dateTime shape: YYYY-MM-DD… with a time separator.
+            value.len() >= 10
+                && value.as_bytes()[4] == b'-'
+                && value.as_bytes()[7] == b'-'
+                && value[..4].chars().all(|c| c.is_ascii_digit())
+        }
+        _ => true, // StringValue / EnumValue: no lexical restriction here
+    };
+    if ok {
+        None
+    } else {
+        Some(match type_name {
+            "HexBinaryValue" => " The value must be a hexadecimal number with an even number of digits.",
+            "Base64BinaryValue" => " The value must be base64 encoded.",
+            "Int32Value" | "Int16Value" | "IntegerValue" => " The value must be an integer.",
+            "UInt32Value" | "UInt16Value" | "ByteValue" => {
+                " The value must be a non-negative integer."
+            }
+            "OnOffValue" => " The value must be one of: true, false, 1, 0, on, off.",
+            "DateTimeValue" => " The value must be an xsd:dateTime.",
+            _ => "",
+        })
+    }
+}
+
+/// C# `SchemaTypeValidator.ValidateValue` for declared attributes: lexical
+/// checks against the generated `type_name`, reporting
+/// `Sch_AttributeValueDataTypeDetailed` on mismatch.
+pub fn validate_attribute_value_types(
+    element: &OpenXmlElement,
+    path: &str,
+) -> Vec<ValidationError> {
+    let Some(info) =
+        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)
+    else {
+        return Vec::new();
+    };
+    if element.prefix != info.prefix {
+        return Vec::new();
+    }
+
+    let mut errors = Vec::new();
+    for attribute in &element.attributes {
+        let prefix = attribute.prefix.as_deref().unwrap_or("");
+        let qname = if prefix.is_empty() {
+            format!("{}:{}", info.prefix, attribute.local_name)
+        } else {
+            format!("{prefix}:{}", attribute.local_name)
+        };
+        let Some(declared) = info.attributes.iter().find(|a| a.qname == qname) else {
+            continue;
+        };
+        if let Some(detail) = attribute_value_type_error(declared.type_name, &attribute.value) {
+            errors.push(ValidationError::with_id(
+                path,
+                "Sch_AttributeValueDataTypeDetailed",
+                format!(
+                    "The attribute '{qname}' has invalid value '{}'.{detail}",
+                    attribute.value
+                ),
+            ));
+        }
+    }
+    errors
+}
+
 /// C# `SchemaTypeValidator.ValidateAttributes` extended-attribute branch:
 /// report `Sch_UndeclaredAttribute` for attributes not declared in the
 /// generated WordprocessingML schema for `element`, skipping MC-ignorable
