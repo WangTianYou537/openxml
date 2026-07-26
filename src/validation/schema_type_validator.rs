@@ -30,14 +30,31 @@ pub fn is_reserved_element(element: &OpenXmlElement) -> bool {
         || element.namespace_uri.is_empty())
 }
 
-/// Whether generated WordprocessingML metadata marks this as a leaf (empty or text).
+/// Whether generated schema metadata marks this as a leaf (empty or text).
+/// Covers Word / Spreadsheet / Presentation / DrawingML main schemas.
 fn generated_leaf_flags(element: &OpenXmlElement) -> Option<(bool, bool)> {
-    let info =
-        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)?;
-    if element.prefix != info.prefix {
-        return None;
+    macro_rules! try_schema {
+        ($mod:path) => {{
+            use $mod as schema;
+            if let Some(info) = schema::info_by_local_name(&element.local_name) {
+                if element.prefix == info.prefix {
+                    return Some((info.is_leaf, info.is_leaf_text));
+                }
+            }
+        }};
     }
-    Some((info.is_leaf, info.is_leaf_text))
+    match element.prefix.as_str() {
+        "w" => try_schema!(crate::generated::wordprocessingml_2006_main),
+        "x" => try_schema!(crate::generated::spreadsheetml_2006_main),
+        "p" => try_schema!(crate::generated::presentationml_2006_main),
+        "a" => try_schema!(crate::generated::drawingml_2006_main),
+        _ => {}
+    }
+    try_schema!(crate::generated::wordprocessingml_2006_main);
+    try_schema!(crate::generated::spreadsheetml_2006_main);
+    try_schema!(crate::generated::presentationml_2006_main);
+    try_schema!(crate::generated::drawingml_2006_main);
+    None
 }
 
 /// C# `SchemaTypeValidator.Validate` for a single element already on the stack.

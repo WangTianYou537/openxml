@@ -12,17 +12,75 @@ use crate::simple_types::{
 
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
+/// Cross-schema attribute metadata (Word / Spreadsheet / Presentation / Drawing).
+#[derive(Debug, Clone, Copy)]
+struct AttrMeta {
+    qname: &'static str,
+    type_name: &'static str,
+}
+
+/// Cross-schema element metadata used by attribute/leaf validation.
+#[derive(Debug, Clone)]
+struct ElementMeta {
+    prefix: &'static str,
+    is_leaf: bool,
+    is_leaf_text: bool,
+    attributes: Vec<AttrMeta>,
+}
+
+/// Resolve generated schema metadata for common OfficeML prefixes.
+///
+/// Looks up Word (`w`), Spreadsheet (`x`), Presentation (`p`), and Drawing (`a`)
+/// schemas. Prefix must match the generated element info (avoids collisions on
+/// shared local names like `fonts` / `comments`).
+fn generated_element_meta(element: &OpenXmlElement) -> Option<ElementMeta> {
+    macro_rules! try_schema {
+        ($mod:path) => {{
+            use $mod as schema;
+            if let Some(info) = schema::info_by_local_name(&element.local_name) {
+                if element.prefix == info.prefix {
+                    return Some(ElementMeta {
+                        prefix: info.prefix,
+                        is_leaf: info.is_leaf,
+                        is_leaf_text: info.is_leaf_text,
+                        attributes: info
+                            .attributes
+                            .iter()
+                            .map(|a| AttrMeta {
+                                qname: a.qname,
+                                type_name: a.type_name,
+                            })
+                            .collect(),
+                    });
+                }
+            }
+        }};
+    }
+
+    // Prefer the element's own prefix, then fall through other schemas.
+    match element.prefix.as_str() {
+        "w" => try_schema!(crate::generated::wordprocessingml_2006_main),
+        "x" => try_schema!(crate::generated::spreadsheetml_2006_main),
+        "p" => try_schema!(crate::generated::presentationml_2006_main),
+        "a" => try_schema!(crate::generated::drawingml_2006_main),
+        _ => {}
+    }
+    try_schema!(crate::generated::wordprocessingml_2006_main);
+    try_schema!(crate::generated::spreadsheetml_2006_main);
+    try_schema!(crate::generated::presentationml_2006_main);
+    try_schema!(crate::generated::drawingml_2006_main);
+    None
+}
+
 /// C# `SchemaTypeValidator.ValidateEmptyComplexType` /
 /// `ValidateSimpleContextComplexType` — a schema leaf element (empty or
 /// simple-content complex type) cannot contain element children. At most one
 /// `Sch_InvalidChildinLeafElement` error is reported per element.
 pub fn validate_leaf_content(element: &OpenXmlElement, path: &str) -> Vec<ValidationError> {
-    let Some(info) =
-        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)
-    else {
+    let Some(info) = generated_element_meta(element) else {
         return Vec::new();
     };
-    if element.prefix != info.prefix || !(info.is_leaf || info.is_leaf_text) {
+    if !(info.is_leaf || info.is_leaf_text) {
         return Vec::new();
     }
     if element.children.iter().any(|child| !child.is_misc_node()) {
@@ -44,19 +102,14 @@ pub fn validate_leaf_content(element: &OpenXmlElement, path: &str) -> Vec<Valida
 ///
 /// Routes numeric / OnOff / HexBinary / token-family types through the
 /// framework [`super::Validator`] stack when a mapping exists; other types keep
-/// the XsdType lexical path.
+/// the XsdType lexical path. Covers Word, Spreadsheet, Presentation, Drawing.
 pub fn validate_attribute_value_types(
     element: &OpenXmlElement,
     path: &str,
 ) -> Vec<ValidationError> {
-    let Some(info) =
-        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)
-    else {
+    let Some(info) = generated_element_meta(element) else {
         return Vec::new();
     };
-    if element.prefix != info.prefix {
-        return Vec::new();
-    }
 
     let settings = super::ValidationSettings::new(crate::file_format::FileFormatVersions::ALL);
     let mut context = super::ValidationContext::new(settings);
@@ -70,7 +123,14 @@ pub fn validate_attribute_value_types(
         } else {
             format!("{prefix}:{}", attribute.local_name)
         };
-        let Some(declared) = info.attributes.iter().find(|a| a.qname == qname) else {
+        // Spreadsheet/Drawing sometimes declare attrs as `:local` (no prefix).
+        let declared = info.attributes.iter().find(|a| {
+            a.qname == qname
+                || a.qname == format!(":{}", attribute.local_name)
+                || (a.qname.ends_with(&format!(":{}", attribute.local_name))
+                    && a.qname.rsplit_once(':').map(|(_, l)| l) == Some(attribute.local_name.as_str()))
+        });
+        let Some(declared) = declared else {
             continue;
         };
         let _ = super::validate_attribute_with_type_name(
@@ -87,22 +147,17 @@ pub fn validate_attribute_value_types(
 
 /// C# `SchemaTypeValidator.ValidateAttributes` extended-attribute branch:
 /// report `Sch_UndeclaredAttribute` for attributes not declared in the
-/// generated WordprocessingML schema for `element`, skipping MC-ignorable
-/// namespaces, `xml:*`, `xmlns` declarations, and `mc:*` compatibility
-/// attributes. Unknown elements are not checked.
+/// generated schema for `element` (Word/Spreadsheet/Presentation/Drawing),
+/// skipping MC-ignorable namespaces, `xml:*`, `xmlns` declarations, and `mc:*`
+/// compatibility attributes. Unknown elements are not checked.
 pub fn validate_undeclared_attributes(
     element: &OpenXmlElement,
     mc_context: &McContext,
     path: &str,
 ) -> Vec<ValidationError> {
-    let Some(info) =
-        crate::generated::wordprocessingml_2006_main::info_by_local_name(&element.local_name)
-    else {
+    let Some(info) = generated_element_meta(element) else {
         return Vec::new();
     };
-    if element.prefix != info.prefix {
-        return Vec::new();
-    }
 
     let mut errors = Vec::new();
     for attribute in &element.attributes {
@@ -133,7 +188,12 @@ pub fn validate_undeclared_attributes(
         } else {
             format!("{prefix}:{}", attribute.local_name)
         };
-        let declared = info.attributes.iter().any(|a| a.qname == qname);
+        let declared = info.attributes.iter().any(|a| {
+            a.qname == qname
+                || a.qname == format!(":{}", attribute.local_name)
+                || (a.qname.ends_with(&format!(":{}", attribute.local_name))
+                    && a.qname.rsplit_once(':').map(|(_, l)| l) == Some(attribute.local_name.as_str()))
+        });
         if !declared {
             let display = if prefix.is_empty() {
                 attribute.local_name.clone()
@@ -398,6 +458,70 @@ mod tests {
         assert!(
             errs.iter().any(|e| e.message.contains("outside range")),
             "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn spreadsheet_undeclared_attribute_reported() {
+        let sheet = OpenXmlElement::x("sheet")
+            .with_attribute("name", "S")
+            .with_attribute("sheetId", "1")
+            .with_attribute("notARealAttr", "x");
+        let mc = McContext::with_exception_on_error(false);
+        let errs = validate_undeclared_attributes(&sheet, &mc, "x:sheet");
+        assert!(
+            errs.iter().any(|e| e.id() == Some("Sch_UndeclaredAttribute")
+                && e.message.contains("notARealAttr")),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn spreadsheet_declared_sheet_attrs_accepted() {
+        let sheet = OpenXmlElement::x("sheet")
+            .with_attribute("name", "S")
+            .with_attribute("sheetId", "1")
+            .with_attribute_qname("r:id", "rId1");
+        let mc = McContext::with_exception_on_error(false);
+        let errs = validate_undeclared_attributes(&sheet, &mc, "x:sheet");
+        assert!(errs.is_empty(), "{errs:?}");
+    }
+
+    #[test]
+    fn spreadsheet_leaf_forbids_element_children() {
+        let mut sheet = OpenXmlElement::x("sheet").with_attribute("name", "S");
+        sheet.append_child(OpenXmlElement::x("sheetData"));
+        let errs = validate_leaf_content(&sheet, "x:sheet");
+        assert!(
+            errs.iter()
+                .any(|e| e.id() == Some("Sch_InvalidChildinLeafElement")),
+            "{errs:?}"
+        );
+    }
+
+    #[test]
+    fn spreadsheet_attribute_type_rejects_bad_sheet_id() {
+        let sheet = OpenXmlElement::x("sheet")
+            .with_attribute("name", "S")
+            .with_attribute("sheetId", "not-a-number");
+        let errs = validate_attribute_value_types(&sheet, "x:sheet");
+        assert!(
+            !errs.is_empty()
+                || errs.iter().any(|e| e.message.contains("sheetId")
+                    || e.id() == Some("Sch_AttributeValueDataTypeDetailed")),
+            "{errs:?}"
+        );
+        // Either a typed error is raised, or at minimum the helper does not panic.
+        let _ = errs;
+        // Strong assertion: bad UInt32 should produce a datatype error.
+        assert!(
+            errs.iter().any(|e| {
+                e.id() == Some("Sch_AttributeValueDataTypeDetailed")
+                    || e.message.to_lowercase().contains("uint")
+                    || e.message.contains("not-a-number")
+                    || e.message.contains("sheetId")
+            }),
+            "expected datatype error for sheetId, got {errs:?}"
         );
     }
 }

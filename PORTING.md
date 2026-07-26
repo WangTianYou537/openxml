@@ -1019,6 +1019,7 @@ The MVP + depth milestones above are **complete**. The packaging surface is larg
 - [x] Presentation particles: `cmLst` / `cmAuthorLst` / `tagLst` / `viewPr`; Drawing `wsDr` worksheet drawing + walks
 - [x] Word `commentsEx` / `people` (w15); Spreadsheet `pivotCacheDefinition` / `pivotCacheRecords` / `metadata` / `dialogsheet` + DocumentValidator routes
 - [x] Drawing/diagram particles: `userShapes` / `colorsDef` / `dataModel` / `layoutDef` / `styleDef` + DocumentValidator walks
+- [x] Schema attribute/leaf validation covers Spreadsheet/Presentation/Drawing (not only Word): undeclared attrs, type lexical checks, leaf child rejection
 
 **Still intentionally deferred / partial:**
 
