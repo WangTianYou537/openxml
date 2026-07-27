@@ -11,15 +11,22 @@ use crate::opc::{OpcPackage, PackUri};
 /// - package has an officeDocument (main) relationship when `require_main` is true
 /// - main part exists and has a content-type override/default
 /// - internal relationship targets resolve to existing parts
+/// - digital signature package structure (no crypto)
 ///
-/// Package relationship constraints use all Office versions; prefer
-/// [`validate_package_for_version`] when a target format is known.
+/// Does **not** enforce part-relationship constraint rules
+/// (`PartIsNotAllowed` / `RequiredPartDoNotExist` / …). Those live in
+/// [`super::validate_package_constraints`] / [`super::validate_package_constraints_for_version`]
+/// (C# `PackageValidator`) and are composed by full validators
+/// (`DocumentValidator`, `OpenXmlValidator::validate_document_package`).
 pub fn validate_package(package: &OpcPackage, require_main: bool) -> Vec<ValidationError> {
     validate_package_for_version(package, require_main, FileFormatVersions::ALL)
 }
 
-/// Like [`validate_package`] but filters part-constraint rules by `version`
-/// (C# `PackageValidator.Validate(version)`).
+/// Same as [`validate_package`]. The `version` parameter is retained for
+/// API stability with callers that previously threaded a target format;
+/// basic OPC structure is version-agnostic. Use
+/// [`super::validate_package_constraints_for_version`] for version-aware
+/// part-constraint rules.
 pub fn validate_package_for_version(
     package: &OpcPackage,
     require_main: bool,
@@ -150,8 +157,10 @@ pub fn validate_package_for_version(
     errors.extend(super::validate_digital_signatures(package));
     errors.extend(super::validate_signature_digests(package));
 
-    // Part relationship constraints (C# PackageValidator with version filter).
-    errors.extend(super::validate_package_constraints_for_version(package, version));
+    // Part relationship constraints (C# PackageValidator) stay in
+    // `validate_package_constraints[_for_version]` — callers that want both
+    // (e.g. DocumentValidator / OpenXmlValidator full walks) compose them.
+    let _ = version; // retained for API stability; structure checks are version-agnostic
 
     errors
 }

@@ -6081,8 +6081,12 @@ fn slicer_people_page_setup_props_counts() {
 
     let mut ppt =
         PresentationDocument::create_in_memory(PresentationDocumentType::Presentation).unwrap();
-    ppt.add_slide_with_text("A").unwrap();
+    // Fresh presentation has no props until a slide (or explicit add) installs them.
     assert!(!ppt.has_any_properties());
+    ppt.add_slide_with_text("A").unwrap();
+    // Office scaffold installs presProps/viewProps with the first slide.
+    assert!(ppt.has_any_properties());
+    // Explicit add is idempotent (returns existing parts).
     ppt.add_presentation_properties().unwrap();
     ppt.add_view_properties().unwrap();
     assert!(ppt.has_any_properties());
@@ -9738,13 +9742,18 @@ fn excel_function_groups_word_note_props_ppt_default_text_style() {
 
     let mut ppt =
         PresentationDocument::create_in_memory(PresentationDocumentType::Presentation).unwrap();
-    ppt.add_slide_with_text("A").unwrap();
+    // Empty presentation has no defaultTextStyle until a slide rewrites it.
     assert!(!ppt.has_default_text_style().unwrap());
-    ppt.ensure_default_text_style().unwrap();
+    ppt.add_slide_with_text("A").unwrap();
+    // rewrite_presentation injects Office defaultTextStyle for robust open.
     assert!(ppt.has_default_text_style().unwrap());
     ppt.ensure_default_text_style().unwrap(); // idempotent
+    assert!(ppt.has_default_text_style().unwrap());
     assert!(ppt.clear_default_text_style().unwrap());
     assert!(!ppt.has_default_text_style().unwrap());
+    // ensure re-adds after clear
+    ppt.ensure_default_text_style().unwrap();
+    assert!(ppt.has_default_text_style().unwrap());
 }
 
 
