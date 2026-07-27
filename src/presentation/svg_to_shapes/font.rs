@@ -47,7 +47,72 @@ impl FontDb {
         let mut faces: HashMap<String, HashMap<String, FontFace>> = HashMap::new();
         let mut aliases = HashMap::new();
 
-        let candidates: &[(&str, &str, &str)] = &[
+        // Paths are tried in order; first existing file wins per (family, style).
+        // Bundled faces ship in assets/fonts so Windows/macOS CI (and hosts without
+        // Liberation/DejaVu packages) still measure and outline Latin text.
+        let bundled = |name: &str| -> String {
+            format!("{}/assets/fonts/{name}", env!("CARGO_MANIFEST_DIR"))
+        };
+        let mut candidates: Vec<(String, String, String)> = Vec::new();
+        let push = |c: &mut Vec<(String, String, String)>, fam: &str, style: &str, path: String| {
+            c.push((fam.into(), style.into(), path));
+        };
+
+        // --- Bundled Latin (always available in the checkout) ---
+        push(
+            &mut candidates,
+            "liberation sans",
+            "regular",
+            bundled("LiberationSans-Regular.ttf"),
+        );
+        push(
+            &mut candidates,
+            "liberation sans",
+            "bold",
+            bundled("LiberationSans-Bold.ttf"),
+        );
+        push(
+            &mut candidates,
+            "liberation serif",
+            "regular",
+            bundled("LiberationSerif-Regular.ttf"),
+        );
+        push(
+            &mut candidates,
+            "liberation serif",
+            "bold",
+            bundled("LiberationSerif-Bold.ttf"),
+        );
+        push(
+            &mut candidates,
+            "dejavu sans",
+            "regular",
+            bundled("DejaVuSans.ttf"),
+        );
+        push(
+            &mut candidates,
+            "dejavu sans",
+            "bold",
+            bundled("DejaVuSans-Bold.ttf"),
+        );
+        // Bundled TrueType Noto Sans SC (Source Han Sans SC) for EOT embedding.
+        // Prefer these over system Noto CJK TTC/OTTO (MS PowerPoint rejects many
+        // CFF extracts) and over Droid (fsType=8 restricted embedding).
+        push(
+            &mut candidates,
+            "noto sans sc",
+            "regular",
+            bundled("NotoSansSC-Regular.ttf"),
+        );
+        push(
+            &mut candidates,
+            "noto sans sc",
+            "bold",
+            bundled("NotoSansSC-Bold.ttf"),
+        );
+
+        // --- Linux system fonts (optional; skip if already loaded from bundle) ---
+        for (fam, style, path) in [
             (
                 "noto sans cjk sc",
                 "regular",
@@ -118,7 +183,6 @@ impl FontDb {
                 "bold",
                 "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
             ),
-            // Liberation Serif ≈ Times New Roman metrics (default Latin when SVG omits font).
             (
                 "liberation serif",
                 "regular",
@@ -139,30 +203,88 @@ impl FontDb {
                 "bold",
                 "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf",
             ),
-            // Bundled TrueType Noto Sans SC (Source Han Sans SC) for EOT embedding.
-            // Prefer these over system Noto CJK TTC/OTTO (MS PowerPoint rejects many
-            // CFF extracts) and over Droid (fsType=8 restricted embedding).
+            // Windows core fonts (CI runners + desktop).
             (
-                "noto sans sc",
+                "liberation sans",
                 "regular",
-                concat!(env!("CARGO_MANIFEST_DIR"), "/assets/fonts/NotoSansSC-Regular.ttf"),
+                r"C:\Windows\Fonts\arial.ttf",
             ),
             (
-                "noto sans sc",
+                "liberation sans",
                 "bold",
-                concat!(env!("CARGO_MANIFEST_DIR"), "/assets/fonts/NotoSansSC-Bold.ttf"),
+                r"C:\Windows\Fonts\arialbd.ttf",
             ),
-        ];
+            (
+                "liberation serif",
+                "regular",
+                r"C:\Windows\Fonts\times.ttf",
+            ),
+            (
+                "liberation serif",
+                "bold",
+                r"C:\Windows\Fonts\timesbd.ttf",
+            ),
+            (
+                "dejavu sans",
+                "regular",
+                r"C:\Windows\Fonts\arial.ttf",
+            ),
+            // macOS system UI fonts (Helvetica / Arial / Times).
+            (
+                "liberation sans",
+                "regular",
+                "/System/Library/Fonts/Supplemental/Arial.ttf",
+            ),
+            (
+                "liberation sans",
+                "bold",
+                "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            ),
+            (
+                "liberation serif",
+                "regular",
+                "/System/Library/Fonts/Supplemental/Times New Roman.ttf",
+            ),
+            (
+                "liberation serif",
+                "bold",
+                "/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf",
+            ),
+            (
+                "liberation sans",
+                "regular",
+                "/Library/Fonts/Arial.ttf",
+            ),
+            (
+                "liberation sans",
+                "bold",
+                "/Library/Fonts/Arial Bold.ttf",
+            ),
+            (
+                "dejavu sans",
+                "regular",
+                "/System/Library/Fonts/Supplemental/Arial.ttf",
+            ),
+        ] {
+            push(&mut candidates, fam, style, path.into());
+        }
 
-        for (family, style, path) in candidates {
+        for (family, style, path) in &candidates {
             let path = Path::new(path);
             if !path.exists() {
                 continue;
             }
+            // First hit wins — keep bundled faces preferred over system aliases.
+            if faces
+                .get(family.as_str())
+                .is_some_and(|m| m.contains_key(style.as_str()))
+            {
+                continue;
+            }
             if let Ok(data) = std::fs::read(path) {
                 let face_index = pick_face_index(&data, family);
-                faces.entry((*family).into()).or_default().insert(
-                    (*style).into(),
+                faces.entry(family.clone()).or_default().insert(
+                    style.clone(),
                     FontFace {
                         path: path.to_path_buf(),
                         index: face_index,
